@@ -1,0 +1,425 @@
+"use client";
+
+import React, { useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import {
+  ArrowLeft,
+  Upload,
+  Plus,
+  FileSpreadsheet,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  Users,
+  Calendar,
+  BarChart3,
+  Check,
+  Search,
+} from "lucide-react";
+import {
+  MOCK_CLASSES,
+  MOCK_STUDENTS_8B,
+} from "@/contracts/mocks/attendanceMocks";
+import { Student } from "@/contracts/attendance";
+
+interface CsvPreviewItem {
+  row: number;
+  nis: string;
+  nama: string;
+  jk: "L" | "P" | "-";
+  isValid: boolean;
+  error?: string;
+}
+
+/**
+ * Halaman Detail Kelas & Impor Siswa CSV (L6 & L7 Stitch)
+ */
+export default function ClassDetailPage() {
+  const params = useParams();
+  const classId = params.id as string;
+  const currentClass =
+    MOCK_CLASSES.find((c) => c.id === classId) ?? MOCK_CLASSES[1];
+
+  const [activeTab, setActiveTab] = useState<"siswa" | "riwayat" | "rekap">("siswa");
+  const [students, setStudents] = useState<Student[]>(MOCK_STUDENTS_8B);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // State Modal Impor CSV
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
+  const [csvStep, setCsvStep] = useState<1 | 2>(1);
+  const [csvPreview, setCsvPreview] = useState<CsvPreviewItem[]>([]);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Filter siswa
+  const filteredStudents = students.filter(
+    (s) =>
+      s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (s.nis && s.nis.includes(searchQuery))
+  );
+
+  // Unduh Templat CSV Contoh (PRD §5 FR-3)
+  const handleDownloadTemplate = () => {
+    const templateContent =
+      "\uFEFFnis,nama,jk\r\n260835,Ahmad Fauzan Pratama,L\r\n260836,Citra Kirana Dewi,P\r\n260837,Danu Wijaya,L\r\n";
+    const blob = new Blob([templateContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "templat-impor-siswa.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Simulasi parsing berkas CSV dengan pratinjau validasi per baris (L7 Stitch)
+  const handleSimulateUpload = () => {
+    const mockParsed: CsvPreviewItem[] = [
+      { row: 1, nis: "260835", nama: "Ahmad Fauzan Pratama", jk: "L", isValid: true },
+      { row: 2, nis: "260836", nama: "Citra Kirana Dewi", jk: "P", isValid: true },
+      { row: 3, nis: "260837", nama: "Danu Wijaya", jk: "L", isValid: true },
+      { row: 4, nis: "260801", nama: "Eka Saputra", jk: "L", isValid: false, error: "NIS 260801 sudah dipakai di kelas ini" },
+      { row: 5, nis: "260838", nama: "", jk: "P", isValid: false, error: "Nama siswa tidak boleh kosong" },
+    ];
+    setCsvPreview(mockParsed);
+    setCsvStep(2);
+  };
+
+  // Konfirmasi Impor Baris yang Valid
+  const handleCommitImport = () => {
+    const validRows = csvPreview.filter((item) => item.isValid);
+    const newStudents: Student[] = validRows.map((item) => ({
+      id: `std-imported-${Date.now()}-${item.row}`,
+      classId: currentClass.id,
+      nis: item.nis,
+      fullName: item.nama,
+      gender: item.jk === "-" ? null : item.jk,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    }));
+
+    setStudents((prev) => [...prev, ...newStudents]);
+    setIsCsvModalOpen(false);
+    setCsvStep(1);
+    setCsvPreview([]);
+    setToastMessage(`Berhasil mengimpor ${validRows.length} siswa ke kelas ${currentClass.name}`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Toast Notifikasi */}
+      {toastMessage && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[var(--status-hadir-fg)] text-white px-4 py-2.5 rounded-[12px] shadow-lg flex items-center gap-2 text-sm font-semibold animate-in fade-in slide-in-from-top-4">
+          <CheckCircle2 className="w-5 h-5" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Navigasi Kembali */}
+      <div className="flex items-center justify-between">
+        <Link
+          href="/classes"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] min-h-[44px] py-2"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Daftar Kelas</span>
+        </Link>
+        <span className="text-xs px-2.5 py-1 rounded-[6px] bg-[var(--surface-recessed)] text-[var(--text-secondary)] font-mono">
+          {currentClass.academicYear}
+        </span>
+      </div>
+
+      {/* Judul & Detail Kelas */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[var(--text-primary)]">
+            Kelas {currentClass.name}
+          </h1>
+          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+            Tahun Ajaran {currentClass.academicYear} · Semester {currentClass.semester ?? 1} · {students.length} Siswa
+          </p>
+        </div>
+
+        {/* Tombol Impor & Tambah Siswa */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setIsCsvModalOpen(true);
+              setCsvStep(1);
+            }}
+            className="min-h-[44px] px-3.5 py-2 bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-[var(--text-primary)] font-semibold rounded-[10px] text-xs flex items-center gap-1.5 transition-all shadow-xs active:scale-[0.98]"
+          >
+            <Upload className="w-4 h-4 text-[var(--color-accent)]" />
+            <span>Impor CSV</span>
+          </button>
+
+          <Link
+            href={`/attendance/${currentClass.id}`}
+            className="min-h-[44px] px-3.5 py-2 bg-[var(--color-accent)] text-[var(--color-on-accent)] font-semibold rounded-[10px] text-xs flex items-center gap-1.5 hover:opacity-95 active:scale-[0.98] transition-all shadow-xs"
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Mulai Absen</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Segmented Top Tabs: Siswa | Riwayat | Rekap (L6 Stitch) */}
+      <div className="p-1 bg-[var(--surface-recessed)] rounded-[12px] flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setActiveTab("siswa")}
+          className={`flex-1 min-h-[38px] rounded-[9px] text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+            activeTab === "siswa"
+              ? "bg-[var(--surface-card)] text-[var(--text-primary)] shadow-xs"
+              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Siswa ({students.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("riwayat")}
+          className={`flex-1 min-h-[38px] rounded-[9px] text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+            activeTab === "riwayat"
+              ? "bg-[var(--surface-card)] text-[var(--text-primary)] shadow-xs"
+              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          <span>Riwayat Kalender</span>
+        </button>
+
+        <Link
+          href="/reports"
+          className="flex-1 min-h-[38px] rounded-[9px] text-xs font-semibold flex items-center justify-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>Rekap Bulanan</span>
+        </Link>
+      </div>
+
+      {/* Konten Tab Siswa */}
+      {activeTab === "siswa" && (
+        <div className="flex flex-col gap-3">
+          {/* Kolom Pencarian Siswa */}
+          <div className="relative">
+            <Search className="w-4 h-4 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari nama atau NIS siswa..."
+              className="w-full min-h-[44px] pl-9 pr-4 py-2 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[10px] text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] shadow-xs"
+            />
+          </div>
+
+          {/* Daftar Siswa */}
+          <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] divide-y divide-[var(--border-hairline)] overflow-hidden shadow-xs">
+            {filteredStudents.map((student, idx) => (
+              <div
+                key={student.id}
+                className="p-3.5 flex items-center justify-between gap-3 hover:bg-[var(--surface-recessed)]/50 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="font-mono text-xs text-[var(--text-secondary)] w-6 text-center shrink-0">
+                    {String(idx + 1).padStart(2, "0")}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm text-[var(--text-primary)] truncate">
+                      {student.fullName}
+                    </p>
+                    <p className="text-xs text-[var(--text-secondary)] font-mono">
+                      NIS {student.nis ?? "-"} · {student.gender === "L" ? "Laki-laki" : "Perempuan"}
+                    </p>
+                  </div>
+                </div>
+
+                <span className="text-[11px] px-2 py-0.5 rounded-[6px] bg-[var(--status-hadir-bg)] text-[var(--status-hadir-fg)] font-semibold shrink-0">
+                  Aktif
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Konten Tab Riwayat Kalender */}
+      {activeTab === "riwayat" && (
+        <div className="p-5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] flex flex-col gap-4 shadow-xs">
+          <div>
+            <h2 className="text-base font-bold text-[var(--text-primary)]">
+              Kalender Kehadiran (September 2026)
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              Titik hijau menandai tanggal sesi presensi yang telah direkam.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1.5 text-center text-xs">
+            {["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"].map((day) => (
+              <span key={day} className="font-bold text-[var(--text-secondary)] py-1">
+                {day}
+              </span>
+            ))}
+            {/* Tanggal 1 s/d 30 */}
+            {Array.from({ length: 30 }).map((_, i) => {
+              const day = i + 1;
+              const isWeekend = (day % 7 === 6) || (day % 7 === 0);
+              const isAttended = !isWeekend && day <= 29;
+              const isToday = day === 29;
+
+              return (
+                <div
+                  key={day}
+                  className={`p-2 rounded-[8px] flex flex-col items-center justify-center min-h-[44px] border ${
+                    isToday
+                      ? "border-[var(--color-accent)] font-bold bg-[var(--surface-recessed)]"
+                      : "border-[var(--border-hairline)]/40"
+                  } ${isWeekend ? "opacity-30 bg-black/5" : ""}`}
+                >
+                  <span className="font-mono text-xs">{day}</span>
+                  {isAttended && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--status-hadir-fg)] mt-1" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Modal / Bottom Sheet Impor CSV (L7 Stitch) */}
+      {isCsvModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[16px] p-5 shadow-xl flex flex-col gap-4 max-h-[85vh] overflow-hidden">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-hairline)]">
+              <div>
+                <h2 className="text-base font-bold text-[var(--text-primary)]">
+                  Impor Siswa dari CSV
+                </h2>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Kelas {currentClass.name}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCsvModalOpen(false)}
+                className="w-8 h-8 rounded-full hover:bg-[var(--surface-recessed)] flex items-center justify-center text-[var(--text-secondary)]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Langkah 1: Pilih Berkas & Unduh Templat */}
+            {csvStep === 1 && (
+              <div className="flex flex-col gap-4">
+                <div
+                  onClick={handleSimulateUpload}
+                  className="border-2 border-dashed border-[var(--border-hairline)] hover:border-[var(--color-accent)] rounded-[14px] p-8 text-center cursor-pointer transition-colors bg-[var(--surface-recessed)]/40 flex flex-col items-center justify-center gap-2"
+                >
+                  <div className="w-12 h-12 rounded-full bg-[var(--surface-recessed)] text-[var(--color-accent)] flex items-center justify-center">
+                    <FileSpreadsheet className="w-6 h-6" />
+                  </div>
+                  <p className="font-semibold text-sm text-[var(--text-primary)]">
+                    Pilih Berkas CSV Siswa
+                  </p>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Klik di sini untuk mengunggah berkas (.csv)
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <span className="text-[var(--text-secondary)]">
+                    Format kolom: <code className="font-mono">nis,nama,jk</code>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="font-semibold text-[var(--color-accent)] hover:underline flex items-center gap-1"
+                  >
+                    Unduh Templat CSV
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Langkah 2: Pratinjau Validasi Baris (L7 Stitch) */}
+            {csvStep === 2 && (
+              <div className="flex flex-col gap-3 overflow-hidden flex-1">
+                <div className="p-2.5 rounded-[10px] bg-[var(--surface-recessed)] flex items-center justify-between text-xs">
+                  <span className="font-semibold text-[var(--status-hadir-fg)] flex items-center gap-1">
+                    <CheckCircle2 className="w-4 h-4" />
+                    3 Baris Valid
+                  </span>
+                  <span className="font-semibold text-[var(--status-alpa-fg)] flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    2 Perlu Diperbaiki
+                  </span>
+                </div>
+
+                {/* Tabel Pratinjau Baris */}
+                <div className="overflow-y-auto max-h-[300px] border border-[var(--border-hairline)] rounded-[10px] divide-y divide-[var(--border-hairline)] text-xs">
+                  {csvPreview.map((item) => (
+                    <div
+                      key={item.row}
+                      className={`p-2.5 flex items-start justify-between gap-2 ${
+                        item.isValid ? "bg-white" : "bg-[var(--status-alpa-bg)]/20"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="font-mono text-[var(--text-secondary)] w-6">
+                          #{item.row}
+                        </span>
+                        <div>
+                          <p className="font-semibold text-[var(--text-primary)]">
+                            {item.nama || <span className="italic text-[var(--status-alpa-fg)]">(Nama Kosong)</span>}
+                          </p>
+                          <p className="text-[11px] text-[var(--text-secondary)] font-mono">
+                            NIS: {item.nis} · JK: {item.jk}
+                          </p>
+                          {!item.isValid && (
+                            <p className="text-[11px] text-[var(--status-alpa-fg)] font-medium mt-0.5">
+                              {item.error}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {item.isValid ? (
+                        <Check className="w-4 h-4 text-[var(--status-hadir-fg)] shrink-0 mt-1" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-[var(--status-alpa-fg)] shrink-0 mt-1" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Tombol Aksi Impor */}
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-hairline)]">
+                  <button
+                    type="button"
+                    onClick={() => setCsvStep(1)}
+                    className="min-h-[40px] px-4 rounded-[10px] text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-recessed)]"
+                  >
+                    Unggah Ulang
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCommitImport}
+                    className="min-h-[40px] px-4 rounded-[10px] text-xs font-bold bg-[var(--color-accent)] text-[var(--color-on-accent)] shadow-xs"
+                  >
+                    Impor 3 Siswa Valid
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

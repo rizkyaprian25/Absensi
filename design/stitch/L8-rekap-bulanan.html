@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+
+<html lang="id"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Rekap Kehadiran - Kelas VIII-B</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100..900&family=Plus+Jakarta+Sans:wght@100..900&display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-surface": "#181c1a",
+            "secondary": "#59605c",
+            "outline": "#6f7a73",
+            "on-tertiary": "#ffffff",
+            "on-secondary-fixed": "#161d1a",
+            "inverse-on-surface": "#eef1ee",
+            "error-container": "#ffdad6",
+            "on-primary-fixed": "#002115",
+            "surface-container-lowest": "#ffffff",
+            "primary-fixed-dim": "#86d6b4",
+            "on-primary-container": "#97e8c5",
+            "on-secondary-container": "#5f6662",
+            "on-primary": "#ffffff",
+            "inverse-surface": "#2d312f",
+            "on-tertiary-fixed": "#3c0707",
+            "on-error-container": "#93000a",
+            "surface-variant": "#e0e3e0",
+            "primary-container": "#0f6b4f",
+            "tertiary-container": "#924843",
+            "tertiary-fixed": "#ffdad6",
+            "primary": "#00513a",
+            "surface-container-low": "#f1f4f1",
+            "on-error": "#ffffff",
+            "surface": "#f7faf6",
+            "tertiary": "#75312d",
+            "secondary-fixed-dim": "#c1c8c3",
+            "secondary-fixed": "#dde4df",
+            "inverse-primary": "#86d6b4",
+            "primary-fixed": "#a1f3cf",
+            "on-secondary": "#ffffff",
+            "tertiary-fixed-dim": "#ffb3ad",
+            "surface-dim": "#d8dbd7",
+            "background": "#f7faf6",
+            "on-surface-variant": "#3f4944",
+            "on-tertiary-fixed-variant": "#75322e",
+            "on-background": "#181c1a",
+            "surface-container-highest": "#e0e3e0",
+            "secondary-container": "#dde4df",
+            "on-primary-fixed-variant": "#00513a",
+            "outline-variant": "#bec9c2",
+            "surface-tint": "#106b4f",
+            "surface-container": "#ecefeb",
+            "on-tertiary-container": "#ffccc7",
+            "error": "#ba1a1a",
+            "surface-container-high": "#e6e9e5",
+            "surface-bright": "#f7faf6",
+            "on-secondary-fixed-variant": "#414845"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xs": "0.25rem",
+            "space-xl": "1.5rem",
+            "margin": "1rem",
+            "gutter": "0.75rem",
+            "space-sm": "0.5rem",
+            "space-lg": "1rem",
+            "space-md": "0.75rem"
+          },
+          "fontFamily": {
+            "label-ledger": ["JetBrains Mono"],
+            "headline-sm": ["Plus Jakarta Sans"],
+            "headline-md": ["Plus Jakarta Sans"],
+            "headline-lg": ["Plus Jakarta Sans"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "label-code": ["JetBrains Mono"],
+            "body-md": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"]
+          },
+          "fontSize": {
+            "label-ledger": ["13px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+            "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+            "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "headline-lg": ["28px", { "lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "label-code": ["11px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "500" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "body-lg": ["16px", { "lineHeight": "22px", "fontWeight": "500" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+      font-size: 20px;
+      line-height: 1;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    /* Thin hairline borders to mimic book stationery ruled lines */
+    .ledger-ruled {
+      box-shadow: inset 0 -1px 0 #E2DED3;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      height: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: #EFECE4;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #bec9c2;
+      border-radius: 2px;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface antialiased min-h-screen selection:bg-primary-fixed selection:text-on-primary-fixed flex justify-center">
+<!-- Mobile Frame Container (440px max-width boundary) -->
+<div class="w-full max-w-[440px] bg-background min-h-screen flex flex-col relative pb-28">
+<!-- Top App Bar (Shared Component Anchor) -->
+<header class="bg-surface dark:bg-surface border-b border-outline-variant dark:border-outline flat no shadows sticky top-0 z-40">
+<div class="flex justify-between items-center w-full max-w-[440px] mx-auto px-margin h-14">
+<!-- Leading: Back Action & Title cluster -->
+<div class="flex items-center gap-space-sm">
+<button aria-label="Kembali" class="w-9 h-9 flex items-center justify-center rounded-lg text-secondary hover:bg-surface-container active:opacity-80 transition-opacity" type="button">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<div class="flex items-center gap-2">
+<h1 class="text-headline-sm font-headline-sm font-semibold text-primary dark:text-primary-fixed">Rekap Kehadiran</h1>
+<span class="font-label-ledger text-label-ledger bg-surface-container px-2 py-0.5 rounded border border-outline-variant text-on-surface">VIII-B</span>
+</div>
+</div>
+<!-- Trailing: Quick Print Action -->
+<button aria-label="Cetak Lembar" class="w-9 h-9 flex items-center justify-center rounded-lg text-primary dark:text-primary-fixed hover:bg-surface-container active:opacity-80 transition-opacity" type="button">
+<span class="material-symbols-outlined">print</span>
+</button>
+</div>
+</header>
+<!-- Sub-Header Utility Actions Strip -->
+<section class="px-margin pt-space-md pb-space-xs flex items-center justify-between">
+<div class="flex items-center gap-1.5 text-secondary">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+<span class="font-body-sm text-body-sm font-medium">Buku Register Resmi</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<button class="flex items-center gap-1 bg-surface-container-lowest border border-outline-variant text-on-surface font-body-sm text-body-sm font-semibold px-2.5 py-1.5 rounded-lg active:scale-95 transition-transform duration-100 hover:bg-surface-container" type="button">
+<span class="material-symbols-outlined text-[16px] text-primary">download</span>
+<span>Unduh CSV</span>
+</button>
+<button class="flex items-center gap-1 bg-surface-container-lowest border border-outline-variant text-on-surface font-body-sm text-body-sm font-semibold px-2.5 py-1.5 rounded-lg active:scale-95 transition-transform duration-100 hover:bg-surface-container" type="button">
+<span class="material-symbols-outlined text-[16px] text-secondary">tune</span>
+<span>Filter</span>
+</button>
+</div>
+</section>
+<!-- Month Navigator Strip -->
+<section class="px-margin my-space-sm">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3 flex items-center justify-between">
+<button aria-label="Bulan Sebelumnya" class="w-8 h-8 flex items-center justify-center rounded-lg border border-outline-variant bg-surface hover:bg-surface-container active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-secondary">chevron_left</span>
+</button>
+<div class="text-center">
+<h2 class="font-headline-sm text-headline-sm font-bold text-on-surface">September 2026</h2>
+<p class="font-label-code text-label-code text-secondary tracking-tight">Tahun Ajaran 2026/2027 · Semester Ganjil</p>
+</div>
+<button aria-label="Bulan Berikutnya" class="w-8 h-8 flex items-center justify-center rounded-lg border border-outline-variant bg-surface hover:bg-surface-container active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-secondary">chevron_right</span>
+</button>
+</div>
+</section>
+<!-- Overview Summary Ledger Card (Stationery aesthetic) -->
+<section class="px-margin mb-space-md">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<div class="flex items-center justify-between pb-3 border-b border-outline-variant">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[18px]">analytics</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">Ikhtisar Bulanan</span>
+</div>
+<span class="font-label-code text-label-code text-secondary">32 Siswa Terdaftar</span>
+</div>
+<!-- 3 Metrics Grid -->
+<div class="grid grid-cols-3 gap-2 py-3 border-b border-outline-variant">
+<!-- Metric 1 -->
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-secondary">Rata-rata</span>
+<span class="font-label-ledger text-[20px] leading-6 font-bold text-primary mt-1">94,8%</span>
+<span class="font-label-code text-[10px] text-secondary mt-0.5">Target: 90%</span>
+</div>
+<!-- Metric 2 -->
+<div class="flex flex-col border-l border-outline-variant pl-2.5">
+<span class="font-body-sm text-body-sm text-secondary">Hari Efektif</span>
+<span class="font-label-ledger text-[20px] leading-6 font-bold text-on-surface mt-1">21 Hari</span>
+<span class="font-label-code text-[10px] text-secondary mt-0.5">4 Pekan KBM</span>
+</div>
+<!-- Metric 3 -->
+<div class="flex flex-col border-l border-outline-variant pl-2.5">
+<span class="font-body-sm text-body-sm text-secondary">Perhatian</span>
+<div class="mt-1">
+<span class="font-label-ledger text-label-ledger font-semibold text-error bg-error-container/40 px-1.5 py-0.5 rounded border border-error-container inline-block">1 Siswa</span>
+</div>
+<span class="font-label-code text-[10px] text-tertiary mt-0.5">< 85% Hadir</span>
+</div>
+</div>
+<!-- Sub-alert Note Box -->
+<div class="mt-3 bg-surface-container-low rounded-lg p-2.5 border border-outline-variant flex items-start gap-2">
+<span class="material-symbols-outlined text-error text-[18px] shrink-0 mt-0.5">info</span>
+<p class="font-body-sm text-body-sm text-on-surface">
+<span class="font-semibold text-on-surface">Farhan Maulana</span> memiliki persentase di bawah ambang batas (71,4%). Diperlukan koordinasi Guru BP/BK.
+          </p>
+</div>
+</div>
+</section>
+<!-- Legend / Keterangan Kode Strip -->
+<section class="px-margin mb-space-sm">
+<div class="flex items-center justify-between bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-on-surface">
+<span class="font-label-code text-label-code text-secondary uppercase font-semibold">Kode:</span>
+<div class="flex items-center gap-2">
+<div class="flex items-center gap-1">
+<span class="w-5 h-5 rounded flex items-center justify-center font-label-code text-label-code font-bold bg-primary-fixed text-on-primary-fixed border border-primary-fixed-dim">H</span>
+<span class="font-body-sm text-body-sm text-secondary">Hadir</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="w-5 h-5 rounded flex items-center justify-center font-label-code text-label-code font-bold bg-secondary-fixed text-on-secondary-fixed border border-secondary-fixed-dim">S</span>
+<span class="font-body-sm text-body-sm text-secondary">Sakit</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="w-5 h-5 rounded flex items-center justify-center font-label-code text-label-code font-bold bg-surface-container-highest text-on-surface-variant border border-outline-variant">I</span>
+<span class="font-body-sm text-body-sm text-secondary">Izin</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="w-5 h-5 rounded flex items-center justify-center font-label-code text-label-code font-bold bg-error-container text-on-error-container border border-error">A</span>
+<span class="font-body-sm text-body-sm text-secondary">Alpa</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Ledger Table Matrix Section -->
+<section class="px-margin mb-space-lg">
+<div class="flex items-center justify-between mb-1.5">
+<h3 class="font-body-md text-body-md font-bold text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[18px]">table_chart</span>
+<span>Matriks Presensi Harian</span>
+</h3>
+<span class="font-label-code text-label-code text-secondary">Geser kanan →</span>
+</div>
+<!-- Matrix Ledger Frame -->
+<div class="border border-outline-variant rounded-xl bg-surface-container-lowest overflow-hidden shadow-none">
+<div class="overflow-x-auto custom-scroll relative">
+<table class="w-full text-left border-collapse border-spacing-0">
+<!-- Table Header -->
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant">
+<!-- Sticky Left: Student Name Header -->
+<th class="sticky left-0 z-20 bg-surface-container-low px-3 py-2.5 font-label-code text-label-code font-bold text-on-surface border-r border-outline-variant min-w-[150px] max-w-[150px]" scope="col">
+                  No. & Siswa
+                </th>
+<!-- Date Columns -->
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">01</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">02</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">03</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">04</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">05</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">08</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">09</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">10</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">11</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">12</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">15</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">16</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">17</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">18</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">19</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">22</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">23</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">24</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">25</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">26</th>
+<th class="px-1.5 py-2 text-center font-label-code text-[10px] text-secondary border-r border-outline-variant/60 min-w-[28px]">29</th>
+<!-- Trailing Summary Headers -->
+<th class="px-2 py-2 text-center font-label-code text-[11px] font-bold text-on-surface bg-surface-container-high border-l border-r border-outline-variant min-w-[34px]">H</th>
+<th class="px-2 py-2 text-center font-label-code text-[11px] font-bold text-on-surface bg-surface-container-high border-r border-outline-variant min-w-[34px]">S</th>
+<th class="px-2 py-2 text-center font-label-code text-[11px] font-bold text-on-surface bg-surface-container-high border-r border-outline-variant min-w-[34px]">I</th>
+<th class="px-2 py-2 text-center font-label-code text-[11px] font-bold text-on-surface bg-surface-container-high border-r border-outline-variant min-w-[34px]">A</th>
+<th class="px-3 py-2 text-center font-label-code text-[11px] font-bold text-on-surface bg-surface-container-high min-w-[64px]">% Hadir</th>
+</tr>
+</thead>
+<!-- Table Body Rows -->
+<tbody class="divide-y divide-outline-variant text-[11px] font-label-ledger">
+<!-- Siswa 01: Aisyah -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="sticky left-0 z-10 bg-surface-container-lowest border-r border-outline-variant px-3 py-2">
+<div class="flex items-center gap-1.5">
+<span class="text-secondary font-label-code">01</span>
+<div class="truncate">
+<p class="font-body-sm font-semibold text-on-surface truncate">Aisyah Putri R.</p>
+<p class="font-label-code text-[9px] text-secondary">23240801</p>
+</div>
+</div>
+</td>
+<!-- 21 Dates (All Hadir except 1 Sakit) -->
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-secondary-fixed text-on-secondary-fixed font-bold">S</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<!-- Summaries -->
+<td class="p-1 text-center font-bold text-on-surface bg-surface-container border-l border-r border-outline-variant">20</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">1</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">0</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">0</td>
+<td class="p-1 text-center font-bold text-primary bg-surface-container">95,2%</td>
+</tr>
+<!-- Siswa 02: Bagas -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="sticky left-0 z-10 bg-surface-container-lowest border-r border-outline-variant px-3 py-2">
+<div class="flex items-center gap-1.5">
+<span class="text-secondary font-label-code">02</span>
+<div class="truncate">
+<p class="font-body-sm font-semibold text-on-surface truncate">Bagas Setiawan</p>
+<p class="font-label-code text-[9px] text-secondary">23240802</p>
+</div>
+</div>
+</td>
+<!-- 21 Dates (All Hadir) -->
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<!-- Summaries -->
+<td class="p-1 text-center font-bold text-on-surface bg-surface-container border-l border-r border-outline-variant">21</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">0</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">0</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">0</td>
+<td class="p-1 text-center font-bold text-primary bg-surface-container">100%</td>
+</tr>
+<!-- Siswa 03: Dimas -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="sticky left-0 z-10 bg-surface-container-lowest border-r border-outline-variant px-3 py-2">
+<div class="flex items-center gap-1.5">
+<span class="text-secondary font-label-code">03</span>
+<div class="truncate">
+<p class="font-body-sm font-semibold text-on-surface truncate">Dimas Anggara</p>
+<p class="font-label-code text-[9px] text-secondary">23240803</p>
+</div>
+</div>
+</td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-surface-container-highest text-on-surface-variant font-bold">I</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<!-- Summaries -->
+<td class="p-1 text-center font-bold text-on-surface bg-surface-container border-l border-r border-outline-variant">20</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">0</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">1</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">0</td>
+<td class="p-1 text-center font-bold text-primary bg-surface-container">95,2%</td>
+</tr>
+<!-- Siswa 04: Farhan Maulana (Perlu Perhatian) -->
+<tr class="bg-error-container/10 hover:bg-error-container/20 transition-colors">
+<td class="sticky left-0 z-10 bg-surface-container-lowest border-r border-outline-variant px-3 py-2">
+<div class="flex items-center gap-1.5">
+<span class="text-secondary font-label-code">04</span>
+<div class="truncate">
+<div class="flex items-center gap-1">
+<p class="font-body-sm font-semibold text-on-surface truncate">Farhan Maulana</p>
+</div>
+<div class="flex items-center gap-1">
+<span class="font-label-code text-[9px] text-secondary">23240804</span>
+<span class="font-label-code text-[8px] bg-error-container text-on-error-container font-semibold px-1 rounded">Perhatian</span>
+</div>
+</div>
+</div>
+</td>
+<!-- 21 Dates (Farhan: 15 Hadir, 3 Sakit, 2 Izin, 1 Alpa = 71,4%) -->
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-secondary-fixed text-on-secondary-fixed font-bold">S</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-secondary-fixed text-on-secondary-fixed font-bold">S</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-surface-container-highest text-on-surface-variant font-bold">I</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-error-container text-on-error-container font-bold">A</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-secondary-fixed text-on-secondary-fixed font-bold">S</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-surface-container-highest text-on-surface-variant font-bold">I</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<!-- Summaries Farhan -->
+<td class="p-1 text-center font-bold text-on-surface bg-surface-container border-l border-r border-outline-variant">15</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">3</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">2</td>
+<td class="p-1 text-center font-bold text-error bg-surface-container border-r border-outline-variant">1</td>
+<td class="p-1 text-center font-bold text-error bg-error-container/20">71,4%</td>
+</tr>
+<!-- Siswa 05: Muhammad Rizky -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="sticky left-0 z-10 bg-surface-container-lowest border-r border-outline-variant px-3 py-2">
+<div class="flex items-center gap-1.5">
+<span class="text-secondary font-label-code">05</span>
+<div class="truncate">
+<p class="font-body-sm font-semibold text-on-surface truncate">Muhammad Rizky</p>
+<p class="font-label-code text-[9px] text-secondary">23240805</p>
+</div>
+</div>
+</td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-secondary-fixed text-on-secondary-fixed font-bold">S</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<!-- Summaries -->
+<td class="p-1 text-center font-bold text-on-surface bg-surface-container border-l border-r border-outline-variant">20</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">1</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">0</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">0</td>
+<td class="p-1 text-center font-bold text-primary bg-surface-container">95,2%</td>
+</tr>
+<!-- Siswa 06: Nadia Kusuma Wardani -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="sticky left-0 z-10 bg-surface-container-lowest border-r border-outline-variant px-3 py-2">
+<div class="flex items-center gap-1.5">
+<span class="text-secondary font-label-code">06</span>
+<div class="truncate">
+<p class="font-body-sm font-semibold text-on-surface truncate">Nadia Kusuma W.</p>
+<p class="font-label-code text-[9px] text-secondary">23240806</p>
+</div>
+</div>
+</td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<!-- Summaries -->
+<td class="p-1 text-center font-bold text-on-surface bg-surface-container border-l border-r border-outline-variant">21</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">0</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">0</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">0</td>
+<td class="p-1 text-center font-bold text-primary bg-surface-container">100%</td>
+</tr>
+<!-- Siswa 07: Salsabila Nur Azizah -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="sticky left-0 z-10 bg-surface-container-lowest border-r border-outline-variant px-3 py-2">
+<div class="flex items-center gap-1.5">
+<span class="text-secondary font-label-code">07</span>
+<div class="truncate">
+<p class="font-body-sm font-semibold text-on-surface truncate">Salsabila Nur A.</p>
+<p class="font-label-code text-[9px] text-secondary">23240807</p>
+</div>
+</div>
+</td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-surface-container-highest text-on-surface-variant font-bold">I</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<td class="p-1 text-center border-r border-outline-variant/40"><span class="inline-block w-5 h-5 leading-5 text-[10px] rounded bg-primary-fixed text-on-primary-fixed font-bold">H</span></td>
+<!-- Summaries -->
+<td class="p-1 text-center font-bold text-on-surface bg-surface-container border-l border-r border-outline-variant">20</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">0</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">1</td>
+<td class="p-1 text-center font-bold text-secondary bg-surface-container border-r border-outline-variant">0</td>
+<td class="p-1 text-center font-bold text-primary bg-surface-container">95,2%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<!-- Footer Validation & Archival Note -->
+<footer class="px-margin mb-6 text-center">
+<div class="py-3 border-t border-outline-variant">
+<p class="font-label-code text-[10px] text-secondary leading-normal">
+          Dicetak secara otomatis oleh Sistem Buku Presensi Digital<br/>
+          Terakhir diperbarui: 29 Sep 2026, 14:00 WIB · SMP Negeri 1 Nusantara
+        </p>
+</div>
+</footer>
+<!-- Bottom Navigation Bar (Shared Component Anchor) -->
+<!-- Tab list from JSON: ["Harian", "Jurnal", "Rekap", "Setelan"] with exact icons -->
+<!-- Current screen is 'Rekap', so it must be active -->
+<nav class="bg-surface dark:bg-surface border-t border-outline-variant dark:border-outline flat no shadows fixed bottom-0 left-0 right-0 w-full max-w-[440px] mx-auto z-50 flex justify-around items-center px-gutter py-2">
+<!-- Tab 1: Harian (Inactive) -->
+<a class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed py-1 hover:text-primary dark:hover:text-primary-fixed transition-colors active:scale-95 transition-transform duration-100" href="#">
+<span class="material-symbols-outlined">edit_calendar</span>
+<span class="text-label-code font-label-code uppercase tracking-wider text-[10px] mt-0.5">Harian</span>
+</a>
+<!-- Tab 2: Jurnal (Inactive) -->
+<a class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed py-1 hover:text-primary dark:hover:text-primary-fixed transition-colors active:scale-95 transition-transform duration-100" href="#">
+<span class="material-symbols-outlined">menu_book</span>
+<span class="text-label-code font-label-code uppercase tracking-wider text-[10px] mt-0.5">Jurnal</span>
+</a>
+<!-- Tab 3: Rekap (ACTIVE - Matched directly to 'Rekap Kehadiran') -->
+<a class="flex flex-col items-center justify-center text-primary dark:text-primary-fixed font-semibold py-1 active:scale-95 transition-transform duration-100" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">table_chart</span>
+<span class="text-label-code font-label-code uppercase tracking-wider text-[10px] mt-0.5 font-bold">Rekap</span>
+</a>
+<!-- Tab 4: Setelan (Inactive) -->
+<a class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed py-1 hover:text-primary dark:hover:text-primary-fixed transition-colors active:scale-95 transition-transform duration-100" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-label-code font-label-code uppercase tracking-wider text-[10px] mt-0.5">Setelan</span>
+</a>
+</nav>
+</div>
+</body></html>
