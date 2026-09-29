@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Palet Kertas & Tinta Dasar (Mode Terang) */
+    --bg-page: #F7F5F0;
+    --surface-card: #FFFFFF;
+    --surface-recessed: #EFECE4;
+    --border-hairline: #E2DED3;
+    --text-primary: #1B1F1D;
+    --text-secondary: #5B625E;
+    --color-accent: #0F6B4F;
+    --color-on-accent: #FFFFFF;
+
+    /* Status Kehadiran (Terang: Tint + Teks Kontras AA) */
+    --status-hadir-fg: #146C43;
+    --status-hadir-bg: #E3F3EA;
+    --status-sakit-fg: #1F5A9E;
+    --status-sakit-bg: #E2ECF8;
+    --status-izin-fg: #8F5A0C;
+    --status-izin-bg: #F8EDD6;
+    --status-alpa-fg: #A82A24;
+    --status-alpa-bg: #FBE4E2;
+    --status-terlambat-fg: #A24A0A;
+    --status-terlambat-bg: #FBE7D8;
+  }
+
+  .dark {
+    /* Palet Kertas & Tinta Dasar (Mode Gelap) */
+    --bg-page: #121412;
+    --surface-card: #1B1E1C;
+    --surface-recessed: #242825;
+    --border-hairline: #2E332F;
+    --text-primary: #ECEFEA;
+    --text-secondary: #A3AAA5;
+    --color-accent: #4FBF95;
+    --color-on-accent: #06261A;
+
+    /* Status Kehadiran (Gelap: Tint + Teks Kontras AA) */
+    --status-hadir-fg: #7FD9AC;
+    --status-hadir-bg: #163A29;
+    --status-sakit-fg: #8DB8EE;
+    --status-sakit-bg: #17304F;
+    --status-izin-fg: #E6B860;
+    --status-izin-bg: #40300F;
+    --status-alpa-fg: #F19A93;
+    --status-alpa-bg: #4A1C1A;
+    --status-terlambat-fg: #F0A46A;
+    --status-terlambat-bg: #45260F;
+  }
+
+  body {
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    font-family: var(--font-plus-jakarta-sans), system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+  }
+
+  /* Hindari horizontal scroll leak sesuai standar SOP §7.5 */
+  html, body {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  /* Font tabular nums untuk angka hitungan dan ID agar konsisten */
+  .font-tabular {
+    font-family: var(--font-jetbrains-mono), monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
