@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import {
   MOCK_CLASSES,
-  MOCK_STUDENTS_8B,
   getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
 import { Student } from "@/contracts/attendance";

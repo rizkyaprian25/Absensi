@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import {
   MOCK_CLASSES,
-  MOCK_MONTHLY_RECAP_8B,
+  getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
 
 /**
@@ -27,10 +27,66 @@ export default function ReportsPage() {
   const [selectedMonth, setSelectedMonth] = useState("2026-09");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Ambil data rekap
-  const recapData = MOCK_MONTHLY_RECAP_8B;
   const currentClass =
     MOCK_CLASSES.find((c) => c.id === selectedClassId) ?? MOCK_CLASSES[0];
+
+  // Ambil data siswa otentik untuk kelas terpilih
+  const classStudents = useMemo(() => {
+    return getStudentsForClass(selectedClassId);
+  }, [selectedClassId]);
+
+  // Data rekapitulasi bulanan dinamis sesuai kelas yang dipilih
+  const recapData = useMemo(() => {
+    const effectiveDates = [
+      "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04",
+      "2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11",
+      "2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18",
+      "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25",
+      "2026-09-28", "2026-09-29",
+    ];
+    const totalHari = effectiveDates.length;
+
+    const studentRecaps = classStudents.map((s, idx) => {
+      const isProblematic = idx === 11;
+      const hadir = isProblematic ? 15 : idx % 5 === 0 ? 19 : 20;
+      const sakit = isProblematic ? 1 : idx % 5 === 0 ? 1 : 0;
+      const izin = isProblematic ? 1 : 1;
+      const alpa = isProblematic ? 4 : 0;
+      const persentase = Number(((hadir / totalHari) * 100).toFixed(1));
+
+      return {
+        studentId: s.id,
+        nis: s.nis ?? null,
+        fullName: s.fullName,
+        hadir,
+        sakit,
+        izin,
+        alpa,
+        terlambat: 0,
+        totalHari,
+        persentaseKehadiran: persentase,
+        dailyStatus: {} as Record<string, string>,
+        needsAttention: persentase < 85,
+      };
+    });
+
+    const averageAttendance = Number(
+      (
+        studentRecaps.reduce((acc, curr) => acc + curr.persentaseKehadiran, 0) /
+        (studentRecaps.length || 1)
+      ).toFixed(1)
+    );
+
+    return {
+      classId: selectedClassId,
+      className: currentClass.name,
+      academicYear: currentClass.academicYear,
+      month: selectedMonth,
+      effectiveDates,
+      averageAttendance,
+      students: studentRecaps,
+    };
+  }, [classStudents, selectedClassId, currentClass, selectedMonth]);
 
   // Hitung jumlah siswa yang perlu perhatian (< 85% kehadiran)
   const studentsNeedingAttention = useMemo(() => {
@@ -56,8 +112,7 @@ export default function ReportsPage() {
     // Baris Siswa
     const rows = recapData.students.map((student, idx) => {
       const dailyCols = recapData.effectiveDates.map((date) => {
-        // Simulasi status per tanggal: jika ada alpa/sakit di siswa bermasalah
-        if (student.fullName === "Farhan Maulana") {
+        if (student.needsAttention) {
           if (date.endsWith("04") || date.endsWith("11") || date.endsWith("18") || date.endsWith("25")) return "A";
           if (date.endsWith("08")) return "S";
           if (date.endsWith("15")) return "I";
@@ -374,7 +429,7 @@ export default function ReportsPage() {
                     {/* Sel Status Tiap Tanggal */}
                     {recapData.effectiveDates.map((date) => {
                       let cellStatus: "HADIR" | "SAKIT" | "IZIN" | "ALPA" = "HADIR";
-                      if (student.fullName === "Farhan Maulana") {
+                      if (student.needsAttention) {
                         if (
                           date.endsWith("04") ||
                           date.endsWith("11") ||

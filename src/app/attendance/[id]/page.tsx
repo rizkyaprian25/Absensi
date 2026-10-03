@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import {
   MOCK_CLASSES,
-  MOCK_STUDENTS_8B,
   getStudentsForClass,
   MOCK_TEACHER_NAME,
   MOCK_SCHOOL_NAME,
@@ -227,7 +226,7 @@ export default function AttendanceTakingPage() {
           Daftar Presensi Harian
         </span>
         <span className="font-mono bg-[var(--surface-recessed)] px-2 py-0.5 rounded-[6px]">
-          {MOCK_STUDENTS_8B.length} Siswa Terdaftar
+          {classStudents.length} Siswa Terdaftar
         </span>
       </div>
 

@@ -5,6 +5,7 @@ import {
   AttendanceRecord,
   MonthlyClassRecap,
 } from "../attendance";
+import { ALL_STUDENTS_BY_CLASS, STUDENTS_CLASS_8B } from "./studentsData";
 
 // ============================================================================
 // DATA GURU & SEKOLAH
@@ -164,59 +165,19 @@ export const MOCK_CLASSES: Class[] = [
 ];
 
 // ============================================================================
-// MOCK SISWA KELAS (34 SISWA NAMA INDONESIA REALISTIS)
+// MOCK SISWA KELAS (MENGGUNAKAN DATA OTENTIK SMP NEGERI 3 CIBUNGBULANG)
 // ============================================================================
 
-export const MOCK_STUDENTS_8B: Student[] = [
-  { id: "std-01", classId: "class-8b", nis: "260801", fullName: "Aisyah Putri Ramadhani", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-02", classId: "class-8b", nis: "260802", fullName: "Alif Fajar Hidayat", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-03", classId: "class-8b", nis: "260803", fullName: "Annisa Rahmawati", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-04", classId: "class-8b", nis: "260804", fullName: "Bagas Setiawan", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-05", classId: "class-8b", nis: "260805", fullName: "Bintang Pratama Wijaya", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-06", classId: "class-8b", nis: "260806", fullName: "Cantika Dewi Maharani", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-07", classId: "class-8b", nis: "260807", fullName: "Daffa Arya Permana", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-08", classId: "class-8b", nis: "260808", fullName: "Dimas Anggara", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-09", classId: "class-8b", nis: "260809", fullName: "Fadhil Nugroho", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-10", classId: "class-8b", nis: "260810", fullName: "Farhan Maulana", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-11", classId: "class-8b", nis: "260811", fullName: "Fatima Zahra", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-12", classId: "class-8b", nis: "260812", fullName: "Gilang Ramadhan", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-13", classId: "class-8b", nis: "260813", fullName: "Hafiz Kurniawan", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-14", classId: "class-8b", nis: "260814", fullName: "Indah Permatasari", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-15", classId: "class-8b", nis: "260815", fullName: "Kevin Aditya Putra", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-16", classId: "class-8b", nis: "260816", fullName: "Lestari Wulandari", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-17", classId: "class-8b", nis: "260817", fullName: "Muhammad Rizky Pratama", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-18", classId: "class-8b", nis: "260818", fullName: "Nabila Syahrani", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-19", classId: "class-8b", nis: "260819", fullName: "Nadia Kusuma Wardani", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-20", classId: "class-8b", nis: "260820", fullName: "Panji Satria Wicaksana", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-21", classId: "class-8b", nis: "260821", fullName: "Putri Ayu Ningrum", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-22", classId: "class-8b", nis: "260822", fullName: "Raditya Danendra", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-23", classId: "class-8b", nis: "260823", fullName: "Rafi Ahmad Fauzi", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-24", classId: "class-8b", nis: "260824", fullName: "Rania Salsabila", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-25", classId: "class-8b", nis: "260825", fullName: "Rayhan Saputra", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-26", classId: "class-8b", nis: "260826", fullName: "Reza Mahendra", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-27", classId: "class-8b", nis: "260827", fullName: "Rizka Amelia", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-28", classId: "class-8b", nis: "260828", fullName: "Salsabila Nur Azizah", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-29", classId: "class-8b", nis: "260829", fullName: "Satria Bagus Pambudi", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-30", classId: "class-8b", nis: "260830", fullName: "Siti Nurhaliza", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-31", classId: "class-8b", nis: "260831", fullName: "Tiara Melati", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-32", classId: "class-8b", nis: "260832", fullName: "Wahyu Tri Prabowo", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-33", classId: "class-8b", nis: "260833", fullName: "Yoga Pratama", gender: "L", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "std-34", classId: "class-8b", nis: "260834", fullName: "Zahra Aulia Citra", gender: "P", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-];
+export { ALL_STUDENTS_BY_CLASS };
+
+/** Daftar siswa otentik kelas 8B */
+export const MOCK_STUDENTS_8B: Student[] = STUDENTS_CLASS_8B;
 
 /**
- * Mendapatkan daftar siswa untuk suatu kelas
+ * Mendapatkan daftar siswa otentik untuk suatu rombongan belajar (7A-7H, 8A-8B)
  */
 export function getStudentsForClass(classId: string): Student[] {
-  const cls = MOCK_CLASSES.find((c) => c.id === classId);
-  const classPrefix = cls ? cls.name.replace(/[^0-9]/g, "") : "7";
-
-  return MOCK_STUDENTS_8B.map((student, idx) => ({
-    ...student,
-    id: `std-${classId}-${idx + 1}`,
-    classId: classId,
-    nis: `260${classPrefix}${String(idx + 1).padStart(2, "0")}`,
-  }));
+  return ALL_STUDENTS_BY_CLASS[classId] ?? STUDENTS_CLASS_8B;
 }
 
 // ============================================================================
@@ -235,9 +196,10 @@ export const MOCK_SESSION_TODAY: AttendanceSession = {
   updatedAt: "2026-09-29T07:15:00Z",
 };
 
-/** Catatan absensi */
+/** Catatan absensi hari ini dengan siswa otentik kelas 8B */
 export const MOCK_RECORDS_TODAY: AttendanceRecord[] = MOCK_STUDENTS_8B.map((student, idx) => {
-  if (student.fullName === "Bagas Setiawan") {
+  if (idx === 2) {
+    // Siswa ke-3 (ANDIKA): Sakit
     return {
       id: `rec-${idx + 1}`,
       sessionId: "session-today-8b",
@@ -247,7 +209,8 @@ export const MOCK_RECORDS_TODAY: AttendanceRecord[] = MOCK_STUDENTS_8B.map((stud
       note: "Surat dokter terlampir",
     };
   }
-  if (student.fullName === "Dimas Anggara") {
+  if (idx === 6) {
+    // Siswa ke-7 (DIKTA ALFARIJI): Izin
     return {
       id: `rec-${idx + 1}`,
       sessionId: "session-today-8b",
@@ -257,7 +220,8 @@ export const MOCK_RECORDS_TODAY: AttendanceRecord[] = MOCK_STUDENTS_8B.map((stud
       note: "Acara keluarga",
     };
   }
-  if (student.fullName === "Farhan Maulana") {
+  if (idx === 11) {
+    // Siswa ke-12 (KHAERUL ILHAM): Alpa
     return {
       id: `rec-${idx + 1}`,
       sessionId: "session-today-8b",
@@ -293,9 +257,9 @@ export const MOCK_MONTHLY_RECAP_8B: MonthlyClassRecap = {
     "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25",
     "2026-09-28", "2026-09-29",
   ],
-  averageAttendance: 94.8,
+  averageAttendance: 95.2,
   students: MOCK_STUDENTS_8B.map((s, idx) => {
-    const isProblematic = s.fullName === "Farhan Maulana";
+    const isProblematic = idx === 11;
     const hadir = isProblematic ? 15 : idx % 5 === 0 ? 19 : 20;
     const sakit = isProblematic ? 1 : idx % 5 === 0 ? 1 : 0;
     const izin = isProblematic ? 1 : 1;

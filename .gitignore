@@ -38,3 +38,10 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# 6. Data Pribadi Siswa & Spreadsheet (UU PDP & Clean Remote Shield)
+Kelas/
+*.xlsx
+*.xls
+*.csv
+

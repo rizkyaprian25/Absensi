@@ -93,8 +93,8 @@ export type UpdateClassInput = z.infer<typeof UpdateClassInputSchema>;
 // ============================================================================
 
 export const StudentSchema = z.object({
-  id: z.string().uuid(),
-  classId: z.string().uuid(),
+  id: z.string(),
+  classId: z.string(),
   nis: z.string().max(20).nullable().optional(),
   fullName: z.string().min(1, "Nama lengkap siswa wajib diisi").max(100),
   gender: GenderSchema.nullable().optional(),
@@ -149,7 +149,7 @@ export interface CsvValidationResult {
 // ============================================================================
 
 export const AttendanceRecordInputSchema = z.object({
-  studentId: z.string().uuid(),
+  studentId: z.string(),
   status: AttendanceStatusSchema,
   lateMinutes: z.number().int().min(1).max(240).optional(),
   note: z.string().max(MAX_NOTE_LENGTH).optional(),
@@ -158,9 +158,9 @@ export const AttendanceRecordInputSchema = z.object({
 export type AttendanceRecordInput = z.infer<typeof AttendanceRecordInputSchema>;
 
 export const AttendanceRecordSchema = z.object({
-  id: z.string().uuid(),
-  sessionId: z.string().uuid(),
-  studentId: z.string().uuid(),
+  id: z.string(),
+  sessionId: z.string(),
+  studentId: z.string(),
   status: AttendanceStatusSchema,
   lateMinutes: z.number().int().nullable().optional(),
   note: z.string().max(MAX_NOTE_LENGTH).nullable().optional(),
@@ -169,13 +169,13 @@ export const AttendanceRecordSchema = z.object({
 export type AttendanceRecord = z.infer<typeof AttendanceRecordSchema>;
 
 export const AttendanceSessionSchema = z.object({
-  id: z.string().uuid(),
-  classId: z.string().uuid(),
+  id: z.string(),
+  classId: z.string(),
   sessionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD"),
   slot: z.number().int().min(0).default(0), // 0 = absensi harian, >=1 = jam pelajaran ke-N
   subject: z.string().max(80).nullable().optional(),
   note: z.string().max(MAX_NOTE_LENGTH).nullable().optional(),
-  clientRequestId: z.string().uuid(),
+  clientRequestId: z.string(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

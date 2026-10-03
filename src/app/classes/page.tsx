@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { Plus, Users, ChevronRight, School, Archive, CheckCircle2 } from "lucide-react";
-import { MOCK_CLASSES, MOCK_STUDENTS_8B } from "@/contracts/mocks/attendanceMocks";
+import { MOCK_CLASSES, getStudentsForClass } from "@/contracts/mocks/attendanceMocks";
 import { Class } from "@/contracts/attendance";
 
 /**
@@ -134,8 +134,7 @@ export default function ClassesPage() {
       {/* Daftar Kelas (Ruled Cards) */}
       <div className="flex flex-col gap-3">
         {classes.map((cls) => {
-          // Jumlah siswa (mock: 34 untuk VIII-B, 32 untuk lainnya)
-          const studentCount = cls.name === "VIII-B" ? MOCK_STUDENTS_8B.length : 32;
+          const studentCount = getStudentsForClass(cls.id).length;
 
           return (
             <Link
@@ -165,7 +164,7 @@ export default function ClassesPage() {
                     <span>·</span>
                     <span className="flex items-center gap-1 font-mono">
                       <Users className="w-3.5 h-3.5" />
-                      34 Siswa
+                      {studentCount} Siswa
                     </span>
                   </div>
                 </div>

@@ -17,6 +17,7 @@ import {
   MOCK_TEACHER_NAME,
   MOCK_SCHOOL_NAME,
   MOCK_SUBJECT,
+  getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
 import { ScheduleDay } from "@/contracts/attendance";
 
@@ -171,7 +172,7 @@ export default function TodayDashboardPage() {
                     <Clock className="w-3.5 h-3.5 text-[var(--color-accent)]" />
                     <span>{cls.scheduleTime} WIB</span>
                     <span>·</span>
-                    <span>34 Siswa</span>
+                    <span>{getStudentsForClass(cls.id).length} Siswa</span>
                   </p>
                 </div>
               </div>
