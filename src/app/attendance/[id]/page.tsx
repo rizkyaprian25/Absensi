@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -17,6 +17,7 @@ import {
   Send,
   AlertCircle,
   FileCheck,
+  CalendarOff,
 } from "lucide-react";
 import {
   MOCK_CLASSES,
@@ -24,7 +25,8 @@ import {
   MOCK_TEACHER_NAME,
   MOCK_SCHOOL_NAME,
 } from "@/contracts/mocks/attendanceMocks";
-import { AttendanceStatus } from "@/contracts/attendance";
+import { AttendanceStatus, HolidayItem } from "@/contracts/attendance";
+import { getStoredHolidays, findHolidayByDate } from "@/lib/calendarUtils";
 
 interface StudentAttendanceState {
   status: AttendanceStatus;
@@ -74,6 +76,23 @@ export default function AttendanceTakingPage() {
   // State toast notifikasi simpan
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [holidays, setHolidays] = useState<HolidayItem[]>([]);
+
+  useEffect(() => {
+    setHolidays(getStoredHolidays());
+  }, []);
+
+  const todayIso = useMemo(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }, []);
+
+  const todayHoliday = useMemo(() => {
+    return findHolidayByDate(todayIso, holidays);
+  }, [todayIso, holidays]);
 
   // Perhitungan ringkasan real-time (Live Tally)
   const tally = useMemo(() => {
@@ -161,7 +180,7 @@ export default function AttendanceTakingPage() {
         </Link>
         <div className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-[8px] bg-[var(--surface-card)] border border-[var(--border-hairline)] text-[var(--text-secondary)] font-mono">
           <Calendar className="w-3.5 h-3.5" />
-          <span>29/09/2026</span>
+          <span>{todayIso}</span>
         </div>
       </div>
 
@@ -179,6 +198,21 @@ export default function AttendanceTakingPage() {
           {currentClass.subject ?? "Informatika"} · {currentClass.scheduleDay ?? "Hari KBM"}, {currentClass.schedulePeriod ?? "Jam Ke 1–3"} ({currentClass.scheduleTime ?? "Sesuai Jadwal"} WIB)
         </p>
       </div>
+
+      {/* Banner Peringatan Jika Hari Libur */}
+      {todayHoliday && (
+        <div className="p-3.5 rounded-[12px] bg-[var(--status-alpa-bg)] border border-[var(--status-alpa-fg)]/20 flex items-start gap-2.5 text-xs text-[var(--text-secondary)] shadow-xs animate-in fade-in">
+          <CalendarOff className="w-4 h-4 text-[var(--status-alpa-fg)] shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold text-[var(--status-alpa-fg)]">
+              Pemberitahuan: Hari Ini Tercatat Sebagai Hari Libur ({todayHoliday.name})
+            </p>
+            <p className="mt-0.5">
+              Anda tetap dapat mencatat presensi jika menyelenggarakan jam pelajaran pengganti atau kegiatan ekstra.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Live Tally Ledger Bar (Menghitung Real-Time) */}
       <div className="p-3 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] flex items-center justify-between gap-1 shadow-xs font-tabular">

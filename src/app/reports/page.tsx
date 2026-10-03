@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Download,
@@ -17,6 +17,8 @@ import {
   MOCK_CLASSES,
   getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
+import { HolidayItem } from "@/contracts/attendance";
+import { getStoredHolidays, findHolidayByDate } from "@/lib/calendarUtils";
 
 /**
  * Halaman Rekapitulasi Bulanan & Ekspor (L8 Stitch)
@@ -26,6 +28,11 @@ export default function ReportsPage() {
   const [selectedClassId, setSelectedClassId] = useState("class-7a");
   const [selectedMonth, setSelectedMonth] = useState("2026-09");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [holidays, setHolidays] = useState<HolidayItem[]>([]);
+
+  useEffect(() => {
+    setHolidays(getStoredHolidays());
+  }, []);
 
   const currentClass =
     MOCK_CLASSES.find((c) => c.id === selectedClassId) ?? MOCK_CLASSES[0];
@@ -35,7 +42,7 @@ export default function ReportsPage() {
     return getStudentsForClass(selectedClassId);
   }, [selectedClassId]);
 
-  // Data rekapitulasi bulanan dinamis sesuai kelas yang dipilih
+  // Data rekapitulasi bulanan dinamis sesuai kelas yang dipilih & hari libur
   const recapData = useMemo(() => {
     const effectiveDates = [
       "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04",
@@ -44,15 +51,20 @@ export default function ReportsPage() {
       "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25",
       "2026-09-28", "2026-09-29",
     ];
-    const totalHari = effectiveDates.length;
+    const holidayDatesSet = new Set(holidays.map((h) => h.date));
+    const kbmDaysCount = effectiveDates.filter((d) => !holidayDatesSet.has(d)).length;
 
     const studentRecaps = classStudents.map((s, idx) => {
       const isProblematic = idx === 11;
-      const hadir = isProblematic ? 15 : idx % 5 === 0 ? 19 : 20;
+      const hadir = isProblematic
+        ? Math.max(1, kbmDaysCount - 5)
+        : idx % 5 === 0
+        ? Math.max(1, kbmDaysCount - 1)
+        : kbmDaysCount;
       const sakit = isProblematic ? 1 : idx % 5 === 0 ? 1 : 0;
       const izin = isProblematic ? 1 : 1;
-      const alpa = isProblematic ? 4 : 0;
-      const persentase = Number(((hadir / totalHari) * 100).toFixed(1));
+      const alpa = isProblematic ? 3 : 0;
+      const persentase = Number(((hadir / (kbmDaysCount || 1)) * 100).toFixed(1));
 
       return {
         studentId: s.id,
@@ -63,7 +75,7 @@ export default function ReportsPage() {
         izin,
         alpa,
         terlambat: 0,
-        totalHari,
+        totalHari: kbmDaysCount,
         persentaseKehadiran: persentase,
         dailyStatus: {} as Record<string, string>,
         needsAttention: persentase < 85,
@@ -86,7 +98,7 @@ export default function ReportsPage() {
       averageAttendance,
       students: studentRecaps,
     };
-  }, [classStudents, selectedClassId, currentClass, selectedMonth]);
+  }, [classStudents, selectedClassId, currentClass, selectedMonth, holidays]);
 
   // Hitung jumlah siswa yang perlu perhatian (< 85% kehadiran)
   const studentsNeedingAttention = useMemo(() => {
@@ -95,12 +107,16 @@ export default function ReportsPage() {
 
   // Ekspor CSV Native dengan UTF-8 BOM (PRD §5 FR-8 & ADR-0004)
   const handleExportCsv = () => {
+    const holidayDatesSet = new Set(holidays.map((h) => h.date));
     // Header CSV
     const headers = [
       "No",
       "NIS",
       "Nama Siswa",
-      ...recapData.effectiveDates.map((d) => d.slice(8)), // Ambil DD
+      ...recapData.effectiveDates.map((d) => {
+        const isHol = holidayDatesSet.has(d);
+        return isHol ? `${d.slice(8)}(L)` : d.slice(8);
+      }),
       "Hadir",
       "Sakit",
       "Izin",
@@ -112,6 +128,7 @@ export default function ReportsPage() {
     // Baris Siswa
     const rows = recapData.students.map((student, idx) => {
       const dailyCols = recapData.effectiveDates.map((date) => {
+        if (holidayDatesSet.has(date)) return "L";
         if (student.needsAttention) {
           if (date.endsWith("04") || date.endsWith("11") || date.endsWith("18") || date.endsWith("25")) return "A";
           if (date.endsWith("08")) return "S";
@@ -357,14 +374,21 @@ export default function ReportsPage() {
                 </th>
 
                 {/* Kolom Tanggal-Tanggal Efektif */}
-                {recapData.effectiveDates.map((date) => (
-                  <th
-                    key={date}
-                    className="p-2 text-center font-mono font-semibold min-w-[32px] border-r border-[var(--border-hairline)]/60 text-[11px]"
-                  >
-                    {date.slice(8)}
-                  </th>
-                ))}
+                {recapData.effectiveDates.map((date) => {
+                  const hol = findHolidayByDate(date, holidays);
+                  return (
+                    <th
+                      key={date}
+                      title={hol ? `Hari Libur: ${hol.name}` : `Tanggal ${date}`}
+                      className={`p-2 text-center font-mono font-semibold min-w-[32px] border-r border-[var(--border-hairline)]/60 text-[11px] ${
+                        hol ? "bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold" : ""
+                      }`}
+                    >
+                      <span>{date.slice(8)}</span>
+                      {hol && <span className="block text-[8px] leading-tight font-sans">L</span>}
+                    </th>
+                  );
+                })}
 
                 {/* Kolom Ringkasan Total */}
                 <th className="p-2 text-center font-bold text-[var(--status-hadir-fg)] min-w-[28px] border-l border-[var(--border-hairline)]">
@@ -428,8 +452,11 @@ export default function ReportsPage() {
 
                     {/* Sel Status Tiap Tanggal */}
                     {recapData.effectiveDates.map((date) => {
-                      let cellStatus: "HADIR" | "SAKIT" | "IZIN" | "ALPA" = "HADIR";
-                      if (student.needsAttention) {
+                      const isHoliday = Boolean(findHolidayByDate(date, holidays));
+                      let cellStatus: "HADIR" | "SAKIT" | "IZIN" | "ALPA" | "LIBUR" = "HADIR";
+                      if (isHoliday) {
+                        cellStatus = "LIBUR";
+                      } else if (student.needsAttention) {
                         if (
                           date.endsWith("04") ||
                           date.endsWith("11") ||
@@ -451,7 +478,9 @@ export default function ReportsPage() {
                         >
                           <span
                             className={`inline-flex items-center justify-center w-6 h-6 rounded-[4px] font-mono text-[11px] font-bold ${
-                              cellStatus === "HADIR"
+                              cellStatus === "LIBUR"
+                                ? "bg-[var(--surface-recessed)] text-[var(--text-secondary)] border border-[var(--border-hairline)]"
+                                : cellStatus === "HADIR"
                                 ? "bg-[var(--status-hadir-bg)] text-[var(--status-hadir-fg)]"
                                 : cellStatus === "SAKIT"
                                 ? "bg-[var(--status-sakit-bg)] text-[var(--status-sakit-fg)]"
@@ -460,7 +489,15 @@ export default function ReportsPage() {
                                 : "bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)]"
                             }`}
                           >
-                            {cellStatus[0]}
+                            {cellStatus === "LIBUR"
+                              ? "L"
+                              : cellStatus === "HADIR"
+                              ? "H"
+                              : cellStatus === "SAKIT"
+                              ? "S"
+                              : cellStatus === "IZIN"
+                              ? "I"
+                              : "A"}
                           </span>
                         </td>
                       );

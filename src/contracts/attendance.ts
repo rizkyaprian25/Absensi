@@ -58,6 +58,30 @@ export type Profile = z.infer<typeof ProfileSchema>;
 export const ScheduleDaySchema = z.enum(["Senin", "Selasa", "Rabu", "Kamis", "Jumat"]);
 export type ScheduleDay = z.infer<typeof ScheduleDaySchema>;
 
+// ============================================================================
+// SKEMA HARI LIBUR & KALENDER AKADEMIK
+// ============================================================================
+
+export const HolidayCategorySchema = z.enum([
+  "NASIONAL",     // Libur Nasional / Tanggal Merah Resmi
+  "CUTI_BERSAMA", // Cuti Bersama
+  "SEKOLAH",      // Libur Khusus Sekolah / Kegiatan Tengah Semester / Classmeeting
+  "KHUSUS",       // Diliburkan Guru / Rapat Dinas / Acara Khusus
+]);
+
+export type HolidayCategory = z.infer<typeof HolidayCategorySchema>;
+
+export const HolidayItemSchema = z.object({
+  id: z.string(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD"),
+  name: z.string().min(1, "Keterangan libur wajib diisi").max(100),
+  category: HolidayCategorySchema.default("SEKOLAH"),
+  description: z.string().max(200).optional(),
+  createdAt: z.string().optional(),
+});
+
+export type HolidayItem = z.infer<typeof HolidayItemSchema>;
+
 export const ClassSchema = z.object({
   id: z.string(),
   teacherId: z.string(),

@@ -6,6 +6,12 @@ import {
   upsertSessionIdempotent,
 } from "./attendanceUtils.ts";
 import type { AttendanceSession } from "../contracts/attendance.ts";
+import {
+  DEFAULT_HOLIDAYS,
+  findHolidayByDate,
+  isDateHoliday,
+  getDateForWeekday,
+} from "./calendarUtils.ts";
 
 /**
  * Smoke Test Mandiri (Fase 4 SOP §3.5 & PRD §14)
@@ -77,6 +83,29 @@ function runSmokeTest() {
     assert.strictEqual(res2.sessions.length, 1, "Jumlah sesi di database tidak boleh bertambah menjadi 2");
 
     console.log("✓ LULUS: Sesi idempoten mencegah penggandaan data saat retry jaringan.");
+  }
+
+  // 4. Pengujian Utilitas Kalender Akademik & Hari Libur Kustom
+  {
+    console.log("[TEST 4] Menguji deteksi hari libur & penentuan tanggal pekan aktif...");
+    const isIndependenceDay = isDateHoliday("2026-08-17", DEFAULT_HOLIDAYS);
+    assert.strictEqual(isIndependenceDay, true, "17 Agustus 2026 harus terdeteksi sebagai hari libur");
+
+    const regularDay = isDateHoliday("2026-08-18", DEFAULT_HOLIDAYS);
+    assert.strictEqual(regularDay, false, "18 Agustus 2026 harus terdeteksi sebagai hari biasa");
+
+    const holidayItem = findHolidayByDate("2026-08-25", DEFAULT_HOLIDAYS);
+    assert.ok(holidayItem, "Maulid Nabi harus ditemukan");
+    assert.strictEqual(holidayItem?.category, "NASIONAL");
+
+    // Pengujian kalkulasi tanggal hari kerja
+    const mondayStr = getDateForWeekday("Senin", new Date("2026-09-30T10:00:00Z")); // Rabu
+    assert.strictEqual(mondayStr, "2026-09-28", "Senin pekan tersebut harus 2026-09-28");
+
+    const fridayStr = getDateForWeekday("Jumat", new Date("2026-09-30T10:00:00Z"));
+    assert.strictEqual(fridayStr, "2026-10-02", "Jumat pekan tersebut harus 2026-10-02");
+
+    console.log("✓ LULUS: Utilitas kalender akademik & hari libur kustom berfungsi presisi.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");
