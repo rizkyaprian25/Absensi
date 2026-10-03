@@ -73,13 +73,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Tersimpan
             </span>
           </div>
-          <div className="flex items-center gap-2 px-2 py-1.5 bg-[var(--surface-recessed)] rounded-[10px]">
-            <div className="w-8 h-8 rounded-full bg-[var(--border-hairline)] flex items-center justify-center font-semibold text-xs text-[var(--text-primary)]">
-              R
+          <div className="flex items-center gap-2.5 px-2 py-2 bg-[var(--surface-recessed)] rounded-[10px]">
+            <div className="w-8 h-8 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] flex items-center justify-center font-bold text-xs shrink-0">
+              M
             </div>
             <div className="truncate text-xs">
-              <p className="font-semibold truncate">Bu Rina, S.Pd.</p>
-              <p className="text-[var(--text-secondary)] truncate">Wali Kelas VIII-B</p>
+              <p className="font-semibold truncate text-[var(--text-primary)]">Muhamad Rizky Aprian, S.Kom</p>
+              <p className="text-[var(--text-secondary)] truncate">Guru Informatika · SMPN 3 Cibungbulang</p>
             </div>
           </div>
         </div>

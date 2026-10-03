@@ -21,6 +21,9 @@ import {
 import {
   MOCK_CLASSES,
   MOCK_STUDENTS_8B,
+  getStudentsForClass,
+  MOCK_TEACHER_NAME,
+  MOCK_SCHOOL_NAME,
 } from "@/contracts/mocks/attendanceMocks";
 import { AttendanceStatus } from "@/contracts/attendance";
 
@@ -38,9 +41,14 @@ export default function AttendanceTakingPage() {
   const params = useParams();
   const classId = params.id as string;
 
-  // Dapatkan informasi kelas (fallback ke VIII-B jika mock)
+  // Dapatkan informasi kelas dari jadwal resmi (fallback ke kelas pertama)
   const currentClass =
-    MOCK_CLASSES.find((c) => c.id === classId) ?? MOCK_CLASSES[1];
+    MOCK_CLASSES.find((c) => c.id === classId) ?? MOCK_CLASSES[0];
+
+  // Dapatkan siswa khusus untuk kelas ini
+  const classStudents = useMemo(() => {
+    return getStudentsForClass(classId);
+  }, [classId]);
 
   // State pencarian siswa
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,11 +58,12 @@ export default function AttendanceTakingPage() {
     Record<string, StudentAttendanceState>
   >(() => {
     const initial: Record<string, StudentAttendanceState> = {};
-    MOCK_STUDENTS_8B.forEach((student) => {
-      // Data awal realistis: Dimas Sakit, Farhan Izin, lainnya Hadir
-      if (student.fullName === "Dimas Anggara") {
+    const students = getStudentsForClass(classId);
+    students.forEach((student, idx) => {
+      // Data simulasi awal realistis
+      if (idx === 7) {
         initial[student.id] = { status: "SAKIT", note: "Surat dokter" };
-      } else if (student.fullName === "Farhan Maulana") {
+      } else if (idx === 9) {
         initial[student.id] = { status: "IZIN", note: "Dispensasi OSIS" };
       } else {
         initial[student.id] = { status: "HADIR" };
@@ -83,19 +92,19 @@ export default function AttendanceTakingPage() {
       else if (item.status === "TERLAMBAT") terlambat++;
     });
 
-    return { hadir, sakit, izin, alpa, terlambat, total: MOCK_STUDENTS_8B.length };
-  }, [attendanceMap]);
+    return { hadir, sakit, izin, alpa, terlambat, total: classStudents.length };
+  }, [attendanceMap, classStudents.length]);
 
   // Filter siswa berdasarkan input pencarian
   const filteredStudents = useMemo(() => {
-    if (!searchQuery.trim()) return MOCK_STUDENTS_8B;
+    if (!searchQuery.trim()) return classStudents;
     const query = searchQuery.toLowerCase();
-    return MOCK_STUDENTS_8B.filter(
+    return classStudents.filter(
       (s) =>
         s.fullName.toLowerCase().includes(query) ||
         (s.nis && s.nis.toLowerCase().includes(query))
     );
-  }, [searchQuery]);
+  }, [classStudents, searchQuery]);
 
   // Fungsi pengubah status seorang siswa
   const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
@@ -168,7 +177,7 @@ export default function AttendanceTakingPage() {
           </span>
         </div>
         <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-          Matematika Wajib · Jam Ke 1–2 (07.15 – 08.45)
+          {currentClass.subject ?? "Informatika"} · {currentClass.scheduleDay ?? "Hari KBM"}, {currentClass.schedulePeriod ?? "Jam Ke 1–3"} ({currentClass.scheduleTime ?? "Sesuai Jadwal"} WIB)
         </p>
       </div>
 
@@ -328,8 +337,8 @@ export default function AttendanceTakingPage() {
 
       {/* Catatan Validasi Guru */}
       <div className="p-3 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[14px] flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-        <FileCheck className="w-4 h-4 text-[var(--text-secondary)] shrink-0" />
-        <span>Validasi Wali Kelas: Bu Rina, S.Pd. · 07.42 WIB</span>
+        <FileCheck className="w-4 h-4 text-[var(--color-accent)] shrink-0" />
+        <span>Guru Pengampu: {MOCK_TEACHER_NAME} · {MOCK_SCHOOL_NAME}</span>
       </div>
 
       {/* Bilah Aksi Bawah Mengambang (Floating Action Bar dengan Glass Blur) */}
@@ -354,7 +363,7 @@ export default function AttendanceTakingPage() {
             <span>
               {isSaving
                 ? "Menyimpan..."
-                : `Simpan Presensi (${MOCK_STUDENTS_8B.length})`}
+                : `Simpan Presensi (${classStudents.length})`}
             </span>
           </button>
         </div>

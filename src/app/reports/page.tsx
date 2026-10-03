@@ -23,14 +23,14 @@ import {
  * Memuat matriks presensi siswa x tanggal, ringkasan persentase, ekspor CSV UTF-8 BOM, dan cetak native
  */
 export default function ReportsPage() {
-  const [selectedClassId, setSelectedClassId] = useState("class-8b-uuid");
+  const [selectedClassId, setSelectedClassId] = useState("class-7a");
   const [selectedMonth, setSelectedMonth] = useState("2026-09");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Ambil data rekap (mock VIII-B)
+  // Ambil data rekap
   const recapData = MOCK_MONTHLY_RECAP_8B;
   const currentClass =
-    MOCK_CLASSES.find((c) => c.id === selectedClassId) ?? MOCK_CLASSES[1];
+    MOCK_CLASSES.find((c) => c.id === selectedClassId) ?? MOCK_CLASSES[0];
 
   // Hitung jumlah siswa yang perlu perhatian (< 85% kehadiran)
   const studentsNeedingAttention = useMemo(() => {
@@ -127,16 +127,24 @@ export default function ReportsPage() {
       {/* Header Halaman & Aksi Cepat */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:hidden">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[var(--text-primary)]">
               Rekap Kehadiran
             </h1>
-            <span className="text-xs px-2.5 py-1 rounded-[6px] bg-[var(--surface-recessed)] text-[var(--text-secondary)] font-mono font-bold">
-              {currentClass.name}
-            </span>
+            <select
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="text-xs px-2.5 py-1.5 rounded-[8px] bg-[var(--surface-card)] text-[var(--color-accent)] font-mono font-bold border border-[var(--border-hairline)] shadow-xs focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] cursor-pointer"
+            >
+              {MOCK_CLASSES.map((cls) => (
+                <option key={cls.id} value={cls.id}>
+                  Kelas {cls.name} ({cls.scheduleDay} · {cls.schedulePeriod})
+                </option>
+              ))}
+            </select>
           </div>
-          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            Buku Register Presensi Bulanan Resmi
+          <p className="text-xs text-[var(--text-secondary)] mt-1">
+            Informatika · SMP Negeri 3 Cibungbulang · Muhamad Rizky Aprian, S.Kom
           </p>
         </div>
 

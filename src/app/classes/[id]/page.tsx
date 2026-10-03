@@ -20,6 +20,7 @@ import {
 import {
   MOCK_CLASSES,
   MOCK_STUDENTS_8B,
+  getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
 import { Student } from "@/contracts/attendance";
 
@@ -39,10 +40,10 @@ export default function ClassDetailPage() {
   const params = useParams();
   const classId = params.id as string;
   const currentClass =
-    MOCK_CLASSES.find((c) => c.id === classId) ?? MOCK_CLASSES[1];
+    MOCK_CLASSES.find((c) => c.id === classId) ?? MOCK_CLASSES[0];
 
   const [activeTab, setActiveTab] = useState<"siswa" | "riwayat" | "rekap">("siswa");
-  const [students, setStudents] = useState<Student[]>(MOCK_STUDENTS_8B);
+  const [students, setStudents] = useState<Student[]>(() => getStudentsForClass(classId));
   const [searchQuery, setSearchQuery] = useState("");
 
   // State Modal Impor CSV
@@ -136,7 +137,7 @@ export default function ClassDetailPage() {
             Kelas {currentClass.name}
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            Tahun Ajaran {currentClass.academicYear} · Semester {currentClass.semester ?? 1} · {students.length} Siswa
+            Informatika · {currentClass.scheduleDay ?? "KBM"}, {currentClass.schedulePeriod ?? "Jam Ke 1–3"} ({currentClass.scheduleTime ?? "Sesuai Jadwal"} WIB) · {students.length} Siswa
           </p>
         </div>
 

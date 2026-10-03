@@ -59,18 +59,18 @@ export default function SettingsPage() {
 
       {/* Kartu Profil Guru */}
       <div className="p-4 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] flex items-center gap-4 shadow-xs">
-        <div className="w-14 h-14 rounded-full bg-[var(--surface-recessed)] text-[var(--color-accent)] flex items-center justify-center font-bold text-lg">
-          R
+        <div className="w-14 h-14 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] flex items-center justify-center font-bold text-xl">
+          M
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="font-bold text-base text-[var(--text-primary)] truncate">
-            Bu Rina, S.Pd.
+            Muhamad Rizky Aprian, S.Kom
           </h2>
           <p className="text-xs text-[var(--text-secondary)] font-mono">
-            NIP 19850412 201001 2 021
+            NIP 19940825 202221 1 004
           </p>
           <p className="text-xs text-[var(--color-accent)] font-medium mt-0.5">
-            Wali Kelas VIII-B · SMP Negeri 1 Nusantara
+            Guru Mata Pelajaran Informatika · SMP Negeri 3 Cibungbulang
           </p>
         </div>
       </div>

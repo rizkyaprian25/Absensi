@@ -29,6 +29,7 @@ export default function ClassesPage() {
       semester: 1,
       archivedAt: null,
       createdAt: new Date().toISOString(),
+      subject: "Informatika",
     };
 
     setClasses((prev) => [...prev, newClass]);
@@ -55,7 +56,7 @@ export default function ClassesPage() {
             Daftar Kelas
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            Rombongan Belajar Tahun Ajaran 2026/2027
+            10 Rombongan Belajar Informatika · SMP Negeri 3 Cibungbulang
           </p>
         </div>
 
@@ -147,15 +148,24 @@ export default function ClassesPage() {
                   <School className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="font-bold text-base text-[var(--text-primary)] leading-tight">
-                    Kelas {cls.name}
-                  </h2>
-                  <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] mt-1">
-                    <span>{cls.academicYear}</span>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-bold text-base text-[var(--text-primary)] leading-tight">
+                      Kelas {cls.name}
+                    </h2>
+                    {cls.scheduleDay && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-[4px] bg-[var(--surface-recessed)] text-[var(--color-accent)] font-mono">
+                        {cls.scheduleDay}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] mt-1 flex-wrap">
+                    <span className="font-mono text-[var(--color-accent)] font-medium">
+                      {cls.schedulePeriod} ({cls.scheduleTime} WIB)
+                    </span>
                     <span>·</span>
                     <span className="flex items-center gap-1 font-mono">
                       <Users className="w-3.5 h-3.5" />
-                      {studentCount} Siswa
+                      34 Siswa
                     </span>
                   </div>
                 </div>

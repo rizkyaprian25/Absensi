@@ -55,14 +55,21 @@ export type Profile = z.infer<typeof ProfileSchema>;
 // SKEMA KELAS
 // ============================================================================
 
+export const ScheduleDaySchema = z.enum(["Senin", "Selasa", "Rabu", "Kamis", "Jumat"]);
+export type ScheduleDay = z.infer<typeof ScheduleDaySchema>;
+
 export const ClassSchema = z.object({
-  id: z.string().uuid(),
-  teacherId: z.string().uuid(),
+  id: z.string(),
+  teacherId: z.string(),
   name: z.string().min(1, "Nama kelas wajib diisi").max(50),
   academicYear: z.string().min(4, "Tahun ajaran wajib diisi").max(20), // Contoh: "2026/2027"
   semester: z.number().int().min(1).max(2).optional(),
   archivedAt: z.string().datetime().nullable().optional(),
   createdAt: z.string().datetime(),
+  scheduleDay: ScheduleDaySchema.optional(),
+  scheduleTime: z.string().optional(),
+  schedulePeriod: z.string().optional(),
+  subject: z.string().default("Informatika"),
 });
 
 export type Class = z.infer<typeof ClassSchema>;
