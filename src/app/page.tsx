@@ -59,6 +59,7 @@ export default function TodayDashboardPage() {
 
   // State Modal Kustomisasi Libur
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
+  const [targetHolidayDate, setTargetHolidayDate] = useState<string | null>(null);
   const [holidayNameInput, setHolidayNameInput] = useState("");
   const [holidayCategoryInput, setHolidayCategoryInput] = useState<HolidayCategory>("SEKOLAH");
   const [holidayDescInput, setHolidayDescInput] = useState("");
@@ -96,6 +97,11 @@ export default function TodayDashboardPage() {
     return findHolidayByDate(selectedDate, holidays);
   }, [selectedDate, holidays]);
 
+  // Cek apakah tanggal susulan yang dipilih adalah hari libur
+  const quickHoliday = useMemo(() => {
+    return findHolidayByDate(quickBackfillDate, holidays);
+  }, [quickBackfillDate, holidays]);
+
   const isCurrentDayOff = Boolean(currentHoliday);
 
   // Format tanggal hari ini di header
@@ -108,41 +114,44 @@ export default function TodayDashboardPage() {
     }).format(new Date());
   }, []);
 
-  // Handler: Simpan Hari Libur Baru untuk Tanggal Terpilih
+  // Handler: Simpan Hari Libur Baru untuk Tanggal Terpilih / Tanggal Lampau
   const handleSaveHoliday = (e: React.FormEvent) => {
     e.preventDefault();
     if (!holidayNameInput.trim()) return;
 
+    const dateToSave = targetHolidayDate || selectedDate;
     const newHoliday: HolidayItem = {
-      id: `hld-${selectedDate}-${Date.now()}`,
-      date: selectedDate,
+      id: `hld-${dateToSave}-${Date.now()}`,
+      date: dateToSave,
       name: holidayNameInput.trim(),
       category: holidayCategoryInput,
       description: holidayDescInput.trim() || undefined,
       createdAt: new Date().toISOString(),
     };
 
-    const updated = [...holidays.filter((h) => h.date !== selectedDate), newHoliday];
+    const updated = [...holidays.filter((h) => h.date !== dateToSave), newHoliday];
     setHolidays(updated);
     saveStoredHolidays(updated);
     setIsHolidayModalOpen(false);
     setHolidayNameInput("");
     setHolidayDescInput("");
+    setTargetHolidayDate(null);
 
     setToastMessage(
-      `Hari ${selectedDay} (${selectedDate}) berhasil ditetapkan sebagai Hari Libur: "${newHoliday.name}"`
+      `Tanggal ${formatIndonesianDate(dateToSave)} berhasil ditetapkan sebagai Hari Libur: "${newHoliday.name}"`
     );
     setTimeout(() => setToastMessage(null), 3500);
   };
 
   // Handler: Batalkan Status Libur (Jadikan Hari Masuk KBM Aktif)
   const handleRemoveHoliday = (holidayId: string) => {
+    const holidayToRemove = holidays.find((h) => h.id === holidayId);
     const updated = holidays.filter((h) => h.id !== holidayId);
     setHolidays(updated);
     saveStoredHolidays(updated);
 
     setToastMessage(
-      `Status libur dibatalkan. Hari ${selectedDay} (${selectedDate}) kini menjadi Hari Masuk (KBM Aktif).`
+      `Status libur dibatalkan. Tanggal ${holidayToRemove ? formatIndonesianDate(holidayToRemove.date) : ""} kini menjadi Hari Masuk (KBM Aktif).`
     );
     setTimeout(() => setToastMessage(null), 3500);
   };
@@ -453,18 +462,45 @@ export default function TodayDashboardPage() {
             />
           </div>
 
-          {/* Tombol Buka Form Presensi */}
+          {/* Tombol Aksi Form Presensi & Tandai Libur */}
           <div className="flex flex-col gap-1.5 justify-end">
-            <label className="text-xs font-semibold text-transparent hidden sm:block">
-              Aksi
+            <label className="text-xs font-semibold text-[var(--text-secondary)]">
+              Aksi Tanggal Terpilih
             </label>
-            <Link
-              href={`/attendance/${quickBackfillClassId}?date=${quickBackfillDate}`}
-              className="min-h-[42px] px-4 py-2 bg-[var(--color-accent)] text-[var(--color-on-accent)] font-bold rounded-[10px] text-xs flex items-center justify-center gap-2 hover:opacity-95 active:scale-[0.98] transition-all shadow-xs"
-            >
-              <span>Isi Presensi Tanggal Tersebut</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/attendance/${quickBackfillClassId}?date=${quickBackfillDate}`}
+                className="flex-1 min-h-[42px] px-3.5 py-2 bg-[var(--color-accent)] text-[var(--color-on-accent)] font-bold rounded-[10px] text-xs flex items-center justify-center gap-1.5 hover:opacity-95 active:scale-[0.98] transition-all shadow-xs"
+              >
+                <span>Isi Presensi</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              {quickHoliday ? (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveHoliday(quickHoliday.id)}
+                  className="min-h-[42px] px-3 py-2 bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-xs font-semibold text-[var(--status-hadir-fg)] rounded-[10px] border border-[var(--border-hairline)] transition-all shadow-xs shrink-0"
+                  title="Batalkan status libur untuk tanggal ini"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 inline mr-1" />
+                  <span>Batal Libur</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetHolidayDate(quickBackfillDate);
+                    setHolidayNameInput("Kegiatan / Libur Khusus Sekolah");
+                    setIsHolidayModalOpen(true);
+                  }}
+                  className="min-h-[42px] px-3 py-2 bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-xs font-semibold text-[var(--status-alpa-fg)] rounded-[10px] border border-[var(--border-hairline)] transition-all shadow-xs flex items-center gap-1 shrink-0"
+                  title="Tandai tanggal ini sebagai hari libur"
+                >
+                  <CalendarOff className="w-3.5 h-3.5" />
+                  <span>Tandai Libur</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -536,7 +572,7 @@ export default function TodayDashboardPage() {
                   Tandai Sebagai Hari Libur
                 </h3>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                  Hari {selectedDay} ({selectedDate})
+                  {formatIndonesianDate(targetHolidayDate || selectedDate)}
                 </p>
               </div>
               <button

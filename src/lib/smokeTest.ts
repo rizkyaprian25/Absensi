@@ -131,6 +131,36 @@ function runSmokeTest() {
     console.log("✓ LULUS: Penelusuran tanggal KBM lampau menghasilkan daftar presensi susulan yang akurat.");
   }
 
+  // 6. Pengujian Penandaan Hari Libur di Pertemuan KBM Lampau
+  {
+    console.log("[TEST 6] Menguji penandaan hari libur kustom pada tanggal lampau...");
+    const customPastHolidayDate = "2026-07-21"; // Hari Selasa kedua di bulan Juli 2026
+    const holidaysWithCustom = [
+      ...DEFAULT_HOLIDAYS,
+      {
+        id: `hld-${customPastHolidayDate}`,
+        date: customPastHolidayDate,
+        name: "Kegiatan MPLS Sekolah",
+        category: "SEKOLAH" as const,
+      },
+    ];
+
+    const tuesdayDates = generatePastTeachingDates(
+      "Selasa",
+      "class-8b",
+      "2026-07-13",
+      new Date("2026-10-03T10:00:00Z"),
+      holidaysWithCustom
+    );
+
+    const targetDate = tuesdayDates.find((t) => t.date === customPastHolidayDate);
+    assert.ok(targetDate, "Tanggal 2026-07-21 harus ada dalam daftar");
+    assert.strictEqual(targetDate?.isHoliday, true, "2026-07-21 harus berhasil ditandai sebagai hari libur");
+    assert.strictEqual(targetDate?.holidayName, "Kegiatan MPLS Sekolah");
+
+    console.log("✓ LULUS: Penandaan hari libur pada tanggal lampau terintegrasi akurat ke riwayat presensi.");
+  }
+
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");
 }
 

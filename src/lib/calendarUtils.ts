@@ -91,6 +91,45 @@ export function saveStoredHolidays(holidays: HolidayItem[]): void {
 }
 
 /**
+ * Menambahkan atau memperbarui hari libur untuk tanggal tertentu (termasuk tanggal lampau)
+ */
+export function addOrUpdateHoliday(
+  date: string,
+  name: string,
+  category: HolidayCategory = "SEKOLAH",
+  description?: string
+): HolidayItem[] {
+  const current = getStoredHolidays();
+  const existingIdx = current.findIndex((h) => h.date === date);
+  const newItem: HolidayItem = {
+    id: existingIdx !== -1 ? current[existingIdx].id : `hld-${date}-${Date.now()}`,
+    date,
+    name,
+    category,
+    description: description?.trim() || undefined,
+    createdAt: new Date().toISOString(),
+  };
+
+  const updated =
+    existingIdx !== -1
+      ? current.map((h, i) => (i === existingIdx ? newItem : h))
+      : [...current, newItem];
+
+  saveStoredHolidays(updated);
+  return updated;
+}
+
+/**
+ * Menghapus hari libur berdasarkan tanggal tertentu (mengembalikan jadi hari KBM aktif)
+ */
+export function removeHolidayByDate(date: string): HolidayItem[] {
+  const current = getStoredHolidays();
+  const updated = current.filter((h) => h.date !== date);
+  saveStoredHolidays(updated);
+  return updated;
+}
+
+/**
  * Memeriksa apakah suatu tanggal tertentu (format YYYY-MM-DD) merupakan hari libur
  */
 export function findHolidayByDate(

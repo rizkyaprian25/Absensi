@@ -30,6 +30,7 @@ import {
 import type {
   AttendanceStatus,
   HolidayItem,
+  HolidayCategory,
   AttendanceSession,
   AttendanceRecord,
 } from "@/contracts/attendance.ts";
@@ -37,6 +38,9 @@ import {
   getStoredHolidays,
   findHolidayByDate,
   formatIndonesianDate,
+  addOrUpdateHoliday,
+  removeHolidayByDate,
+  getCategoryLabel,
 } from "@/lib/calendarUtils.ts";
 import {
   getSessionAndRecords,
@@ -91,6 +95,12 @@ function AttendanceTakingContent() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [holidays, setHolidays] = useState<HolidayItem[]>([]);
+
+  // State Modal Kustomisasi Libur
+  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
+  const [holidayNameInput, setHolidayNameInput] = useState("");
+  const [holidayCategoryInput, setHolidayCategoryInput] = useState<HolidayCategory>("SEKOLAH");
+  const [holidayDescInput, setHolidayDescInput] = useState("");
 
   // Muat hari libur saat mount
   useEffect(() => {
@@ -259,6 +269,38 @@ function AttendanceTakingContent() {
     }, 400);
   };
 
+  // Tandai tanggal yang sedang dibuka sebagai hari libur
+  const handleMarkAsHoliday = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!holidayNameInput.trim()) return;
+
+    const updated = addOrUpdateHoliday(
+      selectedDate,
+      holidayNameInput.trim(),
+      holidayCategoryInput,
+      holidayDescInput.trim() || undefined
+    );
+    setHolidays(updated);
+    setIsHolidayModalOpen(false);
+    setHolidayNameInput("");
+    setHolidayDescInput("");
+
+    setToastMessage(
+      `Tanggal ${formatIndonesianDate(selectedDate)} berhasil ditetapkan sebagai Hari Libur: "${holidayNameInput.trim()}"`
+    );
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Batalkan status libur untuk tanggal ini (jadikan hari masuk aktif)
+  const handleRemoveHoliday = () => {
+    const updated = removeHolidayByDate(selectedDate);
+    setHolidays(updated);
+    setToastMessage(
+      `Status libur untuk tanggal ${formatIndonesianDate(selectedDate)} telah dibatalkan. Tanggal ini kini aktif sebagai Hari Masuk KBM.`
+    );
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
   return (
     <div className="flex flex-col gap-4 pb-24">
       {/* Toast Notifikasi Sukses Simpan */}
@@ -303,6 +345,34 @@ function AttendanceTakingContent() {
             >
               <RotateCcw className="w-3 h-3" />
               <span>Hari Ini</span>
+            </button>
+          )}
+
+          {/* Tombol Aksi Tandai Libur / Jadikan Hari Masuk */}
+          {currentHoliday ? (
+            <button
+              type="button"
+              onClick={handleRemoveHoliday}
+              title="Batalkan status libur (kembali jadi hari masuk KBM aktif)"
+              className="min-h-[38px] px-3 py-1 rounded-[8px] bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-xs font-semibold text-[var(--status-hadir-fg)] transition-all flex items-center gap-1.5 border border-[var(--border-hairline)] shadow-xs"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Jadikan Hari Masuk</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setHolidayNameInput(
+                  isBackfill ? "Kegiatan / Libur Khusus Sekolah" : "Libur / Bebas KBM"
+                );
+                setIsHolidayModalOpen(true);
+              }}
+              title="Tandai tanggal ini sebagai hari libur (siswa bebas absen)"
+              className="min-h-[38px] px-3 py-1 rounded-[8px] bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] text-xs font-semibold text-[var(--status-alpa-fg)] transition-all flex items-center gap-1.5 border border-[var(--border-hairline)] shadow-xs"
+            >
+              <CalendarOff className="w-3.5 h-3.5" />
+              <span>Tandai Libur</span>
             </button>
           )}
         </div>
@@ -350,15 +420,37 @@ function AttendanceTakingContent() {
 
       {/* Banner Peringatan Jika Hari Libur */}
       {currentHoliday && (
-        <div className="p-3.5 rounded-[12px] bg-[var(--status-alpa-bg)] border border-[var(--status-alpa-fg)]/20 flex items-start gap-2.5 text-xs text-[var(--text-secondary)] shadow-xs animate-in fade-in">
-          <CalendarOff className="w-4 h-4 text-[var(--status-alpa-fg)] shrink-0 mt-0.5" />
-          <div>
-            <p className="font-bold text-[var(--status-alpa-fg)]">
-              Pemberitahuan: Tanggal Ini Tercatat Sebagai Hari Libur ({currentHoliday.name})
-            </p>
-            <p className="mt-0.5">
-              Anda tetap dapat mencatat presensi jika menyelenggarakan jam pelajaran pengganti atau kegiatan ekstra.
-            </p>
+        <div className="p-4 rounded-[14px] bg-[var(--status-alpa-bg)] border border-[var(--status-alpa-fg)]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-[10px] bg-[var(--status-alpa-fg)] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+              <CalendarOff className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-bold text-sm text-[var(--status-alpa-fg)]">
+                  Tanggal Ini Ditetapkan Sebagai Hari Libur: {currentHoliday.name}
+                </p>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[var(--status-alpa-fg)]/10 text-[var(--status-alpa-fg)] font-bold font-mono">
+                  {getCategoryLabel(currentHoliday.category)}
+                </span>
+              </div>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                {currentHoliday.description || "Tidak ada kegiatan KBM terjadwal. Seluruh siswa bebas presensi (tidak dihitung alpa)."}
+              </p>
+              <p className="text-[11px] text-[var(--text-secondary)] mt-1">
+                💡 Jika ada jam pengganti atau kegiatan ekstra yang tetap berlangsung, Anda tetap dapat merekam presensi siswa di bawah.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+            <button
+              type="button"
+              onClick={handleRemoveHoliday}
+              className="min-h-[36px] px-3.5 py-1.5 rounded-[8px] bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] transition-all shadow-xs"
+            >
+              Batalkan Status Libur
+            </button>
           </div>
         </div>
       )}
@@ -556,6 +648,92 @@ function AttendanceTakingContent() {
           </button>
         </div>
       </div>
+
+      {/* Modal: Tandai Hari Libur untuk Tanggal Ini */}
+      {isHolidayModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[16px] p-5 shadow-xl flex flex-col gap-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-[var(--text-primary)]">
+                  Tandai Sebagai Hari Libur
+                </h3>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  {formatIndonesianDate(selectedDate)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHolidayModalOpen(false)}
+                className="p-1 rounded-full text-[var(--text-secondary)] hover:bg-[var(--surface-recessed)]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleMarkAsHoliday} className="flex flex-col gap-3.5">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">
+                  Nama / Alasan Libur
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Kegiatan MPLS / Rapat Dinas / Class Meeting"
+                  value={holidayNameInput}
+                  onChange={(e) => setHolidayNameInput(e.target.value)}
+                  className="min-h-[42px] px-3 py-2 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">
+                  Kategori Libur
+                </label>
+                <select
+                  value={holidayCategoryInput}
+                  onChange={(e) => setHolidayCategoryInput(e.target.value as HolidayCategory)}
+                  className="min-h-[42px] px-3 py-2 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] cursor-pointer"
+                >
+                  <option value="SEKOLAH">Libur / Kegiatan Sekolah</option>
+                  <option value="KHUSUS">Diliburkan Khusus Guru</option>
+                  <option value="NASIONAL">Libur Nasional / Tanggal Merah</option>
+                  <option value="CUTI_BERSAMA">Cuti Bersama</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">
+                  Keterangan Tambahan (Opsional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Catatan tambahan untuk jurnal sekolah..."
+                  value={holidayDescInput}
+                  onChange={(e) => setHolidayDescInput(e.target.value)}
+                  className="px-3 py-2 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-hairline)]">
+                <button
+                  type="button"
+                  onClick={() => setIsHolidayModalOpen(false)}
+                  className="min-h-[38px] px-3.5 rounded-[8px] text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-recessed)]"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="min-h-[38px] px-4 rounded-[8px] text-xs font-bold bg-[var(--status-alpa-fg)] text-white shadow-xs hover:opacity-95"
+                >
+                  Simpan Status Libur
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
