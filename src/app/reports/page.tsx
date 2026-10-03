@@ -17,8 +17,75 @@ import {
   MOCK_CLASSES,
   getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
-import { HolidayItem } from "@/contracts/attendance";
+import type {
+  HolidayItem,
+  ScheduleDay,
+  AttendanceSession,
+  AttendanceRecord,
+} from "@/contracts/attendance";
 import { getStoredHolidays, findHolidayByDate } from "@/lib/calendarUtils";
+import { getSavedSessions, getSavedRecords } from "@/lib/attendanceStorage";
+
+const SEMESTER_MONTHS = [
+  { value: "2026-07", label: "Juli 2026" },
+  { value: "2026-08", label: "Agustus 2026" },
+  { value: "2026-09", label: "September 2026" },
+  { value: "2026-10", label: "Oktober 2026" },
+  { value: "2026-11", label: "November 2026" },
+  { value: "2026-12", label: "Desember 2026" },
+];
+
+/**
+ * Menghasilkan daftar tanggal efektif KBM kelas pada bulan terpilih
+ */
+function getDatesForClassMonth(
+  yearMonth: string,
+  scheduleDay?: ScheduleDay,
+  classId?: string,
+  savedSessions: AttendanceSession[] = []
+): string[] {
+  const [yearStr, monthStr] = yearMonth.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+
+  const dayMap: Record<ScheduleDay, number> = {
+    Senin: 1,
+    Selasa: 2,
+    Rabu: 3,
+    Kamis: 4,
+    Jumat: 5,
+  };
+
+  const targetDay = scheduleDay ? dayMap[scheduleDay] : 1;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const dateSet = new Set<string>();
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const curDate = new Date(year, month - 1, d);
+    const dayOfWeek = curDate.getDay();
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+    // Khusus Juli 2026, KBM dimulai 13 Juli 2026 (awal semester)
+    if (yearMonth === "2026-07" && d < 13) {
+      continue;
+    }
+
+    if (dayOfWeek === targetDay) {
+      dateSet.add(dateStr);
+    }
+  }
+
+  // Tambahkan juga jika ada sesi tersimpan di luar jadwal (kelas pengganti)
+  if (classId) {
+    savedSessions.forEach((s) => {
+      if (s.classId === classId && s.sessionDate.startsWith(yearMonth)) {
+        dateSet.add(s.sessionDate);
+      }
+    });
+  }
+
+  return Array.from(dateSet).sort();
+}
 
 /**
  * Halaman Rekapitulasi Bulanan & Ekspor (L8 Stitch)
@@ -27,12 +94,17 @@ import { getStoredHolidays, findHolidayByDate } from "@/lib/calendarUtils";
 export default function ReportsPage() {
   const [selectedClassId, setSelectedClassId] = useState("class-7a");
   const [selectedMonth, setSelectedMonth] = useState("2026-09");
+  const [monthIndex, setMonthIndex] = useState(2); // 2 = September 2026
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [holidays, setHolidays] = useState<HolidayItem[]>([]);
+  const [savedSessions, setSavedSessions] = useState<AttendanceSession[]>([]);
+  const [savedRecords, setSavedRecords] = useState<AttendanceRecord[]>([]);
 
   useEffect(() => {
     setHolidays(getStoredHolidays());
-  }, []);
+    setSavedSessions(getSavedSessions());
+    setSavedRecords(getSavedRecords());
+  }, [selectedClassId, selectedMonth]);
 
   const currentClass =
     MOCK_CLASSES.find((c) => c.id === selectedClassId) ?? MOCK_CLASSES[0];
@@ -44,27 +116,66 @@ export default function ReportsPage() {
 
   // Data rekapitulasi bulanan dinamis sesuai kelas yang dipilih & hari libur
   const recapData = useMemo(() => {
-    const effectiveDates = [
-      "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04",
-      "2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11",
-      "2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18",
-      "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25",
-      "2026-09-28", "2026-09-29",
-    ];
+    const effectiveDates = getDatesForClassMonth(
+      selectedMonth,
+      currentClass.scheduleDay,
+      selectedClassId,
+      savedSessions
+    );
     const holidayDatesSet = new Set(holidays.map((h) => h.date));
-    const kbmDaysCount = effectiveDates.filter((d) => !holidayDatesSet.has(d)).length;
 
-    const studentRecaps = classStudents.map((s, idx) => {
-      const isProblematic = idx === 11;
-      const hadir = isProblematic
-        ? Math.max(1, kbmDaysCount - 5)
-        : idx % 5 === 0
-        ? Math.max(1, kbmDaysCount - 1)
-        : kbmDaysCount;
-      const sakit = isProblematic ? 1 : idx % 5 === 0 ? 1 : 0;
-      const izin = isProblematic ? 1 : 1;
-      const alpa = isProblematic ? 3 : 0;
-      const persentase = Number(((hadir / (kbmDaysCount || 1)) * 100).toFixed(1));
+    // Ambil seluruh sesi kelas ini pada bulan terpilih
+    const classSessions = savedSessions.filter(
+      (s) => s.classId === selectedClassId && s.sessionDate.startsWith(selectedMonth)
+    );
+
+    const studentRecaps = classStudents.map((s) => {
+      let hadir = 0;
+      let sakit = 0;
+      let izin = 0;
+      let alpa = 0;
+      let terlambat = 0;
+      const dailyStatus: Record<string, string> = {};
+
+      effectiveDates.forEach((date) => {
+        if (holidayDatesSet.has(date)) {
+          dailyStatus[date] = "L";
+          return;
+        }
+
+        const session = classSessions.find((sess) => sess.sessionDate === date);
+        if (session) {
+          const rec = savedRecords.find(
+            (r) => r.sessionId === session.id && r.studentId === s.id
+          );
+          const st = rec ? rec.status : "HADIR";
+          if (st === "HADIR") {
+            hadir++;
+            dailyStatus[date] = "H";
+          } else if (st === "SAKIT") {
+            sakit++;
+            dailyStatus[date] = "S";
+          } else if (st === "IZIN") {
+            izin++;
+            dailyStatus[date] = "I";
+          } else if (st === "ALPA") {
+            alpa++;
+            dailyStatus[date] = "A";
+          } else if (st === "TERLAMBAT") {
+            terlambat++;
+            dailyStatus[date] = "T";
+          }
+        } else {
+          // Tanggal belum direkam absensinya
+          dailyStatus[date] = "-";
+        }
+      });
+
+      const totalRecordedDays = hadir + sakit + izin + alpa + terlambat;
+      const persentase =
+        totalRecordedDays > 0
+          ? Number(((hadir / totalRecordedDays) * 100).toFixed(1))
+          : 100;
 
       return {
         studentId: s.id,
@@ -74,20 +185,24 @@ export default function ReportsPage() {
         sakit,
         izin,
         alpa,
-        terlambat: 0,
-        totalHari: kbmDaysCount,
+        terlambat,
+        totalHari: totalRecordedDays,
         persentaseKehadiran: persentase,
-        dailyStatus: {} as Record<string, string>,
-        needsAttention: persentase < 85,
+        dailyStatus,
+        needsAttention: totalRecordedDays > 0 && persentase < 85,
       };
     });
 
-    const averageAttendance = Number(
-      (
-        studentRecaps.reduce((acc, curr) => acc + curr.persentaseKehadiran, 0) /
-        (studentRecaps.length || 1)
-      ).toFixed(1)
-    );
+    const recordedStudents = studentRecaps.filter((s) => s.totalHari > 0);
+    const averageAttendance =
+      recordedStudents.length > 0
+        ? Number(
+            (
+              recordedStudents.reduce((acc, curr) => acc + curr.persentaseKehadiran, 0) /
+              recordedStudents.length
+            ).toFixed(1)
+          )
+        : 100;
 
     return {
       classId: selectedClassId,
@@ -98,12 +213,25 @@ export default function ReportsPage() {
       averageAttendance,
       students: studentRecaps,
     };
-  }, [classStudents, selectedClassId, currentClass, selectedMonth, holidays]);
+  }, [
+    classStudents,
+    selectedClassId,
+    currentClass,
+    selectedMonth,
+    holidays,
+    savedSessions,
+    savedRecords,
+  ]);
 
   // Hitung jumlah siswa yang perlu perhatian (< 85% kehadiran)
   const studentsNeedingAttention = useMemo(() => {
     return recapData.students.filter((s) => s.needsAttention);
   }, [recapData]);
+
+  const currentMonthLabel = useMemo(() => {
+    const found = SEMESTER_MONTHS.find((m) => m.value === selectedMonth);
+    return found ? found.label : selectedMonth;
+  }, [selectedMonth]);
 
   // Ekspor CSV Native dengan UTF-8 BOM (PRD §5 FR-8 & ADR-0004)
   const handleExportCsv = () => {
@@ -128,13 +256,7 @@ export default function ReportsPage() {
     // Baris Siswa
     const rows = recapData.students.map((student, idx) => {
       const dailyCols = recapData.effectiveDates.map((date) => {
-        if (holidayDatesSet.has(date)) return "L";
-        if (student.needsAttention) {
-          if (date.endsWith("04") || date.endsWith("11") || date.endsWith("18") || date.endsWith("25")) return "A";
-          if (date.endsWith("08")) return "S";
-          if (date.endsWith("15")) return "I";
-        }
-        return "H";
+        return student.dailyStatus[date] ?? "-";
       });
 
       return [
@@ -155,7 +277,7 @@ export default function ReportsPage() {
     const csvContent =
       "\uFEFF" +
       [
-        `"REKAP PRESENSI KELAS ${currentClass.name} - BULAN SEPTEMBER 2026"`,
+        `"REKAP PRESENSI KELAS ${currentClass.name} - BULAN ${currentMonthLabel.toUpperCase()}"`,
         `"Tahun Ajaran: ${currentClass.academicYear} | Semester: ${currentClass.semester ?? 1}"`,
         `"Rata-rata Kehadiran Kelas: ${recapData.averageAttendance}%"`,
         "",
@@ -177,7 +299,7 @@ export default function ReportsPage() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    setToastMessage("Berkas CSV berhasil diunduh (format Excel)");
+    setToastMessage(`Berkas CSV Rekap ${currentMonthLabel} berhasil diunduh`);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
@@ -246,32 +368,69 @@ export default function ReportsPage() {
           LAPORAN REKAPITULASI PRESENSI SISWA
         </h1>
         <p className="text-sm">
-          Kelas: {currentClass.name} | Periode: September 2026 | Tahun Ajaran: {currentClass.academicYear}
+          Kelas: {currentClass.name} | Periode: {currentMonthLabel} | Tahun Ajaran: {currentClass.academicYear}
         </p>
       </div>
 
-      {/* Navigasi Periode Bulan */}
+      {/* Navigasi Periode Bulan Interaktif */}
       <div className="p-3 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] flex items-center justify-between shadow-xs print:hidden">
         <button
           type="button"
-          className="w-9 h-9 rounded-[8px] bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] flex items-center justify-center text-[var(--text-primary)] transition-colors"
+          disabled={monthIndex <= 0}
+          onClick={() => {
+            if (monthIndex > 0) {
+              const prev = monthIndex - 1;
+              setMonthIndex(prev);
+              setSelectedMonth(SEMESTER_MONTHS[prev].value);
+            }
+          }}
+          className={`w-9 h-9 rounded-[8px] flex items-center justify-center transition-colors ${
+            monthIndex <= 0
+              ? "opacity-30 cursor-not-allowed bg-[var(--surface-recessed)] text-[var(--text-secondary)]"
+              : "bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)] cursor-pointer"
+          }`}
           aria-label="Bulan Sebelumnya"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
 
-        <div className="text-center">
-          <p className="font-bold text-sm text-[var(--text-primary)]">
-            September 2026
-          </p>
-          <p className="text-[11px] text-[var(--text-secondary)]">
+        <div className="flex flex-col items-center">
+          <select
+            value={selectedMonth}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSelectedMonth(val);
+              const idx = SEMESTER_MONTHS.findIndex((m) => m.value === val);
+              if (idx !== -1) setMonthIndex(idx);
+            }}
+            className="font-bold text-sm text-[var(--text-primary)] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-center cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] rounded-[8px] px-3 py-1 shadow-xs"
+          >
+            {SEMESTER_MONTHS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-mono">
             Tahun Ajaran 2026/2027 · Semester Ganjil
           </p>
         </div>
 
         <button
           type="button"
-          className="w-9 h-9 rounded-[8px] bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] flex items-center justify-center text-[var(--text-primary)] transition-colors"
+          disabled={monthIndex >= SEMESTER_MONTHS.length - 1}
+          onClick={() => {
+            if (monthIndex < SEMESTER_MONTHS.length - 1) {
+              const next = monthIndex + 1;
+              setMonthIndex(next);
+              setSelectedMonth(SEMESTER_MONTHS[next].value);
+            }
+          }}
+          className={`w-9 h-9 rounded-[8px] flex items-center justify-center transition-colors ${
+            monthIndex >= SEMESTER_MONTHS.length - 1
+              ? "opacity-30 cursor-not-allowed bg-[var(--surface-recessed)] text-[var(--text-secondary)]"
+              : "bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)] cursor-pointer"
+          }`}
           aria-label="Bulan Berikutnya"
         >
           <ChevronRight className="w-4 h-4" />
@@ -452,24 +611,7 @@ export default function ReportsPage() {
 
                     {/* Sel Status Tiap Tanggal */}
                     {recapData.effectiveDates.map((date) => {
-                      const isHoliday = Boolean(findHolidayByDate(date, holidays));
-                      let cellStatus: "HADIR" | "SAKIT" | "IZIN" | "ALPA" | "LIBUR" = "HADIR";
-                      if (isHoliday) {
-                        cellStatus = "LIBUR";
-                      } else if (student.needsAttention) {
-                        if (
-                          date.endsWith("04") ||
-                          date.endsWith("11") ||
-                          date.endsWith("18") ||
-                          date.endsWith("25")
-                        ) {
-                          cellStatus = "ALPA";
-                        } else if (date.endsWith("08")) {
-                          cellStatus = "SAKIT";
-                        } else if (date.endsWith("15")) {
-                          cellStatus = "IZIN";
-                        }
-                      }
+                      const code = student.dailyStatus[date] ?? "-";
 
                       return (
                         <td
@@ -478,26 +620,22 @@ export default function ReportsPage() {
                         >
                           <span
                             className={`inline-flex items-center justify-center w-6 h-6 rounded-[4px] font-mono text-[11px] font-bold ${
-                              cellStatus === "LIBUR"
+                              code === "L"
                                 ? "bg-[var(--surface-recessed)] text-[var(--text-secondary)] border border-[var(--border-hairline)]"
-                                : cellStatus === "HADIR"
+                                : code === "H"
                                 ? "bg-[var(--status-hadir-bg)] text-[var(--status-hadir-fg)]"
-                                : cellStatus === "SAKIT"
+                                : code === "S"
                                 ? "bg-[var(--status-sakit-bg)] text-[var(--status-sakit-fg)]"
-                                : cellStatus === "IZIN"
+                                : code === "I"
                                 ? "bg-[var(--status-izin-bg)] text-[var(--status-izin-fg)]"
-                                : "bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)]"
+                                : code === "A"
+                                ? "bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)]"
+                                : code === "T"
+                                ? "bg-amber-100 text-amber-800"
+                                : "text-[var(--text-secondary)]/50 font-normal"
                             }`}
                           >
-                            {cellStatus === "LIBUR"
-                              ? "L"
-                              : cellStatus === "HADIR"
-                              ? "H"
-                              : cellStatus === "SAKIT"
-                              ? "S"
-                              : cellStatus === "IZIN"
-                              ? "I"
-                              : "A"}
+                            {code}
                           </span>
                         </td>
                       );

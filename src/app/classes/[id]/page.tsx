@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowRight,
   Upload,
   Plus,
   FileSpreadsheet,
@@ -16,12 +17,24 @@ import {
   BarChart3,
   Check,
   Search,
+  History,
+  Sparkles,
+  Clock,
 } from "lucide-react";
 import {
   MOCK_CLASSES,
   getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
-import { Student } from "@/contracts/attendance";
+import { Student, HolidayItem } from "@/contracts/attendance";
+import {
+  generatePastTeachingDates,
+  PastTeachingDateInfo,
+  SEMESTER_START_DATE,
+} from "@/lib/attendanceStorage";
+import {
+  formatIndonesianDate,
+  getStoredHolidays,
+} from "@/lib/calendarUtils";
 
 interface CsvPreviewItem {
   row: number;
@@ -50,6 +63,41 @@ export default function ClassDetailPage() {
   const [csvStep, setCsvStep] = useState<1 | 2>(1);
   const [csvPreview, setCsvPreview] = useState<CsvPreviewItem[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Tanggal hari ini ISO
+  const todayIso = useMemo(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }, []);
+
+  // State tanggal bebas untuk presensi susulan / jam pengganti
+  const [customBackfillDate, setCustomBackfillDate] = useState(todayIso);
+
+  // State hari libur dan daftar seluruh pertemuan KBM lampau sejak 13 Juli 2026
+  const [holidays, setHolidays] = useState<HolidayItem[]>([]);
+  const [pastTeachingDates, setPastTeachingDates] = useState<PastTeachingDateInfo[]>([]);
+
+  useEffect(() => {
+    const loadedHolidays = getStoredHolidays();
+    setHolidays(loadedHolidays);
+    if (currentClass.scheduleDay) {
+      const dates = generatePastTeachingDates(
+        currentClass.scheduleDay,
+        currentClass.id,
+        SEMESTER_START_DATE,
+        new Date(),
+        loadedHolidays
+      );
+      setPastTeachingDates(dates);
+    }
+  }, [currentClass.scheduleDay, currentClass.id]);
+
+  const unfilledCount = useMemo(() => {
+    return pastTeachingDates.filter((d) => !d.isFilled && !d.isHoliday).length;
+  }, [pastTeachingDates]);
 
   // Filter siswa
   const filteredStudents = students.filter(
@@ -189,7 +237,12 @@ export default function ClassDetailPage() {
           }`}
         >
           <Calendar className="w-4 h-4" />
-          <span>Riwayat Kalender</span>
+          <span>Riwayat &amp; Susulan</span>
+          {unfilledCount > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+              {unfilledCount}
+            </span>
+          )}
         </button>
 
         <Link
@@ -246,44 +299,168 @@ export default function ClassDetailPage() {
         </div>
       )}
 
-      {/* Konten Tab Riwayat Kalender */}
+      {/* Konten Tab Riwayat & Susulan Pertemuan KBM */}
       {activeTab === "riwayat" && (
-        <div className="p-5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] flex flex-col gap-4 shadow-xs">
-          <div>
-            <h2 className="text-base font-bold text-[var(--text-primary)]">
-              Kalender Kehadiran (September 2026)
-            </h2>
-            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              Titik hijau menandai tanggal sesi presensi yang telah direkam.
-            </p>
+        <div className="flex flex-col gap-4">
+          {/* Header & Statistik Sesi */}
+          <div className="p-4 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] flex flex-col gap-3 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  <History className="w-5 h-5 text-[var(--color-accent)]" />
+                  <span>Riwayat Pertemuan &amp; Presensi Susulan</span>
+                </h2>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  Jadwal resmi: Setiap {currentClass.scheduleDay}, {currentClass.scheduleTime} WIB. Dimulai sejak 13 Juli 2026.
+                </p>
+              </div>
+              <span className="text-xs px-2.5 py-1 rounded-[6px] bg-[var(--surface-recessed)] font-mono text-[var(--text-secondary)] self-start sm:self-auto">
+                Semester Ganjil 2026/2027
+              </span>
+            </div>
+
+            {/* Statistik Ringkas */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[var(--border-hairline)]">
+              <div className="p-2.5 rounded-[10px] bg-[var(--surface-recessed)]/50 border border-[var(--border-hairline)]/60 text-center">
+                <span className="text-[10px] font-bold text-[var(--text-secondary)] block uppercase">Total Pertemuan</span>
+                <span className="font-extrabold text-base text-[var(--text-primary)] font-mono">{pastTeachingDates.length}</span>
+                <span className="text-[10px] text-[var(--text-secondary)] block">Jadwal Terdaftar</span>
+              </div>
+              <div className="p-2.5 rounded-[10px] bg-[var(--surface-recessed)]/50 border border-[var(--border-hairline)]/60 text-center">
+                <span className="text-[10px] font-bold text-[var(--text-secondary)] block uppercase">Sudah Direkam</span>
+                <span className="font-extrabold text-base text-[var(--status-hadir-fg)] font-mono">
+                  {pastTeachingDates.filter((d) => d.isFilled).length}
+                </span>
+                <span className="text-[10px] text-[var(--text-secondary)] block">Sesi Selesai</span>
+              </div>
+              <div className="p-2.5 rounded-[10px] bg-[var(--surface-recessed)]/50 border border-[var(--border-hairline)]/60 text-center">
+                <span className="text-[10px] font-bold text-[var(--text-secondary)] block uppercase">Perlu Susulan</span>
+                <span className="font-extrabold text-base text-amber-500 font-mono">
+                  {unfilledCount}
+                </span>
+                <span className="text-[10px] text-[var(--text-secondary)] block">Belum Diabsen</span>
+              </div>
+              <div className="p-2.5 rounded-[10px] bg-[var(--surface-recessed)]/50 border border-[var(--border-hairline)]/60 text-center">
+                <span className="text-[10px] font-bold text-[var(--text-secondary)] block uppercase">Hari Libur</span>
+                <span className="font-extrabold text-base text-[var(--text-secondary)] font-mono">
+                  {pastTeachingDates.filter((d) => d.isHoliday).length}
+                </span>
+                <span className="text-[10px] text-[var(--text-secondary)] block">Bebas KBM</span>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5 text-center text-xs">
-            {["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"].map((day) => (
-              <span key={day} className="font-bold text-[var(--text-secondary)] py-1">
-                {day}
-              </span>
-            ))}
-            {/* Tanggal 1 s/d 30 */}
-            {Array.from({ length: 30 }).map((_, i) => {
-              const day = i + 1;
-              const isWeekend = (day % 7 === 6) || (day % 7 === 0);
-              const isAttended = !isWeekend && day <= 29;
-              const isToday = day === 29;
+          {/* Form Pintas Presensi Tanggal Lainnya / Jam Pengganti */}
+          <div className="p-4 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div>
+              <h3 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-[var(--color-accent)]" />
+                <span>Isi Presensi Tanggal Lainnya / Jam Pengganti</span>
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                Pilih tanggal apa pun dari bulan Juli hingga hari ini untuk kelas pengganti atau kegiatan ekstra.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={customBackfillDate}
+                min="2026-07-01"
+                max={todayIso}
+                onChange={(e) => setCustomBackfillDate(e.target.value)}
+                className="min-h-[40px] px-3 py-1.5 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-mono font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+              />
+              <Link
+                href={`/attendance/${currentClass.id}?date=${customBackfillDate}`}
+                className="min-h-[40px] px-3.5 py-1.5 bg-[var(--color-accent)] text-[var(--color-on-accent)] font-semibold rounded-[10px] text-xs flex items-center gap-1.5 hover:opacity-95 transition-all shadow-xs shrink-0"
+              >
+                <span>Buka Form</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Daftar Riwayat Pertemuan Terjadwal */}
+          <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] divide-y divide-[var(--border-hairline)] overflow-hidden shadow-xs">
+            <div className="p-3 bg-[var(--surface-recessed)]/50 flex items-center justify-between text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+              <span>Daftar Pertemuan Terjadwal Sejak Awal Semester</span>
+              <span>{pastTeachingDates.length} Pertemuan</span>
+            </div>
+
+            {pastTeachingDates.map((item, index) => {
+              const meetingNumber = pastTeachingDates.length - index;
 
               return (
                 <div
-                  key={day}
-                  className={`p-2 rounded-[8px] flex flex-col items-center justify-center min-h-[44px] border ${
-                    isToday
-                      ? "border-[var(--color-accent)] font-bold bg-[var(--surface-recessed)]"
-                      : "border-[var(--border-hairline)]/40"
-                  } ${isWeekend ? "opacity-30 bg-black/5" : ""}`}
+                  key={item.date}
+                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[var(--surface-recessed)]/40 transition-colors"
                 >
-                  <span className="font-mono text-xs">{day}</span>
-                  {isAttended && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--status-hadir-fg)] mt-1" />
-                  )}
+                  <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                    <div className="w-10 h-10 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] flex flex-col items-center justify-center shrink-0">
+                      <span className="text-[9px] font-bold text-[var(--text-secondary)] font-mono leading-none">TEMU</span>
+                      <span className="text-sm font-extrabold text-[var(--color-accent)] font-mono leading-none mt-0.5">
+                        #{meetingNumber}
+                      </span>
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-bold text-sm text-[var(--text-primary)]">
+                          {formatIndonesianDate(item.date)}
+                        </h4>
+                        {item.isToday && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[var(--color-accent)] text-[var(--color-on-accent)] font-bold">
+                            Hari Ini
+                          </span>
+                        )}
+                        {item.isHoliday && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-[6px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold font-mono">
+                            Libur: {item.holidayName}
+                          </span>
+                        )}
+                        {!item.isHoliday && item.isFilled && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-[6px] bg-[var(--status-hadir-bg)] text-[var(--status-hadir-fg)] font-bold font-mono flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Sudah Diisi ({item.hadirCount ?? 0} Hadir)
+                          </span>
+                        )}
+                        {!item.isHoliday && !item.isFilled && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-[6px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold font-mono flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" />
+                            Belum Diisi (Perlu Susulan)
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-mono">
+                        {item.isHoliday
+                          ? "Tidak ada KBM terjadwal (bebas presensi)."
+                          : item.isFilled
+                          ? `Terekam: ${item.hadirCount ?? 0} dari ${item.totalStudents ?? students.length} siswa hadir.`
+                          : "Presensi belum direkam untuk pertemuan ini."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    <Link
+                      href={`/attendance/${currentClass.id}?date=${item.date}`}
+                      className={`min-h-[40px] px-3.5 py-1.5 rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs active:scale-[0.98] ${
+                        !item.isHoliday && !item.isFilled
+                          ? "bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:opacity-95 font-bold"
+                          : "bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)] border border-[var(--border-hairline)]"
+                      }`}
+                    >
+                      <span>
+                        {item.isHoliday
+                          ? "Catat Jam Pengganti"
+                          : item.isFilled
+                          ? "Lihat / Edit Presensi"
+                          : "Isi Presensi Susulan"}
+                      </span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
                 </div>
               );
             })}

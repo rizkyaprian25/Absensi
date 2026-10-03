@@ -1,11 +1,11 @@
-import {
+import type {
   Class,
   Student,
   AttendanceSession,
   AttendanceRecord,
   MonthlyClassRecap,
-} from "../attendance";
-import { ALL_STUDENTS_BY_CLASS, STUDENTS_CLASS_8B } from "./studentsData";
+} from "../attendance.ts";
+import { ALL_STUDENTS_BY_CLASS, STUDENTS_CLASS_8B } from "./studentsData.ts";
 
 // ============================================================================
 // DATA GURU & SEKOLAH

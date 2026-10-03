@@ -13,6 +13,7 @@ import {
   Plus,
   X,
   Sparkles,
+  History,
 } from "lucide-react";
 import {
   MOCK_CLASSES,
@@ -61,6 +62,19 @@ export default function TodayDashboardPage() {
   const [holidayNameInput, setHolidayNameInput] = useState("");
   const [holidayCategoryInput, setHolidayCategoryInput] = useState<HolidayCategory>("SEKOLAH");
   const [holidayDescInput, setHolidayDescInput] = useState("");
+
+  // Tanggal hari ini ISO
+  const todayIso = useMemo(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }, []);
+
+  // State untuk form cepat presensi susulan tanggal lalu di dashboard
+  const [quickBackfillClassId, setQuickBackfillClassId] = useState("class-7a");
+  const [quickBackfillDate, setQuickBackfillDate] = useState("2026-07-13");
 
   // Inisialisasi daftar hari libur dari penyimpanan lokal saat mount
   useEffect(() => {
@@ -383,6 +397,90 @@ export default function TodayDashboardPage() {
           })}
         </div>
       </section>
+
+      {/* Seksi: Presensi Susulan Bulan-Bulan Lalu (Backfill Tanggal Lampau) */}
+      <div className="p-5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] flex flex-col gap-4 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-[10px] bg-[var(--surface-recessed)] text-[var(--color-accent)] flex items-center justify-center shrink-0">
+              <History className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-[var(--text-primary)]">
+                Isi Presensi Susulan (Bulan-Bulan Lalu)
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                Tahun ajaran berjalan sejak 13 Juli 2026. Pilih rombel dan tanggal lampau untuk melengkapi absensi yang belum tercatat.
+              </p>
+            </div>
+          </div>
+          <span className="text-xs px-2.5 py-1 rounded-[6px] bg-[var(--surface-recessed)] font-mono text-[var(--text-secondary)] self-start sm:self-auto">
+            Mode Susulan Aktif
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          {/* Pilih Kelas */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-[var(--text-secondary)]">
+              Pilih Rombel / Kelas
+            </label>
+            <select
+              value={quickBackfillClassId}
+              onChange={(e) => setQuickBackfillClassId(e.target.value)}
+              className="min-h-[42px] px-3 py-2 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] cursor-pointer"
+            >
+              {MOCK_CLASSES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  Kelas {c.name} ({c.scheduleDay} · {c.scheduleTime} WIB)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Pilih Tanggal */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-[var(--text-secondary)]">
+              Pilih Tanggal Presensi
+            </label>
+            <input
+              type="date"
+              value={quickBackfillDate}
+              min="2026-07-01"
+              max={todayIso}
+              onChange={(e) => setQuickBackfillDate(e.target.value)}
+              className="min-h-[42px] px-3 py-2 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-mono font-bold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+            />
+          </div>
+
+          {/* Tombol Buka Form Presensi */}
+          <div className="flex flex-col gap-1.5 justify-end">
+            <label className="text-xs font-semibold text-transparent hidden sm:block">
+              Aksi
+            </label>
+            <Link
+              href={`/attendance/${quickBackfillClassId}?date=${quickBackfillDate}`}
+              className="min-h-[42px] px-4 py-2 bg-[var(--color-accent)] text-[var(--color-on-accent)] font-bold rounded-[10px] text-xs flex items-center justify-center gap-2 hover:opacity-95 active:scale-[0.98] transition-all shadow-xs"
+            >
+              <span>Isi Presensi Tanggal Tersebut</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+
+        <div className="p-2.5 rounded-[10px] bg-[var(--surface-recessed)]/50 border border-[var(--border-hairline)]/60 flex items-center justify-between text-xs text-[var(--text-secondary)] flex-wrap gap-2">
+          <span>
+            💡 Seluruh siswa akan langsung berstatus <strong className="text-[var(--status-hadir-fg)] font-semibold">HADIR</strong> secara otomatis agar pengisian tanggal lalu cepat selesai.
+          </span>
+          <Link
+            href={`/classes/${quickBackfillClassId}`}
+            className="font-bold text-[var(--color-accent)] hover:underline flex items-center gap-1 shrink-0"
+          >
+            <span>Lihat Riwayat &amp; Jadwal Lengkap Kelas Ini</span>
+            <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+      </div>
 
       {/* Ringkasan Beban Mengajar Mingguan */}
       <div className="p-4 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] flex flex-col gap-3 shadow-xs">

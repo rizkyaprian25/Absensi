@@ -12,6 +12,7 @@ import {
   isDateHoliday,
   getDateForWeekday,
 } from "./calendarUtils.ts";
+import { generatePastTeachingDates } from "./attendanceStorage.ts";
 
 /**
  * Smoke Test Mandiri (Fase 4 SOP §3.5 & PRD §14)
@@ -106,6 +107,28 @@ function runSmokeTest() {
     assert.strictEqual(fridayStr, "2026-10-02", "Jumat pekan tersebut harus 2026-10-02");
 
     console.log("✓ LULUS: Utilitas kalender akademik & hari libur kustom berfungsi presisi.");
+  }
+
+  // 5. Pengujian Penelusuran Tanggal KBM Lampau (Backfill Presensi)
+  {
+    console.log("[TEST 5] Menguji penjadwalan tanggal KBM lampau sejak awal semester...");
+    const tuesdayDates = generatePastTeachingDates(
+      "Selasa",
+      "class-8b",
+      "2026-07-13",
+      new Date("2026-10-03T10:00:00Z"),
+      DEFAULT_HOLIDAYS
+    );
+
+    assert.ok(tuesdayDates.length >= 11, "Harus menghasilkan minimal 11 hari Selasa sejak pertengahan Juli 2026");
+    assert.strictEqual(tuesdayDates[0].dayName, "Selasa");
+
+    // Periksa apakah 2026-08-25 terdeteksi libur (Maulid Nabi)
+    const maulidTuesday = tuesdayDates.find((t) => t.date === "2026-08-25");
+    assert.ok(maulidTuesday, "2026-08-25 harus ada dalam daftar Selasa lampau");
+    assert.strictEqual(maulidTuesday?.isHoliday, true, "2026-08-25 harus terdeteksi sebagai hari libur");
+
+    console.log("✓ LULUS: Penelusuran tanggal KBM lampau menghasilkan daftar presensi susulan yang akurat.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");
