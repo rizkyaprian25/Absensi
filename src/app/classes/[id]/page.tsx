@@ -21,6 +21,7 @@ import {
   History,
   Sparkles,
   Clock,
+  Award,
 } from "lucide-react";
 import {
   MOCK_CLASSES,
@@ -307,6 +308,14 @@ export default function ClassDetailPage() {
             </span>
           )}
         </button>
+
+        <Link
+          href={`/grades?classId=${classId}`}
+          className="flex-1 min-h-[38px] rounded-[9px] text-xs font-semibold flex items-center justify-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
+        >
+          <Award className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          <span>Buku Nilai</span>
+        </Link>
 
         <Link
           href="/reports"

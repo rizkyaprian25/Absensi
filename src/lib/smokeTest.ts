@@ -13,6 +13,18 @@ import {
   getDateForWeekday,
 } from "./calendarUtils.ts";
 import { generatePastTeachingDates } from "./attendanceStorage.ts";
+import {
+  calculateStudentGradeSummary,
+  calculateClassGradeStats,
+  exportGradesToCSV,
+} from "./gradeStorage.ts";
+import {
+  DEFAULT_KKM,
+  getGradePredicate,
+  type AssessmentItem,
+  type StudentScoreRecord,
+} from "../contracts/grades.ts";
+import type { Student } from "../contracts/attendance.ts";
 
 /**
  * Smoke Test Mandiri (Fase 4 SOP §3.5 & PRD §14)
@@ -161,7 +173,114 @@ function runSmokeTest() {
     console.log("✓ LULUS: Penandaan hari libur pada tanggal lampau terintegrasi akurat ke riwayat presensi.");
   }
 
+  // 7. Pengujian Logika Penilaian Siswa (Tugas, UH, Quiz, UTS, UAS, Kalkulasi KKM, Ekspor CSV)
+  {
+    console.log("[TEST 7] Menguji kalkulasi nilai siswa, bobot asesmen, KKM, dan ekspor CSV...");
+
+    const mockStudent1: Student = {
+      id: "std-test-01",
+      classId: "class-7a",
+      fullName: "Budi Santoso",
+      nis: "26001",
+      gender: "L",
+      isActive: true,
+      createdAt: "2026-07-15T00:00:00Z",
+    };
+
+    const mockStudent2: Student = {
+      id: "std-test-02",
+      classId: "class-7a",
+      fullName: "Siti Rahma",
+      nis: "26002",
+      gender: "P",
+      isActive: true,
+      createdAt: "2026-07-15T00:00:00Z",
+    };
+
+    const testAssessments: AssessmentItem[] = [
+      {
+        id: "asmt-tugas-1",
+        classId: "class-7a",
+        subject: "Informatika",
+        type: "TUGAS",
+        title: "Tugas 1",
+        date: "2026-08-01",
+        maxScore: 100,
+        weight: 1,
+        createdAt: "2026-08-01T00:00:00Z",
+      },
+      {
+        id: "asmt-quiz-1",
+        classId: "class-7a",
+        subject: "Informatika",
+        type: "QUIZ",
+        title: "Quiz 1",
+        date: "2026-08-15",
+        maxScore: 100,
+        weight: 1,
+        createdAt: "2026-08-15T00:00:00Z",
+      },
+      {
+        id: "asmt-uh-1",
+        classId: "class-7a",
+        subject: "Informatika",
+        type: "UH",
+        title: "UH 1",
+        date: "2026-09-01",
+        maxScore: 100,
+        weight: 2, // Bobot ganda
+        createdAt: "2026-09-01T00:00:00Z",
+      },
+    ];
+
+    const testScores: StudentScoreRecord[] = [
+      // Siswa 1: Tugas=80, Quiz=90, UH=85 -> Rata-rata berbobot: (80*1 + 90*1 + 85*2) / 4 = 340 / 4 = 85
+      { id: "s1", assessmentId: "asmt-tugas-1", studentId: "std-test-01", score: 80, updatedAt: "2026-08-01" },
+      { id: "s2", assessmentId: "asmt-quiz-1", studentId: "std-test-01", score: 90, updatedAt: "2026-08-15" },
+      { id: "s3", assessmentId: "asmt-uh-1", studentId: "std-test-01", score: 85, updatedAt: "2026-09-01" },
+
+      // Siswa 2: Tugas=70, Quiz=72, UH=68 -> Rata-rata berbobot: (70*1 + 72*1 + 68*2) / 4 = 278 / 4 = 69.5
+      { id: "s4", assessmentId: "asmt-tugas-1", studentId: "std-test-02", score: 70, updatedAt: "2026-08-01" },
+      { id: "s5", assessmentId: "asmt-quiz-1", studentId: "std-test-02", score: 72, updatedAt: "2026-08-15" },
+      { id: "s6", assessmentId: "asmt-uh-1", studentId: "std-test-02", score: 68, updatedAt: "2026-09-01" },
+    ];
+
+    const summary1 = calculateStudentGradeSummary(mockStudent1, testAssessments, testScores, DEFAULT_KKM);
+    assert.strictEqual(summary1.finalScore, 85, "Nilai akhir siswa 1 harus 85");
+    assert.strictEqual(summary1.isPassed, true, "Siswa 1 dengan nilai 85 harus Tuntas (>= 75)");
+    assert.strictEqual(summary1.predicate, "B", "Nilai 85 harus berpredikat B");
+
+    const summary2 = calculateStudentGradeSummary(mockStudent2, testAssessments, testScores, DEFAULT_KKM);
+    assert.strictEqual(summary2.finalScore, 69.5, "Nilai akhir siswa 2 harus 69.5");
+    assert.strictEqual(summary2.isPassed, false, "Siswa 2 dengan nilai 69.5 harus Remedial (< 75)");
+    assert.strictEqual(summary2.predicate, "D", "Nilai 69.5 harus berpredikat D");
+
+    // Statistik Kelas
+    const stats = calculateClassGradeStats([summary1, summary2], DEFAULT_KKM);
+    assert.strictEqual(stats.classAverage, 77.3, "Rata-rata kelas harus (85 + 69.5)/2 = 77.25 dibulatkan ke 77.3");
+    assert.strictEqual(stats.passedCount, 1, "Harus 1 siswa tuntas");
+    assert.strictEqual(stats.remedialCount, 1, "Harus 1 siswa remedial");
+    assert.strictEqual(stats.passingRate, 50, "Tingkat ketuntasan harus 50%");
+
+    // Validasi Predikat
+    assert.strictEqual(getGradePredicate(95), "A");
+    assert.strictEqual(getGradePredicate(85), "B");
+    assert.strictEqual(getGradePredicate(75), "C");
+    assert.strictEqual(getGradePredicate(74), "D");
+    assert.strictEqual(getGradePredicate(null), "-");
+
+    // Ekspor CSV
+    const csv = exportGradesToCSV("7A", testAssessments, [summary1, summary2], DEFAULT_KKM);
+    assert.ok(csv.startsWith("\uFEFF"), "CSV wajib diawali UTF-8 BOM untuk kompatibilitas Excel");
+    assert.ok(csv.includes("Budi Santoso"), "CSV harus memuat nama siswa");
+    assert.ok(csv.includes("Tuntas"), "CSV harus memuat status ketuntasan");
+    assert.ok(csv.includes("Remedial"), "CSV harus memuat status remedial");
+
+    console.log("✓ LULUS: Mesin penilaian, kalkulasi rata-rata berbobot, KKM, dan ekspor CSV berfungsi sempurna.");
+  }
+
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");
 }
+
 
 runSmokeTest();

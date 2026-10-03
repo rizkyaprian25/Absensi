@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar, Users, BarChart3, Settings, BookOpen, CheckCircle2 } from "lucide-react";
+import { Calendar, Users, BarChart3, Settings, BookOpen, CheckCircle2, Award } from "lucide-react";
 
 interface NavItem {
   href: string;
@@ -14,6 +14,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Hari Ini", icon: Calendar },
   { href: "/classes", label: "Kelas", icon: Users },
+  { href: "/grades", label: "Nilai", icon: Award },
   { href: "/reports", label: "Rekap", icon: BarChart3 },
   { href: "/settings", label: "Pengaturan", icon: Settings },
 ];
