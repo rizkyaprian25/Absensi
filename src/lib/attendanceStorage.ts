@@ -4,8 +4,14 @@ import type {
   AttendanceStatus,
   ScheduleDay,
   HolidayItem,
+  HolidayCategory,
 } from "../contracts/attendance.ts";
-import { findHolidayByDate, getStoredHolidays } from "./calendarUtils.ts";
+import {
+  findHolidayByDate,
+  getStoredHolidays,
+  isRealHoliday,
+  isActiveSchoolEvent,
+} from "./calendarUtils.ts";
 import { MOCK_SESSION_TODAY, MOCK_RECORDS_TODAY } from "../contracts/mocks/attendanceMocks.ts";
 
 export const STORAGE_KEY_SESSIONS = "absensi_saved_sessions_v1";
@@ -114,8 +120,11 @@ export function saveSessionAndRecords(
 export interface PastTeachingDateInfo {
   date: string;
   dayName: ScheduleDay;
-  isHoliday: boolean;
+  isHoliday: boolean; // Hanya true untuk hari libur murni (siswa bebas absen)
   holidayName?: string;
+  isSpecialAgenda?: boolean; // True jika pekan UTS, UAS, atau Kokurikuler (sekolah masuk & tetap ada absensi)
+  agendaCategory?: HolidayCategory;
+  agendaName?: string;
   isFilled: boolean;
   isPast: boolean;
   isToday: boolean;
@@ -167,7 +176,12 @@ export function generatePastTeachingDates(
       const d = String(cur.getDate()).padStart(2, "0");
       const dateStr = `${y}-${m}-${d}`;
 
-      const hol = findHolidayByDate(dateStr, holidays);
+      const calItem = findHolidayByDate(dateStr, holidays);
+      // Hanya benar-benar libur jika kategori libur murni (NASIONAL, CUTI_BERSAMA, SEKOLAH, KHUSUS)
+      const isHoliday = Boolean(calItem && isRealHoliday(calItem.category));
+      // Jika UTS, UAS, atau Kokurikuler: sekolah masuk & tetap wajib ada absensi
+      const isSpecialAgenda = Boolean(calItem && isActiveSchoolEvent(calItem.category));
+
       const session = sessions.find(
         (s) => s.classId === classId && s.sessionDate === dateStr
       );
@@ -180,8 +194,11 @@ export function generatePastTeachingDates(
       result.push({
         date: dateStr,
         dayName: scheduleDay,
-        isHoliday: Boolean(hol),
-        holidayName: hol?.name,
+        isHoliday,
+        holidayName: isHoliday ? calItem?.name : undefined,
+        isSpecialAgenda,
+        agendaCategory: isSpecialAgenda ? calItem?.category : undefined,
+        agendaName: isSpecialAgenda ? calItem?.name : undefined,
         isFilled,
         isPast: dateStr < todayStr,
         isToday: dateStr === todayStr,

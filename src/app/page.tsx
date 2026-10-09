@@ -14,6 +14,7 @@ import {
   X,
   Sparkles,
   History,
+  FileCheck,
 } from "lucide-react";
 import {
   MOCK_CLASSES,
@@ -33,6 +34,8 @@ import {
   getDateForWeekday,
   formatIndonesianDate,
   getCategoryLabel,
+  isRealHoliday,
+  isActiveSchoolEvent,
 } from "@/lib/calendarUtils";
 
 const DAYS_OF_WEEK: ScheduleDay[] = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"];
@@ -92,17 +95,26 @@ export default function TodayDashboardPage() {
     return getDateForWeekday(selectedDay);
   }, [selectedDay]);
 
-  // Cek apakah tanggal terpilih merupakan hari libur
+  // Cek apakah tanggal terpilih merupakan hari libur atau agenda pekan khusus
   const currentHoliday = useMemo(() => {
     return findHolidayByDate(selectedDate, holidays);
   }, [selectedDate, holidays]);
 
-  // Cek apakah tanggal susulan yang dipilih adalah hari libur
+  // Libur murni (siswa bebas absen) vs Agenda khusus (UTS/UAS/Kokurikuler tetap ada absensi)
+  const isCurrentDayRealHoliday = useMemo(() => {
+    return currentHoliday ? isRealHoliday(currentHoliday.category) : false;
+  }, [currentHoliday]);
+
+  const currentSpecialAgenda = useMemo(() => {
+    return currentHoliday && isActiveSchoolEvent(currentHoliday.category) ? currentHoliday : null;
+  }, [currentHoliday]);
+
+  const isCurrentDayOff = isCurrentDayRealHoliday;
+
+  // Cek apakah tanggal susulan yang dipilih adalah hari libur murni
   const quickHoliday = useMemo(() => {
     return findHolidayByDate(quickBackfillDate, holidays);
   }, [quickBackfillDate, holidays]);
-
-  const isCurrentDayOff = Boolean(currentHoliday);
 
   // Format tanggal hari ini di header
   const formattedToday = useMemo(() => {
@@ -205,8 +217,9 @@ export default function TodayDashboardPage() {
           const isSelected = selectedDay === day;
           const isToday = currentDayName === day;
           const dayDate = getDateForWeekday(day);
-          const dayHoliday = findHolidayByDate(dayDate, holidays);
-          const isDayHoliday = Boolean(dayHoliday);
+          const dayItem = findHolidayByDate(dayDate, holidays);
+          const isDayRealHoliday = Boolean(dayItem && isRealHoliday(dayItem.category));
+          const daySpecialEvent = dayItem && isActiveSchoolEvent(dayItem.category) ? dayItem : null;
 
           return (
             <button
@@ -229,9 +242,17 @@ export default function TodayDashboardPage() {
                     }`}
                   />
                 )}
-                {isDayHoliday && (
+                {daySpecialEvent && (
                   <span
-                    title={`Libur: ${dayHoliday?.name}`}
+                    title={`Pekan ${daySpecialEvent.category}: ${daySpecialEvent.name}`}
+                    className={`w-2 h-2 rounded-full ${
+                      isSelected ? "bg-purple-200" : "bg-purple-600"
+                    }`}
+                  />
+                )}
+                {isDayRealHoliday && (
+                  <span
+                    title={`Libur: ${dayItem?.name}`}
                     className={`w-2 h-2 rounded-full ${
                       isSelected ? "bg-amber-300" : "bg-[var(--status-alpa-fg)]"
                     }`}
@@ -242,12 +263,20 @@ export default function TodayDashboardPage() {
                 className={`text-[10px] font-normal font-mono ${
                   isSelected
                     ? "text-white/80"
-                    : isDayHoliday
+                    : isDayRealHoliday
                     ? "text-[var(--status-alpa-fg)] font-semibold"
+                    : daySpecialEvent
+                    ? "text-purple-600 dark:text-purple-300 font-bold"
                     : "text-[var(--text-secondary)]"
                 }`}
               >
-                {isDayHoliday ? "Libur" : "2 Sesi KBM"}
+                {isDayRealHoliday
+                  ? "Libur"
+                  : daySpecialEvent
+                  ? daySpecialEvent.category === "KOKURIKULER"
+                    ? "Projek P5"
+                    : `Pekan ${daySpecialEvent.category}`
+                  : "2 Sesi KBM"}
               </span>
             </button>
           );
@@ -268,7 +297,12 @@ export default function TodayDashboardPage() {
               </span>
             </div>
             <div className="flex items-center gap-2 mt-1">
-              {isCurrentDayOff ? (
+              {currentSpecialAgenda ? (
+                <span className="px-2 py-0.5 rounded-[6px] text-[11px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 flex items-center gap-1.5 border border-purple-500/30 font-mono">
+                  <FileCheck className="w-3.5 h-3.5" />
+                  PEKAN {currentSpecialAgenda.category === "UTS" ? "UTS" : currentSpecialAgenda.category === "UAS" ? "UAS" : "KOKURIKULER (P5)"} · TETAP ADA PRESENSI
+                </span>
+              ) : isCurrentDayRealHoliday ? (
                 <span className="px-2 py-0.5 rounded-[6px] text-[11px] font-bold bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] flex items-center gap-1.5 border border-[var(--status-alpa-fg)]/20 font-mono">
                   <CalendarOff className="w-3.5 h-3.5" />
                   HARI LIBUR ({currentHoliday?.name})
@@ -284,7 +318,7 @@ export default function TodayDashboardPage() {
 
           {/* Tombol Aksi Cepat: Masuk <-> Libur */}
           <div className="flex items-center gap-2 self-start sm:self-auto">
-            {isCurrentDayOff ? (
+            {isCurrentDayRealHoliday ? (
               <button
                 type="button"
                 onClick={() => handleRemoveHoliday(currentHoliday!.id)}
@@ -292,6 +326,15 @@ export default function TodayDashboardPage() {
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Ubah Jadi Hari Masuk</span>
+              </button>
+            ) : currentSpecialAgenda ? (
+              <button
+                type="button"
+                onClick={() => handleRemoveHoliday(currentSpecialAgenda.id)}
+                className="min-h-[40px] px-3.5 py-1.5 rounded-[10px] bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1.5 shadow-xs transition-all active:scale-[0.98]"
+              >
+                <X className="w-4 h-4" />
+                <span>Hapus Agenda Pekan Ini</span>
               </button>
             ) : (
               <button
@@ -309,8 +352,43 @@ export default function TodayDashboardPage() {
           </div>
         </div>
 
-        {/* Banner Penjelasan Jika Hari Berstatus Libur */}
-        {isCurrentDayOff && (
+        {/* Banner Penjelasan Jika Berstatus Agenda Khusus (UTS, UAS, Kokurikuler) */}
+        {currentSpecialAgenda && (
+          <div className="p-4 rounded-[14px] bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-[10px] bg-purple-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                <FileCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-sm text-purple-900 dark:text-purple-200">
+                    Agenda: {currentSpecialAgenda.name} (Sekolah Masuk &amp; Tetap Absensi)
+                  </h3>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-purple-200 dark:bg-purple-900 text-purple-800 dark:text-purple-200 font-bold font-mono">
+                    {getCategoryLabel(currentSpecialAgenda.category)}
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  {currentSpecialAgenda.description || "Pekan kegiatan khusus. Siswa tetap hadir dan dicatat presensinya secara aktif."}
+                </p>
+                <p className="text-[11px] text-[var(--text-secondary)] mt-1">
+                  📝 Presensi tetap berjalan seperti biasa. Gunakan status Dispensasi (D) jika ada siswa yang bertugas khusus.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleRemoveHoliday(currentSpecialAgenda.id)}
+              className="min-h-[38px] px-3 py-1.5 rounded-[8px] bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] transition-all shrink-0 self-start sm:self-auto"
+            >
+              Hapus Agenda
+            </button>
+          </div>
+        )}
+
+        {/* Banner Penjelasan Jika Hari Berstatus Libur Murni */}
+        {isCurrentDayRealHoliday && (
           <div className="p-4 rounded-[14px] bg-[var(--status-alpa-bg)] border border-[var(--status-alpa-fg)]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-[10px] bg-[var(--status-alpa-fg)] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">

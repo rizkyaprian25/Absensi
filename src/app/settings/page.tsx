@@ -28,6 +28,8 @@ import {
   formatIndonesianDate,
   getCategoryLabel,
   addOrUpdateSpecialPeriod,
+  isRealHoliday,
+  isActiveSchoolEvent,
 } from "@/lib/calendarUtils";
 
 /**
@@ -211,10 +213,10 @@ export default function SettingsPage() {
             </div>
             <div>
               <h2 className="font-bold text-sm md:text-base text-[var(--text-primary)]">
-                Kalender Hari Masuk &amp; Libur Sekolah
+                Kalender Akademik: Hari Libur &amp; Pekan Kegiatan Khusus
               </h2>
               <p className="text-xs text-[var(--text-secondary)]">
-                Tentukan hari efektif KBM serta agenda khusus (Pekan UTS, UAS, Kokurikuler). Rekap presensi otomatis tidak menghitung alpa pada hari libur.
+                Atur hari libur murni (siswa bebas absen) dan pekan kegiatan khusus seperti UTS, UAS, dan Kokurikuler/P5. Catatan: Pada pekan UTS, UAS, dan Kokurikuler, sekolah tetap masuk dan presensi tetap wajib diambil.
               </p>
             </div>
           </div>
@@ -273,7 +275,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Daftar Hari Libur Terdaftar */}
+        {/* Daftar Hari Libur & Pekan Khusus Terdaftar */}
         <div className="flex flex-col divide-y divide-[var(--border-hairline)]">
           {holidays.length === 0 ? (
             <p className="text-xs text-[var(--text-secondary)] py-4 text-center">
@@ -301,6 +303,15 @@ export default function SettingsPage() {
                     }`}>
                       {getCategoryLabel(h.category)}
                     </span>
+                    {isActiveSchoolEvent(h.category) ? (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-[3px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold font-mono">
+                        TETAP MASUK &amp; ABSEN
+                      </span>
+                    ) : (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-[3px] bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 font-bold font-mono">
+                        LIBUR (BEBAS ABSEN)
+                      </span>
+                    )}
                   </div>
                   <h3 className="font-semibold text-sm text-[var(--text-primary)] mt-0.5">
                     {h.name}
@@ -314,7 +325,7 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => handleDeleteHoliday(h.id, h.name)}
-                  title="Hapus status libur (Jadikan hari masuk)"
+                  title="Hapus status ini dari kalender"
                   className="p-2 rounded-[8px] text-[var(--status-alpa-fg)] hover:bg-[var(--status-alpa-bg)] transition-colors shrink-0"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -561,22 +572,43 @@ export default function SettingsPage() {
 
               <div>
                 <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1">
-                  Kategori Libur / Agenda
+                  Kategori Agenda / Status Hari
                 </label>
                 <select
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value as HolidayCategory)}
                   className="w-full min-h-[42px] px-3 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] cursor-pointer"
                 >
-                  <option value="SEKOLAH">Libur / Kegiatan Khusus Sekolah</option>
-                  <option value="UTS">Minggu / Pekan UTS (Penilaian Tengah Semester)</option>
-                  <option value="UAS">Minggu / Pekan UAS (Penilaian Akhir Semester)</option>
-                  <option value="KOKURIKULER">Minggu Kokurikuler / Projek P5 / Classmeeting</option>
-                  <option value="KHUSUS">Diliburkan Khusus Guru / Rapat</option>
-                  <option value="NASIONAL">Libur Nasional / Tanggal Merah</option>
-                  <option value="CUTI_BERSAMA">Cuti Bersama</option>
+                  <optgroup label="Pekan Khusus (Sekolah Masuk &amp; Tetap Ada Presensi)">
+                    <option value="UTS">Minggu / Pekan UTS (Penilaian Tengah Semester)</option>
+                    <option value="UAS">Minggu / Pekan UAS (Penilaian Akhir Semester)</option>
+                    <option value="KOKURIKULER">Minggu Kokurikuler / Projek P5 / Classmeeting</option>
+                  </optgroup>
+                  <optgroup label="Hari Libur (Siswa Bebas Presensi / di Rumah)">
+                    <option value="SEKOLAH">Libur / Kegiatan Khusus Sekolah</option>
+                    <option value="KHUSUS">Diliburkan Khusus Guru / Rapat</option>
+                    <option value="NASIONAL">Libur Nasional / Tanggal Merah</option>
+                    <option value="CUTI_BERSAMA">Cuti Bersama</option>
+                  </optgroup>
                 </select>
               </div>
+
+              {/* Notifikasi Penjelasan Sifat Hari */}
+              {isActiveSchoolEvent(newCategory) ? (
+                <div className="p-2.5 rounded-[10px] bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-xs text-purple-900 dark:text-purple-200 flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Pekan {newCategory}:</strong> Bukan hari libur! Siswa tetap masuk dan absensi tetap wajib direkam ke jurnal kelas.
+                  </span>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-[10px] bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-900 dark:text-rose-200 flex items-start gap-2">
+                  <CalendarOff className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Hari Libur:</strong> Siswa libur di rumah dan tidak dihitung alpa pada rekap bulanan.
+                  </span>
+                </div>
+              )}
 
               <div>
                 <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1">
@@ -603,7 +635,7 @@ export default function SettingsPage() {
                   type="submit"
                   className="min-h-[40px] px-4 rounded-[10px] text-xs font-bold bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:opacity-95 shadow-xs"
                 >
-                  Simpan Hari Libur
+                  {isActiveSchoolEvent(newCategory) ? "Simpan Jadwal Pekan" : "Simpan Hari Libur"}
                 </button>
               </div>
             </form>

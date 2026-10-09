@@ -290,10 +290,12 @@ export function generateAttendanceExcelHtmlWithKop(
         ${effectiveDates
           .map((d) => {
             const hol = holidayDatesMap.get(d);
+            const isSpecial = hol?.category === "UTS" || hol?.category === "UAS" || hol?.category === "KOKURIKULER";
             const label = hol
-              ? `${d.slice(8)}<br/><span style="font-size: 7pt; color: #A82A24;">${hol.category === "UTS" ? "UTS" : hol.category === "UAS" ? "UAS" : hol.category === "KOKURIKULER" ? "P5" : "LIBUR"}</span>`
+              ? `${d.slice(8)}<br/><span style="font-size: 7pt; color: ${isSpecial ? "#6B21A8" : "#A82A24"};">${hol.category === "UTS" ? "UTS" : hol.category === "UAS" ? "UAS" : hol.category === "KOKURIKULER" ? "P5" : "LIBUR"}</span>`
               : d.slice(8);
-            return `<th style="width: 32px; background-color: ${hol ? "#FEE2E2" : "#E2EFDA"};">${label}</th>`;
+            const bgCol = hol ? (isSpecial ? "#F3E8FF" : "#FEE2E2") : "#E2EFDA";
+            return `<th style="width: 32px; background-color: ${bgCol};">${label}</th>`;
           })
           .join("")}
         <th style="width: 32px; background-color: #D1FAE5; color: #065F46;">H</th>

@@ -130,7 +130,30 @@ export function removeHolidayByDate(date: string): HolidayItem[] {
 }
 
 /**
- * Memeriksa apakah suatu tanggal tertentu (format YYYY-MM-DD) merupakan hari libur
+ * Memeriksa apakah suatu kategori merupakan hari libur murni (siswa bebas absen di rumah)
+ * vs agenda kegiatan aktif (UTS, UAS, Kokurikuler tetap masuk & tetap ada absensi).
+ */
+export function isRealHoliday(category?: HolidayCategory): boolean {
+  if (!category) return false;
+  return (
+    category === "NASIONAL" ||
+    category === "CUTI_BERSAMA" ||
+    category === "SEKOLAH" ||
+    category === "KHUSUS"
+  );
+}
+
+/**
+ * Memeriksa apakah suatu kategori merupakan agenda kegiatan sekolah aktif
+ * di mana siswa TETAP MASUK dan TETAP ADA ABSENSI (UTS, UAS, Kokurikuler/P5).
+ */
+export function isActiveSchoolEvent(category?: HolidayCategory): boolean {
+  if (!category) return false;
+  return category === "UTS" || category === "UAS" || category === "KOKURIKULER";
+}
+
+/**
+ * Memeriksa apakah suatu tanggal tertentu (format YYYY-MM-DD) tercatat dalam kalender
  */
 export function findHolidayByDate(
   dateStr: string,
@@ -140,13 +163,38 @@ export function findHolidayByDate(
 }
 
 /**
- * Memeriksa apakah suatu tanggal merupakan hari libur (boolean)
+ * Memeriksa apakah suatu tanggal merupakan hari libur murni (sekolah libur, bebas absen).
+ * CATATAN PENTING: Pekan UTS, UAS, dan Kokurikuler BUKAN hari libur karena siswa tetap
+ * masuk sekolah dan presensi tetap wajib diambil. Fungsi ini mengembalikan FALSE untuk UTS/UAS/P5.
  */
 export function isDateHoliday(
   dateStr: string,
   holidays: HolidayItem[] = DEFAULT_HOLIDAYS
 ): boolean {
-  return Boolean(findHolidayByDate(dateStr, holidays));
+  const item = findHolidayByDate(dateStr, holidays);
+  return Boolean(item && isRealHoliday(item.category));
+}
+
+/**
+ * Memeriksa apakah suatu tanggal merupakan agenda kegiatan pekan khusus aktif (UTS, UAS, Kokurikuler)
+ */
+export function isDateActiveEvent(
+  dateStr: string,
+  holidays: HolidayItem[] = DEFAULT_HOLIDAYS
+): boolean {
+  const item = findHolidayByDate(dateStr, holidays);
+  return Boolean(item && isActiveSchoolEvent(item.category));
+}
+
+/**
+ * Mengambil agenda pekan aktif (UTS/UAS/Kokurikuler) pada tanggal tertentu jika ada
+ */
+export function getActiveSpecialEvent(
+  dateStr: string,
+  holidays: HolidayItem[] = DEFAULT_HOLIDAYS
+): HolidayItem | null {
+  const item = findHolidayByDate(dateStr, holidays);
+  return item && isActiveSchoolEvent(item.category) ? item : null;
 }
 
 /**
@@ -206,21 +254,21 @@ export function formatIndonesianDate(dateStr: string): string {
 export function getCategoryLabel(category: HolidayCategory): string {
   switch (category) {
     case "NASIONAL":
-      return "Libur Nasional / Tanggal Merah";
+      return "Libur Nasional / Tanggal Merah (Bebas Absen)";
     case "CUTI_BERSAMA":
-      return "Cuti Bersama";
+      return "Cuti Bersama (Bebas Absen)";
     case "SEKOLAH":
-      return "Libur / Kegiatan Sekolah";
+      return "Libur Sekolah (Bebas Absen)";
     case "KHUSUS":
-      return "Diliburkan Khusus Guru";
+      return "Diliburkan Khusus Guru (Bebas Absen)";
     case "UTS":
-      return "Pekan / Minggu Penilaian Tengah Semester (UTS/PTS)";
+      return "Pekan UTS / PTS (Sekolah Masuk & Tetap Ada Presensi)";
     case "UAS":
-      return "Pekan / Minggu Penilaian Akhir Semester (UAS/PAS)";
+      return "Pekan UAS / PAS (Sekolah Masuk & Tetap Ada Presensi)";
     case "KOKURIKULER":
-      return "Pekan / Kegiatan Kokurikuler & P5";
+      return "Pekan Kokurikuler / Projek P5 (Sekolah Masuk & Tetap Ada Presensi)";
     default:
-      return "Hari Libur / Agenda";
+      return "Agenda Kalender";
   }
 }
 

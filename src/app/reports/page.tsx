@@ -26,7 +26,14 @@ import type {
   AttendanceSession,
   AttendanceRecord,
 } from "@/contracts/attendance";
-import { getStoredHolidays, findHolidayByDate, getCategoryLabel, formatIndonesianDate } from "@/lib/calendarUtils";
+import {
+  getStoredHolidays,
+  findHolidayByDate,
+  getCategoryLabel,
+  formatIndonesianDate,
+  isRealHoliday,
+  isActiveSchoolEvent,
+} from "@/lib/calendarUtils";
 import { getSavedSessions, getSavedRecords } from "@/lib/attendanceStorage";
 import {
   generateAttendanceCsvWithKop,
@@ -111,7 +118,7 @@ function computeRecapForClass(
     cls.id,
     savedSessions
   );
-  const holidayDatesSet = new Set(holidays.map((h) => h.date));
+  const holidayDatesMap = new Map(holidays.map((h) => [h.date, h]));
   const classSessions = savedSessions.filter(
     (s) => s.classId === cls.id && s.sessionDate.startsWith(month)
   );
@@ -126,12 +133,18 @@ function computeRecapForClass(
     const dailyStatus: Record<string, string> = {};
 
     effectiveDates.forEach((date) => {
-      if (holidayDatesSet.has(date)) {
+      const calItem = holidayDatesMap.get(date);
+      // Hanya benar-benar libur jika kategori libur murni (sekolah libur, siswa bebas absen)
+      const isRealHol = calItem ? isRealHoliday(calItem.category) : false;
+      const session = classSessions.find((sess) => sess.sessionDate === date);
+
+      // Jika hari libur murni dan tidak ada sesi pertemuan tersimpan, tandai L (Libur)
+      if (isRealHol && !session) {
         dailyStatus[date] = "L";
         return;
       }
 
-      const session = classSessions.find((sess) => sess.sessionDate === date);
+      // Jika ada sesi tersimpan (termasuk pada pekan UTS, UAS, Kokurikuler, maupun hari biasa)
       if (session) {
         const rec = savedRecords.find(
           (r) => r.sessionId === session.id && r.studentId === s.id
@@ -157,7 +170,8 @@ function computeRecapForClass(
           dailyStatus[date] = "D";
         }
       } else {
-        dailyStatus[date] = "-";
+        // Jika belum ada sesi: hari libur murni berstatus "L", hari aktif/pekan khusus berstatus "-" (belum diisi)
+        dailyStatus[date] = isRealHol ? "L" : "-";
       }
     });
 
@@ -621,7 +635,10 @@ export default function ReportsPage() {
           D (Dispensasi)
         </span>
         <span className="px-2 py-0.5 rounded-[4px] bg-[var(--surface-recessed)] text-[var(--text-secondary)] font-mono font-bold border border-[var(--border-hairline)]">
-          L (Libur / Agenda)
+          L (Libur Sekolah)
+        </span>
+        <span className="px-2 py-0.5 rounded-[4px] bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 font-mono font-bold border border-purple-200 dark:border-purple-800">
+          UTS / UAS / P5 (Tetap Masuk &amp; Diabsen)
         </span>
       </div>
 

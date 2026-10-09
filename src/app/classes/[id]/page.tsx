@@ -494,6 +494,17 @@ export default function ClassDetailPage() {
                             Hari Ini
                           </span>
                         )}
+                        {item.isSpecialAgenda && (
+                          <span className={`text-[10px] px-2 py-0.5 rounded-[6px] font-bold font-mono border ${
+                            item.agendaCategory === "UTS"
+                              ? "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800"
+                              : item.agendaCategory === "UAS"
+                              ? "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800"
+                              : "bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-800"
+                          }`}>
+                            {item.agendaCategory === "UTS" ? "Pekan UTS" : item.agendaCategory === "UAS" ? "Pekan UAS" : "Kokurikuler (P5)"}
+                          </span>
+                        )}
                         {item.isHoliday && (
                           <span className="text-[10px] px-2 py-0.5 rounded-[6px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold font-mono">
                             Libur: {item.holidayName}
@@ -508,14 +519,16 @@ export default function ClassDetailPage() {
                         {!item.isHoliday && !item.isFilled && (
                           <span className="text-[10px] px-2 py-0.5 rounded-[6px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold font-mono flex items-center gap-1">
                             <AlertCircle className="w-3 h-3" />
-                            Belum Diisi (Perlu Susulan)
+                            {item.isSpecialAgenda ? `Belum Diisi (${item.agendaCategory})` : "Belum Diisi (Perlu Susulan)"}
                           </span>
                         )}
                       </div>
 
                       <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-mono">
                         {item.isHoliday
-                          ? "Tidak ada KBM terjadwal (bebas presensi)."
+                          ? "Hari Libur Sekolah (bebas presensi)."
+                          : item.isSpecialAgenda && !item.isFilled
+                          ? `Pekan ${item.agendaCategory}: Sekolah tetap masuk, presensi siswa tetap wajib direkam.`
                           : item.isFilled
                           ? `Terekam: ${item.hadirCount ?? 0} dari ${item.totalStudents ?? students.length} siswa hadir.`
                           : "Presensi belum direkam untuk pertemuan ini."}

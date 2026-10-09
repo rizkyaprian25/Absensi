@@ -12,6 +12,9 @@ import {
   isDateHoliday,
   getDateForWeekday,
   addOrUpdateSpecialPeriod,
+  isRealHoliday,
+  isActiveSchoolEvent,
+  isDateActiveEvent,
 } from "./calendarUtils.ts";
 import { generatePastTeachingDates } from "./attendanceStorage.ts";
 import {
@@ -295,15 +298,25 @@ function runSmokeTest() {
     console.log("✓ LULUS: Mesin penilaian, kalkulasi rata-rata berbobot, KKM, dan ekspor CSV berfungsi sempurna.");
   }
 
-  // 8. Pengujian Status Kehadiran DISPEN & Agenda Khusus (Minggu UTS, UAS, Kokurikuler)
+  // 8. Pengujian Status Kehadiran DISPEN & Agenda Khusus (Minggu UTS, UAS, Kokurikuler Bukan Libur)
   {
-    console.log("[TEST 8] Menguji status kehadiran DISPEN & penetapan agenda pekan (UTS, UAS, Kokurikuler)...");
+    console.log("[TEST 8] Menguji status kehadiran DISPEN & penetapan agenda pekan (UTS, UAS, Kokurikuler tetap masuk & ada absensi)...");
 
     // Validasi skema enum
     assert.strictEqual(AttendanceStatusSchema.parse("DISPEN"), "DISPEN", "Status DISPEN harus valid dalam skema");
     assert.strictEqual(HolidayCategorySchema.parse("UTS"), "UTS", "Kategori UTS harus valid");
     assert.strictEqual(HolidayCategorySchema.parse("UAS"), "UAS", "Kategori UAS harus valid");
     assert.strictEqual(HolidayCategorySchema.parse("KOKURIKULER"), "KOKURIKULER", "Kategori KOKURIKULER harus valid");
+
+    // Validasi pembedaan hari libur murni vs agenda kegiatan aktif
+    assert.strictEqual(isRealHoliday("SEKOLAH"), true, "Kategori SEKOLAH harus merupakan libur murni");
+    assert.strictEqual(isRealHoliday("UTS"), false, "Pekan UTS BUKAN hari libur");
+    assert.strictEqual(isRealHoliday("UAS"), false, "Pekan UAS BUKAN hari libur");
+    assert.strictEqual(isRealHoliday("KOKURIKULER"), false, "Pekan Kokurikuler BUKAN hari libur");
+
+    assert.strictEqual(isActiveSchoolEvent("UTS"), true, "UTS harus terdeteksi sebagai agenda aktif sekolah");
+    assert.strictEqual(isActiveSchoolEvent("UAS"), true, "UAS harus terdeteksi sebagai agenda aktif sekolah");
+    assert.strictEqual(isActiveSchoolEvent("KOKURIKULER"), true, "Kokurikuler harus terdeteksi sebagai agenda aktif sekolah");
 
     // Uji pembuatan rentang pekan khusus
     const sampleWeek = addOrUpdateSpecialPeriod(
@@ -318,7 +331,25 @@ function runSmokeTest() {
     assert.ok(utsDays.some((d) => d.date === "2026-09-21"));
     assert.ok(utsDays.some((d) => d.date === "2026-09-25"));
 
-    console.log("✓ LULUS: Status DISPEN dan manajemen pekan UTS, UAS, Kokurikuler terverifikasi sempurna.");
+    // Tanggal UTS TIDAK boleh terdeteksi sebagai hari libur (karena siswa tetap masuk & tetap diabsen)
+    assert.strictEqual(isDateHoliday("2026-09-21", sampleWeek), false, "Hari UTS tidak boleh dianggap libur bebas absen");
+    assert.strictEqual(isDateActiveEvent("2026-09-21", sampleWeek), true, "Hari UTS harus terdeteksi sebagai agenda aktif");
+
+    // Uji pada penelusuran tanggal KBM lampau (generatePastTeachingDates)
+    const datesWithUts = generatePastTeachingDates(
+      "Senin",
+      "class-7a",
+      "2026-09-21",
+      new Date("2026-09-22T10:00:00Z"),
+      sampleWeek
+    );
+    const mondayUts = datesWithUts.find((d) => d.date === "2026-09-21");
+    assert.ok(mondayUts, "Senin UTS harus ditemukan");
+    assert.strictEqual(mondayUts?.isHoliday, false, "Senin UTS tidak boleh isHoliday=true");
+    assert.strictEqual(mondayUts?.isSpecialAgenda, true, "Senin UTS harus isSpecialAgenda=true");
+    assert.strictEqual(mondayUts?.agendaCategory, "UTS");
+
+    console.log("✓ LULUS: Status DISPEN dan manajemen pekan UTS, UAS, Kokurikuler (tetap masuk & tetap ada absensi) terverifikasi 100%.");
   }
 
   // 9. Pengujian Ekspor dengan Kop Surat Resmi Sekolah (SMPN 3 Cibungbulang)

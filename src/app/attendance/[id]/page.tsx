@@ -42,6 +42,7 @@ import {
   addOrUpdateHoliday,
   removeHolidayByDate,
   getCategoryLabel,
+  isActiveSchoolEvent,
 } from "@/lib/calendarUtils.ts";
 import {
   getSessionAndRecords,
@@ -461,9 +462,9 @@ function AttendanceTakingContent() {
                     ? "text-teal-800 dark:text-teal-300"
                     : "text-[var(--status-alpa-fg)]"
                 }`}>
-                  {currentHoliday.category === "UTS" || currentHoliday.category === "UAS" || currentHoliday.category === "KOKURIKULER"
-                    ? `Agenda Khusus: ${currentHoliday.name}`
-                    : `Tanggal Ini Ditetapkan Sebagai Hari Libur: ${currentHoliday.name}`}
+                  {isActiveSchoolEvent(currentHoliday.category)
+                    ? `Pekan Kegiatan: ${currentHoliday.name} (Sekolah Masuk & Tetap Ada Presensi)`
+                    : `Hari Libur Sekolah: ${currentHoliday.name}`}
                 </p>
                 <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-black/10 dark:bg-white/10 font-bold font-mono">
                   {getCategoryLabel(currentHoliday.category)}
@@ -473,7 +474,9 @@ function AttendanceTakingContent() {
                 {currentHoliday.description || "Agenda terjadwal di kalender akademik."}
               </p>
               <p className="text-[11px] text-[var(--text-secondary)] mt-1">
-                💡 Anda dapat merekam presensi pelaksanaan kegiatan ini atau mencatat siswa yang bertugas dengan status Dispensasi (D).
+                {isActiveSchoolEvent(currentHoliday.category)
+                  ? "💡 Siswa tetap masuk dan diabsen. Rekam kehadiran seperti biasa (H, S, I, A, T, D) untuk akumulasi rekap semester."
+                  : "💡 Hari libur bebas presensi. Jika ada kegiatan ekstra, Anda tetap dapat merekam presensi kelas di bawah."}
               </p>
             </div>
           </div>
@@ -484,7 +487,7 @@ function AttendanceTakingContent() {
               onClick={handleRemoveHoliday}
               className="min-h-[36px] px-3.5 py-1.5 rounded-[8px] bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] transition-all shadow-xs"
             >
-              Batalkan Agenda Ini
+              {isActiveSchoolEvent(currentHoliday.category) ? "Hapus Penanda Pekan" : "Batalkan Libur"}
             </button>
           </div>
         </div>
