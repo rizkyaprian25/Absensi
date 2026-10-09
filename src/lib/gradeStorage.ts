@@ -11,13 +11,38 @@ import {
   generateInitialMockScores,
 } from "../contracts/mocks/gradesMocks";
 
-export const STORAGE_KEY_ASSESSMENTS = "absensi_grade_assessments_v1";
-export const STORAGE_KEY_SCORES = "absensi_student_scores_v1";
+export const STORAGE_KEY_ASSESSMENTS = "absensi_grade_assessments_v2";
+export const STORAGE_KEY_SCORES = "absensi_student_scores_v2";
 export const STORAGE_KEY_KKM = "absensi_grade_kkm_v1";
 
 // ============================================================================
 // AKSES PENYIMPANAN LOKAL (LOCALSTORAGE OFFLINE-FIRST)
 // ============================================================================
+
+/**
+ * Membersihkan data mock lama (v1) dari browser pengguna jika ada
+ */
+function cleanupLegacyMockData(): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (
+      localStorage.getItem("absensi_grade_assessments_v1") !== null ||
+      localStorage.getItem("absensi_student_scores_v1") !== null
+    ) {
+      localStorage.removeItem("absensi_grade_assessments_v1");
+      localStorage.removeItem("absensi_student_scores_v1");
+      // Inisialisasi v2 dengan kondisi bersih/kosong
+      if (localStorage.getItem(STORAGE_KEY_ASSESSMENTS) === null) {
+        localStorage.setItem(STORAGE_KEY_ASSESSMENTS, JSON.stringify([]));
+      }
+      if (localStorage.getItem(STORAGE_KEY_SCORES) === null) {
+        localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify([]));
+      }
+    }
+  } catch (err) {
+    console.warn("Peringatan saat membersihkan sisa data mock v1:", err);
+  }
+}
 
 /**
  * Mengambil daftar seluruh penilaian (asesmen) yang tersimpan
@@ -26,6 +51,8 @@ export function getStoredAssessments(): AssessmentItem[] {
   if (typeof window === "undefined") {
     return INITIAL_MOCK_ASSESSMENTS;
   }
+
+  cleanupLegacyMockData();
 
   try {
     const raw = localStorage.getItem(STORAGE_KEY_ASSESSMENTS);
@@ -61,6 +88,8 @@ export function getStoredScores(): StudentScoreRecord[] {
     return generateInitialMockScores();
   }
 
+  cleanupLegacyMockData();
+
   try {
     const raw = localStorage.getItem(STORAGE_KEY_SCORES);
     if (!raw) {
@@ -85,6 +114,28 @@ export function saveStoredScores(scores: StudentScoreRecord[]): void {
     localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify(scores));
   } catch (err) {
     console.error("Gagal menyimpan catatan nilai ke localStorage:", err);
+  }
+}
+
+/**
+ * Mengosongkan seluruh penilaian dan nilai (baik untuk satu kelas atau seluruh kelas)
+ */
+export function clearAssessmentsForClass(classId?: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (!classId) {
+      saveStoredAssessments([]);
+      saveStoredScores([]);
+    } else {
+      const allAssessments = getStoredAssessments();
+      const removedIds = new Set(allAssessments.filter((a) => a.classId === classId).map((a) => a.id));
+      const remainingAssessments = allAssessments.filter((a) => a.classId !== classId);
+      const remainingScores = getStoredScores().filter((s) => !removedIds.has(s.assessmentId));
+      saveStoredAssessments(remainingAssessments);
+      saveStoredScores(remainingScores);
+    }
+  } catch (err) {
+    console.error("Gagal mengosongkan data penilaian:", err);
   }
 }
 

@@ -54,6 +54,7 @@ import {
   calculateStudentGradeSummary,
   calculateClassGradeStats,
   exportGradesToCSV,
+  clearAssessmentsForClass,
 } from "@/lib/gradeStorage";
 import {
   generateGradesExcelHtmlWithKop,
@@ -352,6 +353,17 @@ function GradesPageContent() {
     URL.revokeObjectURL(url);
   };
 
+  // Konfirmasi & Kosongkan Penilaian Kelas Terpilih
+  const handleClearAssessments = () => {
+    const isConfirm = window.confirm(
+      `Apakah Anda yakin ingin mengosongkan seluruh penilaian dan nilai untuk Kelas ${currentClass.name}? Semua tugas, ulangan, dan nilai yang dibuat pada kelas ini akan dihapus bersih.`
+    );
+    if (!isConfirm) return;
+
+    clearAssessmentsForClass(selectedClassId);
+    refreshData();
+  };
+
   return (
     <div className="flex flex-col gap-5 pb-12">
       {/* Header Utama Buku Nilai */}
@@ -405,6 +417,19 @@ function GradesPageContent() {
             <Download className="w-3.5 h-3.5 text-[var(--color-accent)]" />
             <span>Ekspor CSV</span>
           </button>
+
+          {/* Tombol Kosongkan Nilai (Hanya muncul jika kelas memiliki asesmen) */}
+          {classAssessments.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearAssessments}
+              className="px-3 py-2 bg-[var(--surface-card)] hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 border border-[var(--border-hairline)] hover:border-rose-300 rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+              title="Kosongkan seluruh penilaian dan nilai kelas ini"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Kosongkan Nilai</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -521,6 +546,32 @@ function GradesPageContent() {
         </div>
       </div>
 
+      {/* Banner Penilaian Bersih / Kosong Sesuai Permintaan Guru */}
+      {classAssessments.length === 0 && (
+        <div className="bg-[var(--surface-card)] border-2 border-dashed border-[var(--border-hairline)] rounded-[16px] p-8 text-center flex flex-col items-center justify-center shadow-xs">
+          <div className="w-14 h-14 rounded-2xl bg-[var(--color-accent)]/10 text-[var(--color-accent)] flex items-center justify-center mb-3">
+            <BookOpen className="w-7 h-7" />
+          </div>
+          <h3 className="text-base font-bold text-[var(--text-primary)]">
+            Buku Nilai Kelas {currentClass.name} Masih Kosong
+          </h3>
+          <p className="text-xs text-[var(--text-secondary)] max-w-md mt-1 mb-4 leading-relaxed">
+            Data penilaian tugas, ulangan harian, kuis, UTS, dan UAS telah dikosongkan. Anda dapat membuat penilaian mandiri sesuai jadwal dan materi ajar Anda.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingAssessment(null);
+              setIsAssessmentModalOpen(true);
+            }}
+            className="px-4 py-2.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent)]/90 text-[var(--color-on-accent)] rounded-[10px] text-xs font-semibold flex items-center gap-2 transition-all shadow-xs active:scale-[0.98]"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Buat Penilaian Pertama</span>
+          </button>
+        </div>
+      )}
+
       {/* Filter Kategori Asesmen & Pencarian */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[var(--surface-card)] p-3 rounded-[12px] border border-[var(--border-hairline)]">
         {/* Filter Kategori Pills */}
@@ -616,7 +667,12 @@ function GradesPageContent() {
                 </th>
 
                 {/* Kolom Tiap Asesmen */}
-                {filteredAssessments.map((asmt) => {
+                {filteredAssessments.length === 0 ? (
+                  <th className="py-2.5 px-4 font-normal text-[var(--text-secondary)] italic border-r border-[var(--border-hairline)] min-w-[220px]">
+                    Belum ada penilaian dibuat
+                  </th>
+                ) : (
+                  filteredAssessments.map((asmt) => {
                   const meta = ASSESSMENT_TYPE_METAS[asmt.type];
                   return (
                     <th
@@ -662,7 +718,8 @@ function GradesPageContent() {
                       </div>
                     </th>
                   );
-                })}
+                })
+              )}
 
                 {/* Kolom Hasil & KKM */}
                 <th className="py-3 px-3 text-center font-bold text-[var(--text-secondary)] min-w-[90px] bg-[var(--surface-recessed)] border-r border-[var(--border-hairline)]">
@@ -715,60 +772,66 @@ function GradesPageContent() {
                       </td>
 
                       {/* Kolom Nilai Tiap Asesmen */}
-                      {filteredAssessments.map((asmt) => {
-                        const sc = summary.scores[asmt.id];
-                        const isEditingThis =
-                          editingCell?.studentId === summary.studentId &&
-                          editingCell?.assessmentId === asmt.id;
+                      {filteredAssessments.length === 0 ? (
+                        <td className="py-2.5 px-4 text-center text-[var(--text-secondary)] italic border-r border-[var(--border-hairline)] text-[11px]">
+                          -
+                        </td>
+                      ) : (
+                        filteredAssessments.map((asmt) => {
+                          const sc = summary.scores[asmt.id];
+                          const isEditingThis =
+                            editingCell?.studentId === summary.studentId &&
+                            editingCell?.assessmentId === asmt.id;
 
-                        const isUnderKkm = sc !== null && sc !== undefined && sc < kkm;
+                          const isUnderKkm = sc !== null && sc !== undefined && sc < kkm;
 
-                        return (
-                          <td
-                            key={asmt.id}
-                            className={`py-2 px-3 text-center border-r border-[var(--border-hairline)] font-mono transition-colors ${
-                              isUnderKkm ? "bg-amber-50/50 dark:bg-amber-950/20" : ""
-                            }`}
-                          >
-                            {isEditingThis ? (
-                              <input
-                                autoFocus
-                                type="number"
-                                min={0}
-                                max={100}
-                                value={cellInputValue}
-                                onChange={(e) => setCellInputValue(e.target.value)}
-                                onBlur={handleSaveCellEdit}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleSaveCellEdit();
-                                  if (e.key === "Escape") setEditingCell(null);
-                                }}
-                                className="w-16 px-1.5 py-1 text-center font-mono text-xs bg-[var(--surface-card)] border-2 border-[var(--color-accent)] rounded outline-none shadow-xs"
-                              />
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleStartCellEdit(summary.studentId, asmt.id, sc ?? null)
-                                }
-                                title="Klik untuk mengedit nilai"
-                                className={`w-full py-1 rounded text-xs transition-colors hover:bg-[var(--surface-recessed)] flex items-center justify-center gap-1 ${
-                                  sc === null || sc === undefined
-                                    ? "text-[var(--text-secondary)]/50"
-                                    : isUnderKkm
-                                    ? "text-amber-700 dark:text-amber-400 font-bold"
-                                    : "text-[var(--text-primary)] font-semibold"
-                                }`}
-                              >
-                                <span>{sc !== null && sc !== undefined ? sc : "-"}</span>
-                                {isUnderKkm && (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                                )}
-                              </button>
-                            )}
-                          </td>
-                        );
-                      })}
+                          return (
+                            <td
+                              key={asmt.id}
+                              className={`py-2 px-3 text-center border-r border-[var(--border-hairline)] font-mono transition-colors ${
+                                isUnderKkm ? "bg-amber-50/50 dark:bg-amber-950/20" : ""
+                              }`}
+                            >
+                              {isEditingThis ? (
+                                <input
+                                  autoFocus
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  value={cellInputValue}
+                                  onChange={(e) => setCellInputValue(e.target.value)}
+                                  onBlur={handleSaveCellEdit}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") handleSaveCellEdit();
+                                    if (e.key === "Escape") setEditingCell(null);
+                                  }}
+                                  className="w-16 px-1.5 py-1 text-center font-mono text-xs bg-[var(--surface-card)] border-2 border-[var(--color-accent)] rounded outline-none shadow-xs"
+                                />
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleStartCellEdit(summary.studentId, asmt.id, sc ?? null)
+                                  }
+                                  title="Klik untuk mengedit nilai"
+                                  className={`w-full py-1 rounded text-xs transition-colors hover:bg-[var(--surface-recessed)] flex items-center justify-center gap-1 ${
+                                    sc === null || sc === undefined
+                                      ? "text-[var(--text-secondary)]/50"
+                                      : isUnderKkm
+                                      ? "text-amber-700 dark:text-amber-400 font-bold"
+                                      : "text-[var(--text-primary)] font-semibold"
+                                  }`}
+                                >
+                                  <span>{sc !== null && sc !== undefined ? sc : "-"}</span>
+                                  {isUnderKkm && (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                  )}
+                                </button>
+                              )}
+                            </td>
+                          );
+                        })
+                      )}
 
                       {/* Nilai Rata-rata Akhir */}
                       <td className="py-2.5 px-3 text-center font-mono font-bold text-xs border-r border-[var(--border-hairline)] bg-[var(--surface-card)]">
