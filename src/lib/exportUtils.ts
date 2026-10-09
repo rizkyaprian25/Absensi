@@ -2,6 +2,7 @@ import type {
   Class,
   HolidayItem,
   StudentMonthlyRecap,
+  AttendanceSession,
 } from "../contracts/attendance";
 import type {
   AssessmentItem,
@@ -46,7 +47,8 @@ export function generateAttendanceCsvWithKop(
   effectiveDates: string[],
   students: StudentMonthlyRecap[],
   holidays: HolidayItem[] = [],
-  meta: SchoolExportMetadata = {}
+  meta: SchoolExportMetadata = {},
+  sessions: AttendanceSession[] = []
 ): string {
   const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
   const holidayDatesMap = new Map(holidays.map((h) => [h.date, h]));
@@ -150,6 +152,27 @@ export function generateAttendanceCsvWithKop(
   rows.push(`"( ............................................ )","","","","${effectiveDates.map(() => '""').join(",")}","${mergedMeta.teacherName}"`);
   rows.push(`"NIP. ........................................","","","","${effectiveDates.map(() => '""').join(",")}","NIP. ${mergedMeta.teacherNip}"`);
 
+  // --- JURNAL AGENDA PEMBELAJARAN (KBM) ---
+  if (sessions && sessions.length > 0) {
+    rows.push("");
+    rows.push("");
+    rows.push(`"JURNAL AGENDA PEMBELAJARAN (KBM) - KELAS ${currentClass.name.toUpperCase()}"`);
+    rows.push(`"Bulan: ${monthLabel.toUpperCase()}"`);
+    rows.push(`"No.","Hari / Tanggal","Status / Kategori","Materi / Pokok Bahasan","Uraian Kegiatan & Catatan Guru"`);
+
+    effectiveDates.forEach((d, idx) => {
+      const sess = sessions.find((s) => s.classId === currentClass.id && s.sessionDate === d);
+      const hol = holidayDatesMap.get(d);
+      let statusStr = "KBM Aktif";
+      if (hol) {
+        statusStr = hol.category === "UTS" ? "Pekan UTS" : hol.category === "UAS" ? "Pekan UAS" : hol.category === "KOKURIKULER" ? "Kokurikuler (P5)" : `Libur: ${hol.name}`;
+      }
+      const topicStr = sess?.topic ? sess.topic.replace(/"/g, '""') : "-";
+      const actStr = sess?.learningActivities ? sess.learningActivities.replace(/"/g, '""') : "-";
+      rows.push(`"${idx + 1}","${formatIndonesianDate(d)}","${statusStr}","${topicStr}","${actStr}"`);
+    });
+  }
+
   return "\uFEFF" + rows.join("\r\n");
 }
 
@@ -162,7 +185,8 @@ export function generateAttendanceExcelHtmlWithKop(
   effectiveDates: string[],
   students: StudentMonthlyRecap[],
   holidays: HolidayItem[] = [],
-  meta: SchoolExportMetadata = {}
+  meta: SchoolExportMetadata = {},
+  sessions: AttendanceSession[] = []
 ): string {
   const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
   const holidayDatesMap = new Map(holidays.map((h) => [h.date, h]));
@@ -342,6 +366,53 @@ export function generateAttendanceExcelHtmlWithKop(
       </td>
     </tr>
   </table>
+
+  ${sessions && sessions.length > 0 ? `
+  <br/><br/>
+  <!-- JURNAL AGENDA PEMBELAJARAN (KBM) -->
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <th colspan="5" style="background-color: #0D9488; color: #FFFFFF; font-size: 11pt; padding: 8px; text-align: left;">
+        JURNAL AGENDA PEMBELAJARAN (KBM) - KELAS ${currentClass.name.toUpperCase()} (BULAN ${monthLabel.toUpperCase()})
+      </th>
+    </tr>
+    <tr>
+      <th style="width: 40px; background-color: #CCFBF1; color: #0F766E;">NO</th>
+      <th style="width: 130px; background-color: #CCFBF1; color: #0F766E;">HARI &amp; TANGGAL</th>
+      <th style="width: 130px; background-color: #CCFBF1; color: #0F766E;">STATUS / KEGIATAN</th>
+      <th style="width: 260px; background-color: #CCFBF1; color: #0F766E;">MATERI / POKOK BAHASAN</th>
+      <th style="background-color: #CCFBF1; color: #0F766E;">URAIAN KEGIATAN &amp; CATATAN GURU</th>
+    </tr>
+    ${effectiveDates
+      .map((d, idx) => {
+        const sess = sessions.find((s) => s.classId === currentClass.id && s.sessionDate === d);
+        const hol = holidayDatesMap.get(d);
+        const isSpecial = hol?.category === "UTS" || hol?.category === "UAS" || hol?.category === "KOKURIKULER";
+        let statusBadge = "KBM Normal";
+        let statusStyle = "color: #065F46; font-weight: bold;";
+        if (hol) {
+          if (isSpecial) {
+            statusBadge = hol.category === "UTS" ? "Pekan UTS" : hol.category === "UAS" ? "Pekan UAS" : "Kokurikuler (P5)";
+            statusStyle = "color: #6B21A8; font-weight: bold;";
+          } else {
+            statusBadge = `Libur: ${hol.name}`;
+            statusStyle = "color: #991B1B; font-weight: bold;";
+          }
+        }
+        const topicText = sess?.topic || `<span style="color: #9CA3AF; font-style: italic;">Belum ada catatan materi</span>`;
+        const actText = sess?.learningActivities || `<span style="color: #9CA3AF; font-style: italic;">-</span>`;
+
+        return `<tr>
+          <td style="text-align: center; font-family: monospace;">${idx + 1}</td>
+          <td style="text-align: center;">${formatIndonesianDate(d)}</td>
+          <td style="${statusStyle}">${statusBadge}</td>
+          <td style="font-weight: 500;">${topicText}</td>
+          <td style="color: #374151;">${actText}</td>
+        </tr>`;
+      })
+      .join("")}
+  </table>
+  ` : ""}
 </body>
 </html>
 `;

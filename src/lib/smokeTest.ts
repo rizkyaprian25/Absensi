@@ -31,6 +31,7 @@ import {
 import {
   AttendanceStatusSchema,
   HolidayCategorySchema,
+  AttendanceSessionSchema,
   type Student,
   type Class,
   type StudentMonthlyRecap,
@@ -493,6 +494,92 @@ function runSmokeTest() {
     assert.ok(gradesCsv.includes("REKAPITULASI DAFTAR NILAI SISWA KELAS 7A"), "Kop nilai CSV harus sesuai");
 
     console.log("✓ LULUS: Ekspor berkas presensi dan nilai dengan Kop Surat resmi SMPN 3 Cibungbulang terverifikasi 100%.");
+  }
+
+  // 10. Pengujian Jurnal Agenda Pembelajaran & Materi KBM (Catatan Pembelajaran)
+  {
+    console.log("[TEST 10] Menguji pencatatan agenda materi pembelajaran KBM...");
+
+    // Validasi skema Zod untuk topic dan learningActivities
+    const sessionWithAgenda = {
+      id: "session-agenda-1",
+      classId: "class-7a",
+      sessionDate: "2026-09-28",
+      slot: 0,
+      subject: "Informatika",
+      topic: "Berpikir Komputasional: Algoritma Searching",
+      learningActivities: "Siswa mempelajari algoritma linear search dan binary search melalui simulasi kartu.",
+      note: "Diskusi kelompok berjalan sangat aktif.",
+      clientRequestId: "req-agenda-001",
+      createdAt: "2026-09-28T07:00:00Z",
+      updatedAt: "2026-09-28T07:00:00Z",
+    };
+
+    const parsedSession = AttendanceSessionSchema.parse(sessionWithAgenda);
+    assert.strictEqual(parsedSession.topic, "Berpikir Komputasional: Algoritma Searching");
+    assert.ok(parsedSession.learningActivities?.includes("linear search"));
+
+    // Ekspor Excel & CSV dengan Jurnal Agenda
+    const sampleDates = ["2026-09-28"];
+    const sampleRecapStudents: StudentMonthlyRecap[] = [
+      {
+        studentId: "std-1",
+        nis: "262707001",
+        fullName: "ABDULLAH AL SAFWA",
+        hadir: 1,
+        sakit: 0,
+        izin: 0,
+        alpa: 0,
+        terlambat: 0,
+        dispen: 0,
+        totalHari: 1,
+        persentaseKehadiran: 100.0,
+        dailyStatus: { "2026-09-28": "H" },
+        needsAttention: false,
+      },
+    ];
+
+    const mockClassForAgenda: Class = {
+      id: "class-7a",
+      teacherId: "teacher-1",
+      name: "7A",
+      academicYear: "2026/2027",
+      semester: 1,
+      createdAt: "2026-07-01T00:00:00Z",
+      scheduleDay: "Senin",
+      schedulePeriod: "Jam 1-2 (07:30 - 08:50)",
+      scheduleTime: "07:30 - 08:50",
+      subject: "Informatika",
+    };
+
+    const excelWithAgenda = generateAttendanceExcelHtmlWithKop(
+      mockClassForAgenda,
+      "September 2026",
+      sampleDates,
+      sampleRecapStudents,
+      [],
+      {},
+      [parsedSession]
+    );
+
+    assert.ok(excelWithAgenda.includes("JURNAL AGENDA PEMBELAJARAN (KBM)"), "Excel harus memuat tabel Jurnal Agenda KBM");
+    assert.ok(excelWithAgenda.includes("Berpikir Komputasional: Algoritma Searching"), "Excel harus memuat topik materi");
+    assert.ok(excelWithAgenda.includes("simulasi kartu"), "Excel harus memuat uraian kegiatan");
+
+    const csvWithAgenda = generateAttendanceCsvWithKop(
+      mockClassForAgenda,
+      "September 2026",
+      sampleDates,
+      sampleRecapStudents,
+      [],
+      {},
+      [parsedSession]
+    );
+
+    assert.ok(csvWithAgenda.includes("JURNAL AGENDA PEMBELAJARAN (KBM)"), "CSV harus memuat section Jurnal Agenda KBM");
+    assert.ok(csvWithAgenda.includes("Berpikir Komputasional: Algoritma Searching"), "CSV harus memuat topik materi di baris agenda");
+
+    console.log("✓ LULUS: Fitur agenda materi dan jurnal KBM teruji valid dan konsisten dalam ekspor.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");

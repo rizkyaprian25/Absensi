@@ -21,6 +21,9 @@ import {
   History,
   RotateCcw,
   Award,
+  BookOpen,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import {
   MOCK_CLASSES,
@@ -104,15 +107,31 @@ function AttendanceTakingContent() {
   const [holidayCategoryInput, setHolidayCategoryInput] = useState<HolidayCategory>("SEKOLAH");
   const [holidayDescInput, setHolidayDescInput] = useState("");
 
+  // State Agenda & Materi Pembelajaran KBM Hari Ini
+  const [topic, setTopic] = useState("");
+  const [learningActivities, setLearningActivities] = useState("");
+  const [sessionNote, setSessionNote] = useState("");
+  const [isAgendaExpanded, setIsAgendaExpanded] = useState(true);
+
   // Muat hari libur saat mount
   useEffect(() => {
     setHolidays(getStoredHolidays());
   }, []);
 
-  // Muat data presensi yang sudah tersimpan untuk kelas dan tanggal yang dipilih
+  // Muat data presensi dan agenda KBM yang sudah tersimpan untuk kelas dan tanggal yang dipilih
   useEffect(() => {
     const { session, records } = getSessionAndRecords(classId, selectedDate);
     const newMap: Record<string, StudentAttendanceState> = {};
+
+    if (session) {
+      setTopic(session.topic ?? "");
+      setLearningActivities(session.learningActivities ?? "");
+      setSessionNote(session.note ?? "");
+    } else {
+      setTopic("");
+      setLearningActivities("");
+      setSessionNote("");
+    }
 
     if (session && records.length > 0) {
       records.forEach((r) => {
@@ -132,10 +151,12 @@ function AttendanceTakingContent() {
       classStudents.forEach((student, idx) => {
         // Simulasi jika hari ini tanggal 29 Sep bawaan mock demo
         if (selectedDate === "2026-09-29") {
-          if (idx === 7) {
+          if (idx === 2) {
             newMap[student.id] = { status: "SAKIT", note: "Surat dokter" };
-          } else if (idx === 9) {
-            newMap[student.id] = { status: "IZIN", note: "Dispensasi OSIS" };
+          } else if (idx === 6) {
+            newMap[student.id] = { status: "IZIN", note: "Acara keluarga" };
+          } else if (idx === 11) {
+            newMap[student.id] = { status: "ALPA", note: "Tanpa keterangan" };
           } else {
             newMap[student.id] = { status: "HADIR" };
           }
@@ -243,7 +264,9 @@ function AttendanceTakingContent() {
       sessionDate: selectedDate,
       slot: 0,
       subject: currentClass.subject ?? "Informatika",
-      note: isBackfill ? "Presensi Susulan" : null,
+      topic: topic.trim() || null,
+      learningActivities: learningActivities.trim() || null,
+      note: sessionNote.trim() || (isBackfill ? "Presensi Susulan" : null),
       clientRequestId: `req-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -525,6 +548,105 @@ function AttendanceTakingContent() {
           <span>D:</span>
           <span className="text-sm font-extrabold">{tally.dispen}</span>
         </div>
+      </div>
+
+      {/* Kartu Jurnal Agenda & Materi Belajar KBM */}
+      <div className="p-4 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] shadow-xs flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-[8px] bg-[var(--color-accent)]/10 text-[var(--color-accent)] flex items-center justify-center shrink-0">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-[var(--text-primary)]">
+                Agenda &amp; Materi Pembelajaran Hari Ini
+              </h3>
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                Catat topik bahasan atau kegiatan KBM yang diajarkan pada pertemuan ini
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsAgendaExpanded(!isAgendaExpanded)}
+            className="p-1.5 rounded-[8px] bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-semibold flex items-center gap-1 transition-all"
+          >
+            <span>{isAgendaExpanded ? "Tutup" : "Buka Catatan"}</span>
+            {isAgendaExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+
+        {isAgendaExpanded && (
+          <div className="flex flex-col gap-3 pt-2.5 border-t border-[var(--border-hairline)] animate-in fade-in">
+            {/* Template Cepat Topik Informatika */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-semibold text-[var(--text-secondary)] mr-0.5">Topik Cepat:</span>
+              {[
+                "Berpikir Komputasional",
+                "Algoritma & Pemrograman",
+                "Perangkat Keras (Hardware)",
+                "Jaringan Komputer & Internet",
+                "Analisis Data & Spreadsheet",
+                "Dampak Sosial Informatika",
+                "Projek P5 / Kokurikuler",
+                "Ulangan Harian (Formatif)",
+                "Praktikum Komputer",
+              ].map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => setTopic(chip)}
+                  className="px-2 py-0.5 rounded-[5px] bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-[10px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-hairline)] transition-all cursor-pointer"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+
+            {/* Input Materi / Pokok Bahasan */}
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1">
+                Materi / Pokok Bahasan KBM <span className="text-[var(--color-accent)]">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Contoh: Bab 2 Berpikir Komputasional - Algoritma Searching & Sorting"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                className="w-full min-h-[42px] px-3 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+              />
+            </div>
+
+            {/* Input Uraian Kegiatan & Catatan Khusus */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1">
+                  Uraian Kegiatan / Agenda Belajar (Opsional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Contoh: Pemaparan materi, simulasi tebak kartu bilangan, diskusi kelompok di lab..."
+                  value={learningActivities}
+                  onChange={(e) => setLearningActivities(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-xs text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1">
+                  Catatan Khusus KBM / Refleksi (Opsional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Contoh: Seluruh siswa aktif memahami materi; 2 siswa butuh pendampingan modul..."
+                  value={sessionNote}
+                  onChange={(e) => setSessionNote(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-xs text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] resize-none"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Bilah Aksi Cepat & Pencarian Siswa */}

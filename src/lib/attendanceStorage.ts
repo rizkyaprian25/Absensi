@@ -125,6 +125,9 @@ export interface PastTeachingDateInfo {
   isSpecialAgenda?: boolean; // True jika pekan UTS, UAS, atau Kokurikuler (sekolah masuk & tetap ada absensi)
   agendaCategory?: HolidayCategory;
   agendaName?: string;
+  topic?: string | null; // Materi / Topik Bahasan Pembelajaran KBM
+  learningActivities?: string | null; // Agenda / Uraian Aktivitas Belajar
+  sessionNote?: string | null; // Catatan khusus KBM / refleksi kelas
   isFilled: boolean;
   isPast: boolean;
   isToday: boolean;
@@ -199,6 +202,9 @@ export function generatePastTeachingDates(
         isSpecialAgenda,
         agendaCategory: isSpecialAgenda ? calItem?.category : undefined,
         agendaName: isSpecialAgenda ? calItem?.name : undefined,
+        topic: session?.topic ?? null,
+        learningActivities: session?.learningActivities ?? null,
+        sessionNote: session?.note ?? null,
         isFilled,
         isPast: dateStr < todayStr,
         isToday: dateStr === todayStr,
@@ -211,4 +217,56 @@ export function generatePastTeachingDates(
 
   // Urutkan dari tanggal terbaru ke terlama agar guru mudah melihat riwayat
   return result.reverse();
+}
+
+/**
+ * Memperbarui atau menyimpan agenda materi pembelajaran untuk sesi tertentu
+ */
+export function updateSessionAgenda(
+  classId: string,
+  sessionDate: string,
+  topic: string,
+  learningActivities?: string,
+  note?: string
+): AttendanceSession {
+  const sessions = getSavedSessions();
+  const existingIdx = sessions.findIndex(
+    (s) => s.classId === classId && s.sessionDate === sessionDate
+  );
+
+  let updatedSession: AttendanceSession;
+
+  if (existingIdx !== -1) {
+    updatedSession = {
+      ...sessions[existingIdx],
+      topic: topic.trim() || null,
+      learningActivities: learningActivities?.trim() || null,
+      note: note?.trim() || sessions[existingIdx].note,
+      updatedAt: new Date().toISOString(),
+    };
+    sessions[existingIdx] = updatedSession;
+  } else {
+    updatedSession = {
+      id: `session-${classId}-${sessionDate}`,
+      classId,
+      sessionDate,
+      slot: 0,
+      subject: "Informatika",
+      topic: topic.trim() || null,
+      learningActivities: learningActivities?.trim() || null,
+      note: note?.trim() || null,
+      clientRequestId: `req-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    sessions.push(updatedSession);
+  }
+
+  try {
+    localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(sessions));
+  } catch (err) {
+    console.error("Gagal memperbarui agenda KBM lokal:", err);
+  }
+
+  return updatedSession;
 }

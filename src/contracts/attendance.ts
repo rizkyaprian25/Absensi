@@ -202,7 +202,9 @@ export const AttendanceSessionSchema = z.object({
   sessionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD"),
   slot: z.number().int().min(0).default(0), // 0 = absensi harian, >=1 = jam pelajaran ke-N
   subject: z.string().max(80).nullable().optional(),
-  note: z.string().max(MAX_NOTE_LENGTH).nullable().optional(),
+  topic: z.string().max(200).nullable().optional(), // Materi Pokok / Topik Bahasan Pembelajaran
+  learningActivities: z.string().max(500).nullable().optional(), // Uraian Agenda KBM / Aktivitas Belajar
+  note: z.string().max(MAX_NOTE_LENGTH).nullable().optional(), // Catatan Refleksi / Kejadian Khusus di Kelas
   clientRequestId: z.string(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -214,6 +216,8 @@ export type AttendanceSession = z.infer<typeof AttendanceSessionSchema>;
 export const SaveSessionInputSchema = z.object({
   records: z.array(AttendanceRecordInputSchema).min(1, "Minimal harus ada satu catatan kehadiran siswa"),
   subject: z.string().max(80).optional(),
+  topic: z.string().max(200).optional(),
+  learningActivities: z.string().max(500).optional(),
   note: z.string().max(MAX_NOTE_LENGTH).optional(),
 });
 

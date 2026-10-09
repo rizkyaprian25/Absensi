@@ -15,6 +15,7 @@ import {
   Sparkles,
   History,
   FileCheck,
+  BookOpen,
 } from "lucide-react";
 import {
   MOCK_CLASSES,
@@ -26,7 +27,9 @@ import {
   ScheduleDay,
   HolidayItem,
   HolidayCategory,
+  AttendanceSession,
 } from "@/contracts/attendance";
+import { getSavedSessions } from "@/lib/attendanceStorage";
 import {
   getStoredHolidays,
   saveStoredHolidays,
@@ -80,9 +83,12 @@ export default function TodayDashboardPage() {
   const [quickBackfillClassId, setQuickBackfillClassId] = useState("class-7a");
   const [quickBackfillDate, setQuickBackfillDate] = useState("2026-07-13");
 
-  // Inisialisasi daftar hari libur dari penyimpanan lokal saat mount
+  const [sessions, setSessions] = useState<AttendanceSession[]>([]);
+
+  // Inisialisasi daftar hari libur dan sesi tersimpan dari penyimpanan lokal saat mount
   useEffect(() => {
     setHolidays(getStoredHolidays());
+    setSessions(getSavedSessions());
   }, []);
 
   // Filter kelas berdasarkan hari yang dipilih
@@ -427,6 +433,9 @@ export default function TodayDashboardPage() {
         <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] divide-y divide-[var(--border-hairline)] overflow-hidden shadow-xs">
           {classesForSelectedDay.map((cls) => {
             const studentCount = getStudentsForClass(cls.id).length;
+            const classSession = sessions.find(
+              (s) => s.classId === cls.id && s.sessionDate === selectedDate
+            );
 
             return (
               <div
@@ -461,6 +470,15 @@ export default function TodayDashboardPage() {
                       <span>·</span>
                       <span>{studentCount} Siswa</span>
                     </p>
+
+                    {classSession && (
+                      <div className="mt-1.5 flex items-center gap-1.5 text-xs text-[var(--text-secondary)] bg-[var(--surface-recessed)]/50 px-2 py-1 rounded-[6px] border border-[var(--border-hairline)]/50">
+                        <BookOpen className="w-3.5 h-3.5 text-[var(--color-accent)] shrink-0" />
+                        <span className="truncate font-medium text-[var(--text-primary)]">
+                          {classSession.topic ? `Materi: ${classSession.topic}` : "Presensi telah direkam"}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

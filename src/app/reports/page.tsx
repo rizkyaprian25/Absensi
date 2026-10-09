@@ -14,6 +14,7 @@ import {
   Filter,
   Layers,
   ChevronDown,
+  BookOpen,
 } from "lucide-react";
 import {
   MOCK_CLASSES,
@@ -271,7 +272,39 @@ export default function ReportsPage() {
     return recapData.students.filter((s) => s.needsAttention);
   }, [recapData]);
 
-  // Ekspor Excel (.xls) dengan Kop Surat Resmi Sekolah
+  // Data Jurnal Agenda KBM untuk Bulan Terpilih
+  const monthlyAgendas = useMemo(() => {
+    return recapData.effectiveDates.map((date, idx) => {
+      const session = savedSessions.find(
+        (s) => s.classId === currentClass.id && s.sessionDate === date
+      );
+      const holiday = findHolidayByDate(date, holidays);
+      const isSpecial = holiday && isActiveSchoolEvent(holiday.category);
+      const isRealHol = holiday && isRealHoliday(holiday.category);
+
+      return {
+        meetingNumber: idx + 1,
+        date,
+        session,
+        holiday,
+        isSpecial,
+        isRealHoliday: isRealHol,
+        topic: session?.topic || null,
+        learningActivities: session?.learningActivities || null,
+        note: session?.note || null,
+        hadirCount: session
+          ? savedRecords.filter(
+              (r) => r.sessionId === session.id && r.status === "HADIR"
+            ).length
+          : null,
+        totalCount: session
+          ? savedRecords.filter((r) => r.sessionId === session.id).length
+          : null,
+      };
+    });
+  }, [recapData.effectiveDates, savedSessions, savedRecords, currentClass.id, holidays]);
+
+  // Ekspor Excel (.xls) dengan Kop Surat Resmi Sekolah & Jurnal Agenda
   const handleExportExcel = (targetClass: Class = currentClass) => {
     const data =
       targetClass.id === currentClass.id
@@ -283,7 +316,9 @@ export default function ReportsPage() {
       currentMonthLabel,
       data.effectiveDates,
       data.students,
-      holidays
+      holidays,
+      {},
+      savedSessions
     );
 
     const blob = new Blob([htmlContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
@@ -303,7 +338,7 @@ export default function ReportsPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Ekspor CSV Native dengan UTF-8 BOM & Kop Surat Resmi
+  // Ekspor CSV Native dengan UTF-8 BOM, Kop Surat Resmi Sekolah & Jurnal Agenda
   const handleExportCsv = (targetClass: Class = currentClass) => {
     const data =
       targetClass.id === currentClass.id
@@ -315,7 +350,9 @@ export default function ReportsPage() {
       currentMonthLabel,
       data.effectiveDates,
       data.students,
-      holidays
+      holidays,
+      {},
+      savedSessions
     );
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -819,6 +856,88 @@ export default function ReportsPage() {
                   </tr>
                 );
               })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Seksi Jurnal Agenda Pembelajaran & Materi KBM */}
+      <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] overflow-hidden shadow-xs">
+        <div className="p-3 bg-[var(--surface-recessed)] border-b border-[var(--border-hairline)] flex items-center justify-between text-xs text-[var(--text-secondary)]">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-[var(--color-accent)]" />
+            <span className="font-bold text-[var(--text-primary)]">
+              Jurnal Agenda Pembelajaran &amp; Materi KBM Bulan {currentMonthLabel}
+            </span>
+          </div>
+          <span className="text-[11px] font-mono">
+            Kelas {currentClass.name} · {monthlyAgendas.length} Pertemuan
+          </span>
+        </div>
+
+        <div className="overflow-x-auto max-w-full">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-[var(--surface-recessed)]/50 border-b border-[var(--border-hairline)] text-[var(--text-secondary)]">
+                <th className="p-2.5 font-bold w-12 text-center border-r border-[var(--border-hairline)]">Temu</th>
+                <th className="p-2.5 font-bold min-w-[130px] border-r border-[var(--border-hairline)]">Hari &amp; Tanggal</th>
+                <th className="p-2.5 font-bold min-w-[120px] border-r border-[var(--border-hairline)]">Status / Kategori</th>
+                <th className="p-2.5 font-bold min-w-[200px] border-r border-[var(--border-hairline)]">Materi / Topik Pembelajaran</th>
+                <th className="p-2.5 font-bold min-w-[240px] border-r border-[var(--border-hairline)]">Uraian Kegiatan &amp; Refleksi KBM</th>
+                <th className="p-2.5 font-bold text-center min-w-[90px]">Kehadiran</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border-hairline)]">
+              {monthlyAgendas.map((item) => (
+                <tr key={item.date} className="hover:bg-[var(--surface-recessed)]/40 transition-colors">
+                  <td className="p-2.5 text-center font-mono font-bold text-[var(--color-accent)] border-r border-[var(--border-hairline)]">
+                    #{item.meetingNumber}
+                  </td>
+                  <td className="p-2.5 font-semibold text-[var(--text-primary)] border-r border-[var(--border-hairline)] whitespace-nowrap">
+                    {formatIndonesianDate(item.date)}
+                  </td>
+                  <td className="p-2.5 border-r border-[var(--border-hairline)]">
+                    {item.isRealHoliday ? (
+                      <span className="px-2 py-0.5 rounded-[4px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold text-[11px]">
+                        Libur: {item.holiday?.name}
+                      </span>
+                    ) : item.isSpecial ? (
+                      <span className="px-2 py-0.5 rounded-[4px] bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 font-bold text-[11px] border border-purple-200 dark:border-purple-800">
+                        {item.holiday?.category === "UTS" ? "Pekan UTS" : item.holiday?.category === "UAS" ? "Pekan UAS" : "Kokurikuler (P5)"}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-[4px] bg-[var(--status-hadir-bg)] text-[var(--status-hadir-fg)] font-bold text-[11px]">
+                        KBM Normal
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-2.5 border-r border-[var(--border-hairline)] font-medium text-[var(--text-primary)]">
+                    {item.topic ? (
+                      <span>{item.topic}</span>
+                    ) : item.isRealHoliday ? (
+                      <span className="italic text-[var(--text-secondary)]">Tidak ada KBM (Hari Libur)</span>
+                    ) : (
+                      <span className="italic text-[var(--text-tertiary)]">Belum ada catatan materi</span>
+                    )}
+                  </td>
+                  <td className="p-2.5 border-r border-[var(--border-hairline)] text-[var(--text-secondary)]">
+                    {item.learningActivities ? (
+                      <span>{item.learningActivities}</span>
+                    ) : (
+                      <span className="italic text-[var(--text-tertiary)]">-</span>
+                    )}
+                  </td>
+                  <td className="p-2.5 text-center font-mono">
+                    {item.hadirCount !== null ? (
+                      <span className="font-semibold text-[var(--status-hadir-fg)]">
+                        {item.hadirCount}/{item.totalCount} Hadir
+                      </span>
+                    ) : (
+                      <span className="text-[var(--text-secondary)]">-</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

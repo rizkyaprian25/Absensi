@@ -22,6 +22,7 @@ import {
   Sparkles,
   Clock,
   Award,
+  BookOpen,
 } from "lucide-react";
 import {
   MOCK_CLASSES,
@@ -533,6 +534,29 @@ export default function ClassDetailPage() {
                           ? `Terekam: ${item.hadirCount ?? 0} dari ${item.totalStudents ?? students.length} siswa hadir.`
                           : "Presensi belum direkam untuk pertemuan ini."}
                       </p>
+
+                      {/* Catatan Materi & Agenda KBM */}
+                      {!item.isHoliday && (
+                        <div className="mt-2 text-xs flex items-start gap-1.5 text-[var(--text-secondary)] bg-[var(--surface-recessed)]/50 px-2.5 py-1.5 rounded-[8px] border border-[var(--border-hairline)]/60">
+                          <BookOpen className="w-3.5 h-3.5 text-[var(--color-accent)] shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            {item.topic ? (
+                              <p className="font-medium text-[var(--text-primary)]">
+                                {item.topic}
+                              </p>
+                            ) : (
+                              <p className="italic text-[var(--text-tertiary)] text-[11px]">
+                                Belum ada catatan materi pembelajaran
+                              </p>
+                            )}
+                            {item.learningActivities && (
+                              <p className="text-[11px] text-[var(--text-secondary)] line-clamp-1 mt-0.5">
+                                {item.learningActivities}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
