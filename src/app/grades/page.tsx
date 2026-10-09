@@ -87,6 +87,14 @@ function GradesPageContent() {
   const [quickEntryAssessmentId, setQuickEntryAssessmentId] = useState<string>("");
   const [quickScores, setQuickScores] = useState<Record<string, string>>({});
   const [bulkValue, setBulkValue] = useState<string>("");
+  const [quickSearchQuery, setQuickSearchQuery] = useState<string>("");
+  const [quickStatusFilter, setQuickStatusFilter] = useState<"ALL" | "UNGRADED" | "GRADED" | "REMEDIAL">("ALL");
+
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const [isKkmModalOpen, setIsKkmModalOpen] = useState(false);
   const [tempKkm, setTempKkm] = useState<number>(DEFAULT_KKM);
@@ -168,6 +176,56 @@ function GradesPageContent() {
 
     return result;
   }, [studentSummaries, searchQuery, sortBy]);
+
+  // Daftar Siswa Terfilter untuk Modal Input Nilai Cepat (Pencarian Nama & Filter Status)
+  const filteredQuickStudents = useMemo(() => {
+    let list = students.map((s, originalIdx) => ({
+      student: s,
+      originalIndex: originalIdx + 1,
+    }));
+
+    if (quickSearchQuery.trim()) {
+      const q = quickSearchQuery.toLowerCase().trim();
+      list = list.filter(
+        ({ student }) =>
+          student.fullName.toLowerCase().includes(q) ||
+          (student.nis && student.nis.toLowerCase().includes(q))
+      );
+    }
+
+    if (quickStatusFilter !== "ALL") {
+      list = list.filter(({ student }) => {
+        const val = quickScores[student.id]?.trim();
+        const num = val === "" || val === undefined ? null : Number(val);
+        if (quickStatusFilter === "UNGRADED") return num === null;
+        if (quickStatusFilter === "GRADED") return num !== null;
+        if (quickStatusFilter === "REMEDIAL") return num !== null && num < kkm;
+        return true;
+      });
+    }
+
+    return list;
+  }, [students, quickSearchQuery, quickStatusFilter, quickScores, kkm]);
+
+  // Statistik status penilaian pada modal cepat
+  const quickCounts = useMemo(() => {
+    let ungraded = 0;
+    let graded = 0;
+    let remedial = 0;
+
+    students.forEach((s) => {
+      const val = quickScores[s.id]?.trim();
+      const num = val === "" || val === undefined ? null : Number(val);
+      if (num === null) {
+        ungraded++;
+      } else {
+        graded++;
+        if (num < kkm) remedial++;
+      }
+    });
+
+    return { ungraded, graded, remedial };
+  }, [students, quickScores, kkm]);
 
   // Simpan Penilaian Baru atau Perbarui
   const handleSaveAssessment = (e: React.FormEvent<HTMLFormElement>) => {
@@ -261,6 +319,8 @@ function GradesPageContent() {
 
     setQuickScores(currentScoresMap);
     setBulkValue("");
+    setQuickSearchQuery(searchQuery.trim());
+    setQuickStatusFilter("ALL");
     setIsQuickEntryOpen(true);
   };
 
@@ -278,6 +338,7 @@ function GradesPageContent() {
 
     refreshData();
     setIsQuickEntryOpen(false);
+    showToast(`Nilai berhasil disimpan untuk ${students.length} siswa.`);
   };
 
   // Terapkan Nilai Massal
@@ -288,12 +349,17 @@ function GradesPageContent() {
       return;
     }
 
+    const targetStudents =
+      filteredQuickStudents.length < students.length
+        ? filteredQuickStudents.map((f) => f.student)
+        : students;
+
     const updated = { ...quickScores };
-    students.forEach((s) => {
-      // Isi hanya yang kosong atau timpa semua sesuai preferensi
+    targetStudents.forEach((s) => {
       updated[s.id] = String(num);
     });
     setQuickScores(updated);
+    showToast(`Nilai massal ${num} diterapkan untuk ${targetStudents.length} siswa.`);
   };
 
   // Simpan Pengaturan KKM
@@ -366,6 +432,14 @@ function GradesPageContent() {
 
   return (
     <div className="flex flex-col gap-5 pb-12">
+      {/* Toast Notifikasi */}
+      {toastMessage && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[var(--status-hadir-fg)] text-white px-4 py-2.5 rounded-[12px] shadow-lg flex items-center gap-2 text-sm font-semibold animate-in fade-in slide-in-from-top-4 print:hidden">
+          <CheckCircle2 className="w-5 h-5 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Header Utama Buku Nilai */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--border-hairline)] pb-4">
         <div>
@@ -715,6 +789,16 @@ function GradesPageContent() {
                           <span>{asmt.date.slice(5)}</span>
                           <span>Max {asmt.maxScore}</span>
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenQuickEntry(asmt.id)}
+                          className="mt-1 w-full py-1 px-1.5 rounded-[6px] bg-[var(--surface-card)] hover:bg-[var(--color-accent)] hover:text-[var(--color-on-accent)] text-[var(--text-primary)] font-semibold text-[10px] flex items-center justify-center gap-1 transition-all border border-[var(--border-hairline)] shadow-2xs"
+                          title={`Buka form input nilai untuk ${asmt.title}`}
+                        >
+                          <Sparkles className="w-2.5 h-2.5" />
+                          <span>Beri Nilai</span>
+                        </button>
                       </div>
                     </th>
                   );
@@ -1159,75 +1243,215 @@ function GradesPageContent() {
               </div>
             </div>
 
+            {/* Toolbar Pencarian Siswa & Filter Status */}
+            <div className="p-3 bg-[var(--surface-card)] border-b border-[var(--border-hairline)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  autoFocus
+                  value={quickSearchQuery}
+                  onChange={(e) => setQuickSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && filteredQuickStudents.length > 0) {
+                      e.preventDefault();
+                      const firstStudent = filteredQuickStudents[0];
+                      document.getElementById(`quick-score-${firstStudent.student.id}`)?.focus();
+                    }
+                  }}
+                  placeholder="Ketik nama siswa atau NIS untuk mencari..."
+                  className="w-full pl-9 pr-8 py-2 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-xs text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+                />
+                {quickSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setQuickSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    title="Hapus kata kunci pencarian"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Status Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-[11px] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setQuickStatusFilter("ALL")}
+                  className={`px-2.5 py-1 rounded-[6px] font-medium transition-colors shrink-0 ${
+                    quickStatusFilter === "ALL"
+                      ? "bg-[var(--text-primary)] text-[var(--surface-card)] font-bold"
+                      : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  Semua ({students.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuickStatusFilter("UNGRADED")}
+                  className={`px-2.5 py-1 rounded-[6px] font-medium transition-colors shrink-0 ${
+                    quickStatusFilter === "UNGRADED"
+                      ? "bg-amber-500 text-white font-bold"
+                      : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  Belum Dinilai ({quickCounts.ungraded})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuickStatusFilter("GRADED")}
+                  className={`px-2.5 py-1 rounded-[6px] font-medium transition-colors shrink-0 ${
+                    quickStatusFilter === "GRADED"
+                      ? "bg-emerald-600 text-white font-bold"
+                      : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  Sudah Dinilai ({quickCounts.graded})
+                </button>
+                {quickCounts.remedial > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setQuickStatusFilter("REMEDIAL")}
+                    className={`px-2.5 py-1 rounded-[6px] font-medium transition-colors shrink-0 ${
+                      quickStatusFilter === "REMEDIAL"
+                        ? "bg-rose-600 text-white font-bold"
+                        : "bg-[var(--surface-recessed)] text-[var(--status-alpa-fg)] hover:text-[var(--status-alpa-fg)]"
+                    }`}
+                  >
+                    Remedial ({quickCounts.remedial})
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Indikator Hasil Pencarian jika ada query atau filter */}
+            {(quickSearchQuery || quickStatusFilter !== "ALL") && (
+              <div className="px-4 py-1.5 bg-[var(--surface-recessed)]/60 border-b border-[var(--border-hairline)] text-[11px] text-[var(--text-secondary)] flex items-center justify-between shrink-0">
+                <span>
+                  Menampilkan <strong>{filteredQuickStudents.length}</strong> dari {students.length} siswa
+                  {quickSearchQuery && <> dengan kata kunci &quot;<strong>{quickSearchQuery}</strong>&quot;</>}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuickSearchQuery("");
+                    setQuickStatusFilter("ALL");
+                  }}
+                  className="text-[var(--color-accent)] hover:underline font-semibold"
+                >
+                  Reset Filter
+                </button>
+              </div>
+            )}
+
             {/* Daftar Siswa & Input Nilai (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 divide-y divide-[var(--border-hairline)]">
-              {students.map((student, idx) => {
-                const currentVal = quickScores[student.id] ?? "";
-                const numVal = currentVal === "" ? null : Number(currentVal);
-                const isUnderKkm = numVal !== null && numVal < kkm;
-
-                return (
-                  <div
-                    key={student.id}
-                    className="py-2.5 flex items-center justify-between gap-3 hover:bg-[var(--surface-recessed)]/30 px-2 rounded-lg"
+              {filteredQuickStudents.length === 0 ? (
+                <div className="py-12 text-center text-[var(--text-secondary)] flex flex-col items-center justify-center">
+                  <Search className="w-8 h-8 opacity-30 mb-2" />
+                  <p className="font-semibold text-xs text-[var(--text-primary)]">
+                    Tidak ada siswa yang sesuai pencarian
+                  </p>
+                  <p className="text-[11px] mt-1 text-[var(--text-secondary)] max-w-xs">
+                    {quickSearchQuery ? `Tidak ada siswa dengan nama "${quickSearchQuery}".` : "Tidak ada siswa dalam kategori ini."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickSearchQuery("");
+                      setQuickStatusFilter("ALL");
+                    }}
+                    className="mt-3 px-3 py-1.5 rounded-[8px] bg-[var(--surface-recessed)] text-[var(--color-accent)] text-xs font-semibold hover:bg-[var(--border-hairline)] transition-colors"
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="font-mono text-xs text-[var(--text-secondary)] w-6 text-center shrink-0">
-                        {String(idx + 1).padStart(2, "0")}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-xs text-[var(--text-primary)] truncate">
-                          {student.fullName}
-                        </p>
-                        <p className="text-[10px] text-[var(--text-secondary)] font-mono">
-                          NIS {student.nis ?? "-"} · {student.gender === "L" ? "Laki-laki" : "Perempuan"}
-                        </p>
+                    Tampilkan Semua Siswa
+                  </button>
+                </div>
+              ) : (
+                filteredQuickStudents.map(({ student, originalIndex }, idx) => {
+                  const currentVal = quickScores[student.id] ?? "";
+                  const numVal = currentVal === "" ? null : Number(currentVal);
+                  const isUnderKkm = numVal !== null && numVal < kkm;
+
+                  return (
+                    <div
+                      key={student.id}
+                      className="py-2.5 flex items-center justify-between gap-3 hover:bg-[var(--surface-recessed)]/40 px-2 rounded-lg transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="font-mono text-xs text-[var(--text-secondary)] w-7 text-center shrink-0 font-semibold">
+                          #{String(originalIndex).padStart(2, "0")}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-xs text-[var(--text-primary)] truncate">
+                            {student.fullName}
+                          </p>
+                          <p className="text-[10px] text-[var(--text-secondary)] font-mono">
+                            NIS {student.nis ?? "-"} · {student.gender === "L" ? "Laki-laki" : "Perempuan"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {numVal !== null ? (
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-semibold font-mono ${
+                              isUnderKkm
+                                ? "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                                : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                            }`}
+                          >
+                            {isUnderKkm ? "Remedial" : "Tuntas"}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium font-mono text-[var(--text-secondary)] bg-[var(--surface-recessed)] border border-[var(--border-hairline)]/50">
+                            Kosong
+                          </span>
+                        )}
+                        <input
+                          id={`quick-score-${student.id}`}
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={currentVal}
+                          placeholder="0-100"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const next = filteredQuickStudents[idx + 1];
+                              if (next) {
+                                document.getElementById(`quick-score-${next.student.id}`)?.focus();
+                              } else {
+                                handleSaveQuickEntry();
+                              }
+                            }
+                          }}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setQuickScores((prev) => ({
+                              ...prev,
+                              [student.id]: val,
+                            }));
+                          }}
+                          className={`w-20 px-2.5 py-1.5 text-center font-mono text-xs border rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] ${
+                            isUnderKkm
+                              ? "border-amber-400 bg-amber-50/50 dark:bg-amber-950/20 text-[var(--text-primary)]"
+                              : "border-[var(--border-hairline)] bg-[var(--surface-card)] text-[var(--text-primary)]"
+                          }`}
+                        />
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {numVal !== null && (
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded-full font-semibold font-mono ${
-                            isUnderKkm
-                              ? "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
-                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                          }`}
-                        >
-                          {isUnderKkm ? "Remedial" : "Tuntas"}
-                        </span>
-                      )}
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={currentVal}
-                        placeholder="0-100"
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setQuickScores((prev) => ({
-                            ...prev,
-                            [student.id]: val,
-                          }));
-                        }}
-                        className={`w-20 px-2.5 py-1.5 text-center font-mono text-xs border rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] ${
-                          isUnderKkm
-                            ? "border-amber-400 bg-amber-50/50 dark:bg-amber-950/20"
-                            : "border-[var(--border-hairline)] bg-[var(--surface-card)] text-[var(--text-primary)]"
-                        }`}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
             {/* Footer Modal Input Cepat */}
-            <div className="p-4 border-t border-[var(--border-hairline)] bg-[var(--surface-recessed)] flex items-center justify-between shrink-0">
+            <div className="p-4 border-t border-[var(--border-hairline)] bg-[var(--surface-recessed)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
               <span className="text-xs text-[var(--text-secondary)]">
-                Tekan <strong>Tab</strong> untuk pindah ke siswa berikutnya
+                Ketik nama di pencarian &rarr; Tekan <strong>Enter</strong> atau <strong>Tab</strong> untuk mengisi nilai berurutan
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-end sm:self-auto">
                 <button
                   type="button"
                   onClick={() => setIsQuickEntryOpen(false)}
