@@ -5,11 +5,13 @@ import type {
 } from "../contracts/attendance.ts";
 
 /** Kunci penyimpanan lokal daftar hari libur kustom */
-export const STORAGE_KEY_HOLIDAYS = "absensi_custom_holidays_v1";
+export const STORAGE_KEY_HOLIDAYS = "absensi_custom_holidays_v2";
 
 /**
- * Daftar Hari Libur Default Tahun Ajaran 2026/2027 (Semester Ganjil)
+ * Daftar Hari Libur Nasional Resmi Tahun Ajaran 2026/2027 (Semester Ganjil)
  * SMP Negeri 3 Cibungbulang (Kabupaten Bogor)
+ * Catatan: Pekan UTS, UAS, dan Kokurikuler TIDAK diset otomatis oleh sistem,
+ * agar guru leluasa menentukan dan menyesuaikan sendiri tanggal pelaksanaannya.
  */
 export const DEFAULT_HOLIDAYS: HolidayItem[] = [
   {
@@ -26,128 +28,6 @@ export const DEFAULT_HOLIDAYS: HolidayItem[] = [
     category: "NASIONAL",
     description: "Peringatan hari besar keagamaan nasional",
   },
-  // Minggu Penilaian Tengah Semester (UTS / PTS Ganjil)
-  {
-    id: "hld-2026-09-21",
-    date: "2026-09-21",
-    name: "Minggu Penilaian Tengah Semester (UTS / PTS)",
-    category: "UTS",
-    description: "Pekan pelaksanaan tes sumatif tengah semester ganjil",
-  },
-  {
-    id: "hld-2026-09-22",
-    date: "2026-09-22",
-    name: "Minggu Penilaian Tengah Semester (UTS / PTS)",
-    category: "UTS",
-    description: "Pekan pelaksanaan tes sumatif tengah semester ganjil",
-  },
-  {
-    id: "hld-2026-09-23",
-    date: "2026-09-23",
-    name: "Minggu Penilaian Tengah Semester (UTS / PTS)",
-    category: "UTS",
-    description: "Pekan pelaksanaan tes sumatif tengah semester ganjil",
-  },
-  {
-    id: "hld-2026-09-24",
-    date: "2026-09-24",
-    name: "Minggu Penilaian Tengah Semester (UTS / PTS)",
-    category: "UTS",
-    description: "Pekan pelaksanaan tes sumatif tengah semester ganjil",
-  },
-  {
-    id: "hld-2026-09-25",
-    date: "2026-09-25",
-    name: "Minggu Penilaian Tengah Semester (UTS / PTS)",
-    category: "UTS",
-    description: "Pekan pelaksanaan tes sumatif tengah semester ganjil",
-  },
-  {
-    id: "hld-2026-10-01",
-    date: "2026-10-01",
-    name: "Hari Kesaktian Pancasila",
-    category: "SEKOLAH",
-    description: "Peringatan nasional & apel pagi sekolah",
-  },
-  // Minggu Kokurikuler / P5 (Projek Penguatan Profil Pelajar Pancasila)
-  {
-    id: "hld-2026-10-12",
-    date: "2026-10-12",
-    name: "Minggu Kokurikuler / Projek P5",
-    category: "KOKURIKULER",
-    description: "Kegiatan kokurikuler blok proyek bertema Kearifan Lokal & Rekayasa Teknologi",
-  },
-  {
-    id: "hld-2026-10-13",
-    date: "2026-10-13",
-    name: "Minggu Kokurikuler / Projek P5",
-    category: "KOKURIKULER",
-    description: "Kegiatan kokurikuler blok proyek bertema Kearifan Lokal & Rekayasa Teknologi",
-  },
-  {
-    id: "hld-2026-10-14",
-    date: "2026-10-14",
-    name: "Minggu Kokurikuler / Projek P5",
-    category: "KOKURIKULER",
-    description: "Kegiatan kokurikuler blok proyek bertema Kearifan Lokal & Rekayasa Teknologi",
-  },
-  {
-    id: "hld-2026-10-15",
-    date: "2026-10-15",
-    name: "Minggu Kokurikuler / Projek P5",
-    category: "KOKURIKULER",
-    description: "Kegiatan kokurikuler blok proyek bertema Kearifan Lokal & Rekayasa Teknologi",
-  },
-  {
-    id: "hld-2026-10-16",
-    date: "2026-10-16",
-    name: "Minggu Kokurikuler / Projek P5",
-    category: "KOKURIKULER",
-    description: "Kegiatan kokurikuler blok proyek bertema Kearifan Lokal & Rekayasa Teknologi",
-  },
-  {
-    id: "hld-2026-11-25",
-    date: "2026-11-25",
-    name: "Hari Guru Nasional (HGN)",
-    category: "SEKOLAH",
-    description: "Peringatan hari guru & apresiasi pendidik",
-  },
-  // Minggu Penilaian Akhir Semester (UAS / PAS / SAS Ganjil)
-  {
-    id: "hld-2026-11-30",
-    date: "2026-11-30",
-    name: "Minggu Penilaian Akhir Semester (UAS / PAS)",
-    category: "UAS",
-    description: "Pekan pelaksanaan asesmen sumatif akhir semester (PAS) ganjil",
-  },
-  {
-    id: "hld-2026-12-01",
-    date: "2026-12-01",
-    name: "Minggu Penilaian Akhir Semester (UAS / PAS)",
-    category: "UAS",
-    description: "Pekan pelaksanaan asesmen sumatif akhir semester (PAS) ganjil",
-  },
-  {
-    id: "hld-2026-12-02",
-    date: "2026-12-02",
-    name: "Minggu Penilaian Akhir Semester (UAS / PAS)",
-    category: "UAS",
-    description: "Pekan pelaksanaan asesmen sumatif akhir semester (PAS) ganjil",
-  },
-  {
-    id: "hld-2026-12-03",
-    date: "2026-12-03",
-    name: "Minggu Penilaian Akhir Semester (UAS / PAS)",
-    category: "UAS",
-    description: "Pekan pelaksanaan asesmen sumatif akhir semester (PAS) ganjil",
-  },
-  {
-    id: "hld-2026-12-04",
-    date: "2026-12-04",
-    name: "Minggu Penilaian Akhir Semester (UAS / PAS)",
-    category: "UAS",
-    description: "Pekan pelaksanaan asesmen sumatif akhir semester (PAS) ganjil",
-  },
   {
     id: "hld-2026-12-25",
     date: "2026-12-25",
@@ -157,6 +37,22 @@ export const DEFAULT_HOLIDAYS: HolidayItem[] = [
   },
 ];
 
+/**
+ * Membersihkan cache hari libur lama (v1) yang sebelumnya memuat tanggal otomatis
+ */
+function cleanupLegacyHolidays(): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (localStorage.getItem("absensi_custom_holidays_v1") !== null) {
+      localStorage.removeItem("absensi_custom_holidays_v1");
+      if (localStorage.getItem(STORAGE_KEY_HOLIDAYS) === null) {
+        localStorage.setItem(STORAGE_KEY_HOLIDAYS, JSON.stringify(DEFAULT_HOLIDAYS));
+      }
+    }
+  } catch (err) {
+    console.warn("Peringatan saat membersihkan cache hari libur lama:", err);
+  }
+}
 
 /**
  * Mengambil daftar hari libur dari penyimpanan lokal (dengan fallback ke default)
@@ -165,6 +61,8 @@ export function getStoredHolidays(): HolidayItem[] {
   if (typeof window === "undefined") {
     return DEFAULT_HOLIDAYS;
   }
+
+  cleanupLegacyHolidays();
 
   try {
     const raw = localStorage.getItem(STORAGE_KEY_HOLIDAYS);

@@ -51,6 +51,37 @@ export default function SettingsPage() {
     setHolidays(getStoredHolidays());
   }, []);
 
+  /**
+   * Membuka modal dengan preset agenda pekan khusus (UTS, UAS, Kokurikuler, atau Libur Harian)
+   */
+  const openAddModalWithPreset = (preset?: "UTS" | "UAS" | "KOKURIKULER" | "SINGLE") => {
+    const today = new Date().toISOString().split("T")[0];
+    setNewDate(today);
+    setEndDate(today);
+    if (preset === "UTS") {
+      setIsRangeMode(true);
+      setNewCategory("UTS");
+      setNewName("Minggu Penilaian Tengah Semester (UTS / PTS)");
+      setNewDesc("Pekan pelaksanaan tes sumatif tengah semester ganjil");
+    } else if (preset === "UAS") {
+      setIsRangeMode(true);
+      setNewCategory("UAS");
+      setNewName("Minggu Penilaian Akhir Semester (UAS / PAS)");
+      setNewDesc("Pekan asesmen sumatif akhir semester ganjil");
+    } else if (preset === "KOKURIKULER") {
+      setIsRangeMode(true);
+      setNewCategory("KOKURIKULER");
+      setNewName("Minggu Kokurikuler / Projek P5");
+      setNewDesc("Kegiatan kokurikuler blok proyek bertema P5");
+    } else {
+      setIsRangeMode(false);
+      setNewCategory("SEKOLAH");
+      setNewName("");
+      setNewDesc("");
+    }
+    setIsAddModalOpen(true);
+  };
+
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
     if (!isDarkMode) {
@@ -183,7 +214,7 @@ export default function SettingsPage() {
                 Kalender Hari Masuk &amp; Libur Sekolah
               </h2>
               <p className="text-xs text-[var(--text-secondary)]">
-                Tentukan hari efektif KBM dan hari libur agar rekap presensi tidak menghitung alpa pada hari libur.
+                Tentukan hari efektif KBM serta agenda khusus (Pekan UTS, UAS, Kokurikuler). Rekap presensi otomatis tidak menghitung alpa pada hari libur.
               </p>
             </div>
           </div>
@@ -200,14 +231,44 @@ export default function SettingsPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setNewDate(new Date().toISOString().split("T")[0]);
-                setIsAddModalOpen(true);
-              }}
+              onClick={() => openAddModalWithPreset("SINGLE")}
               className="min-h-[38px] px-3 py-1.5 rounded-[8px] bg-[var(--color-accent)] text-[var(--color-on-accent)] text-xs font-bold flex items-center gap-1.5 shadow-xs hover:opacity-95 transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>Tambah Libur</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Tombol Pintas Penentuan Jadwal Pekan Khusus (Manual oleh Guru) */}
+        <div className="flex items-center gap-2 flex-wrap p-2.5 bg-[var(--surface-recessed)]/60 rounded-[10px] border border-[var(--border-hairline)] text-xs">
+          <span className="font-semibold text-[var(--text-secondary)] text-[11px] shrink-0">
+            Atur Manual Jadwal Pekan:
+          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => openAddModalWithPreset("UTS")}
+              className="px-2.5 py-1 rounded-[6px] bg-purple-100 dark:bg-purple-950/70 text-purple-800 dark:text-purple-300 font-semibold hover:bg-purple-200 dark:hover:bg-purple-900 border border-purple-300 dark:border-purple-800 transition-colors flex items-center gap-1"
+            >
+              <Plus className="w-3 h-3" />
+              + Pekan UTS
+            </button>
+            <button
+              type="button"
+              onClick={() => openAddModalWithPreset("UAS")}
+              className="px-2.5 py-1 rounded-[6px] bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 font-semibold hover:bg-rose-200 dark:hover:bg-rose-900 border border-rose-300 dark:border-rose-800 transition-colors flex items-center gap-1"
+            >
+              <Plus className="w-3 h-3" />
+              + Pekan UAS
+            </button>
+            <button
+              type="button"
+              onClick={() => openAddModalWithPreset("KOKURIKULER")}
+              className="px-2.5 py-1 rounded-[6px] bg-teal-100 dark:bg-teal-950/70 text-teal-800 dark:text-teal-300 font-semibold hover:bg-teal-200 dark:hover:bg-teal-900 border border-teal-300 dark:border-teal-800 transition-colors flex items-center gap-1"
+            >
+              <Plus className="w-3 h-3" />
+              + Pekan Kokurikuler (P5)
             </button>
           </div>
         </div>
@@ -387,6 +448,59 @@ export default function SettingsPage() {
             </div>
 
             <form onSubmit={handleAddHoliday} className="flex flex-col gap-3">
+              {/* Template Cepat */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Template Cepat:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRangeMode(true);
+                    setNewCategory("UTS");
+                    setNewName("Minggu Penilaian Tengah Semester (UTS / PTS)");
+                    setNewDesc("Pekan pelaksanaan tes sumatif tengah semester ganjil");
+                  }}
+                  className="px-2 py-0.5 rounded-[5px] bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 text-[11px] font-bold hover:opacity-90"
+                >
+                  UTS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRangeMode(true);
+                    setNewCategory("UAS");
+                    setNewName("Minggu Penilaian Akhir Semester (UAS / PAS)");
+                    setNewDesc("Pekan asesmen sumatif akhir semester ganjil");
+                  }}
+                  className="px-2 py-0.5 rounded-[5px] bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 text-[11px] font-bold hover:opacity-90"
+                >
+                  UAS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRangeMode(true);
+                    setNewCategory("KOKURIKULER");
+                    setNewName("Minggu Kokurikuler / Projek P5");
+                    setNewDesc("Kegiatan kokurikuler blok proyek bertema P5");
+                  }}
+                  className="px-2 py-0.5 rounded-[5px] bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 text-[11px] font-bold hover:opacity-90"
+                >
+                  Kokurikuler (P5)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRangeMode(false);
+                    setNewCategory("SEKOLAH");
+                    setNewName("");
+                    setNewDesc("");
+                  }}
+                  className="px-2 py-0.5 rounded-[5px] bg-[var(--surface-recessed)] text-[var(--text-secondary)] text-[11px] font-medium hover:text-[var(--text-primary)]"
+                >
+                  Reset
+                </button>
+              </div>
+
               {/* Pilihan Mode: 1 Hari atau Rentang Pekan (Minggu UTS, UAS, Kokurikuler) */}
               <div className="flex items-center gap-2 p-2 bg-[var(--surface-recessed)] rounded-[10px]">
                 <input
