@@ -10,6 +10,7 @@ import {
   INITIAL_MOCK_ASSESSMENTS,
   generateInitialMockScores,
 } from "../contracts/mocks/gradesMocks";
+import { triggerAutoSnapshot } from "./backupManager.ts";
 
 export const STORAGE_KEY_ASSESSMENTS = "absensi_grade_assessments_v2";
 export const STORAGE_KEY_SCORES = "absensi_student_scores_v2";
@@ -75,6 +76,7 @@ export function saveStoredAssessments(assessments: AssessmentItem[]): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY_ASSESSMENTS, JSON.stringify(assessments));
+    triggerAutoSnapshot("Pembaruan Data Asesmen");
   } catch (err) {
     console.error("Gagal menyimpan daftar asesmen ke localStorage:", err);
   }
@@ -112,6 +114,7 @@ export function saveStoredScores(scores: StudentScoreRecord[]): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify(scores));
+    triggerAutoSnapshot("Pemberian Nilai Siswa");
   } catch (err) {
     console.error("Gagal menyimpan catatan nilai ke localStorage:", err);
   }
@@ -134,6 +137,7 @@ export function clearAssessmentsForClass(classId?: string): void {
       saveStoredAssessments(remainingAssessments);
       saveStoredScores(remainingScores);
     }
+    triggerAutoSnapshot("Pengosongan Penilaian Kelas");
   } catch (err) {
     console.error("Gagal mengosongkan data penilaian:", err);
   }
@@ -161,6 +165,7 @@ export function saveStoredKKM(kkm: number): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY_KKM, String(kkm));
+    triggerAutoSnapshot("Pembaruan Nilai KKM");
   } catch (err) {
     console.error("Gagal menyimpan KKM:", err);
   }

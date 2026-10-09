@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   User,
   Shield,
@@ -16,6 +16,17 @@ import {
   Trash2,
   RotateCcw,
   X,
+  Download,
+  Upload,
+  Database,
+  ShieldCheck,
+  History,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  RefreshCw,
+  FileJson,
+  Check,
 } from "lucide-react";
 import {
   HolidayItem,
@@ -31,9 +42,21 @@ import {
   isRealHoliday,
   isActiveSchoolEvent,
 } from "@/lib/calendarUtils";
+import {
+  AppBackupPayload,
+  AutoSnapshotItem,
+  DataIntegrityStats,
+  getDataIntegrityStats,
+  getAutoSnapshots,
+  triggerAutoSnapshot,
+  downloadBackupFile,
+  restoreFromSnapshot,
+  deleteSnapshot,
+  restoreFromUploadedJson,
+} from "@/lib/backupManager";
 
 /**
- * Halaman Pengaturan, Profil Guru, dan Manajemen Kalender Hari Masuk/Libur
+ * Halaman Pengaturan, Profil Guru, Manajemen Kalender, dan Pusat Keamanan Cadangan Data
  */
 export default function SettingsPage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -49,8 +72,33 @@ export default function SettingsPage() {
   const [newCategory, setNewCategory] = useState<HolidayCategory>("SEKOLAH");
   const [newDesc, setNewDesc] = useState("");
 
+  // State Pusat Keamanan & Cadangan Data
+  const [integrityStats, setIntegrityStats] = useState<DataIntegrityStats | null>(null);
+  const [snapshots, setSnapshots] = useState<AutoSnapshotItem[]>([]);
+  const [isSnapshotHistoryExpanded, setIsSnapshotHistoryExpanded] = useState(false);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [pendingRestoreData, setPendingRestoreData] = useState<AppBackupPayload | null>(null);
+  const [pendingRestoreFileName, setPendingRestoreFileName] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const refreshBackupData = () => {
+    setIntegrityStats(getDataIntegrityStats());
+    setSnapshots(getAutoSnapshots());
+  };
+
   useEffect(() => {
     setHolidays(getStoredHolidays());
+    refreshBackupData();
+
+    // Dengarkan perubahan data lokal secara reaktif
+    const handleDataChanged = () => {
+      refreshBackupData();
+    };
+
+    window.addEventListener("absensi-data-changed", handleDataChanged);
+    return () => {
+      window.removeEventListener("absensi-data-changed", handleDataChanged);
+    };
   }, []);
 
   /**
@@ -96,9 +144,131 @@ export default function SettingsPage() {
     setTimeout(() => setToastMessage(null), 2500);
   };
 
-  const handleClearCache = () => {
-    setToastMessage("Cache data lokal berhasil dibersihkan");
+  // Unduh Cadangan JSON Lengkap
+  const handleDownloadBackup = () => {
+    try {
+      const result = downloadBackupFile();
+      refreshBackupData();
+      setToastMessage(`Cadangan ${result.filename} (${(result.sizeBytes / 1024).toFixed(1)} KB) berhasil diunduh`);
+      setTimeout(() => setToastMessage(null), 3500);
+    } catch (err: any) {
+      alert(`Gagal mengunduh berkas cadangan: ${err?.message || "Kesalahan tidak dikenal"}`);
+    }
+  };
+
+  // Buat Snapshot Manual
+  const handleManualSnapshot = () => {
+    try {
+      const snap = triggerAutoSnapshot("Snapshot Manual Pengguna");
+      if (snap) {
+        refreshBackupData();
+        setToastMessage("Snapshot pengaman sistem berhasil dibuat");
+        setTimeout(() => setToastMessage(null), 2500);
+      }
+    } catch (err: any) {
+      alert(`Gagal membuat snapshot: ${err?.message}`);
+    }
+  };
+
+  // Buka dialog pemilihan berkas
+  const handleTriggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Pemilihan Berkas JSON untuk Pemulihan
+  const handleFileSelectedForRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text) as AppBackupPayload;
+
+        if (!parsed || typeof parsed !== "object" || !parsed.data) {
+          alert("Format berkas tidak valid: Berkas bukan arsip cadangan Buku Presensi.");
+          return;
+        }
+
+        if (parsed.version !== 2 && parsed.version !== 1) {
+          alert(`Versi cadangan (${parsed.version}) tidak didukung oleh sistem ini.`);
+          return;
+        }
+
+        setPendingRestoreData(parsed);
+        setPendingRestoreFileName(file.name);
+        setIsRestoreModalOpen(true);
+      } catch (err: any) {
+        alert(`Gagal membaca berkas JSON: ${err?.message || "Berkas korup atau rusak"}`);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  // Konfirmasi Terapkan Pemulihan Berkas JSON
+  const handleConfirmRestore = () => {
+    if (!pendingRestoreData) return;
+
+    const result = restoreFromUploadedJson(JSON.stringify(pendingRestoreData));
+    if (result.success) {
+      setHolidays(getStoredHolidays());
+      refreshBackupData();
+      setIsRestoreModalOpen(false);
+      setPendingRestoreData(null);
+      setToastMessage("Data berhasil dipulihkan secara utuh!");
+      setTimeout(() => setToastMessage(null), 3500);
+    } else {
+      alert(`Gagal memulihkan data: ${result.message}`);
+    }
+  };
+
+  // Pulihkan dari Snapshot Tertentu
+  const handleRestoreFromSnapshot = (snapshotId: string, triggerLabel: string) => {
+    const confirmed = window.confirm(
+      `Apakah Anda yakin ingin memulihkan sistem ke titik snapshot:\n"${triggerLabel}"?\n\nSistem akan otomatis mencadangkan data saat ini terlebih dahulu untuk keamanan.`
+    );
+    if (!confirmed) return;
+
+    const success = restoreFromSnapshot(snapshotId);
+    if (success) {
+      setHolidays(getStoredHolidays());
+      refreshBackupData();
+      setToastMessage("Sistem berhasil dipulihkan ke titik snapshot terpilih!");
+      setTimeout(() => setToastMessage(null), 3000);
+    } else {
+      alert("Gagal memulihkan snapshot.");
+    }
+  };
+
+  // Hapus Satu Snapshot dari Riwayat
+  const handleDeleteSnapshot = (snapshotId: string) => {
+    const confirmed = window.confirm("Hapus arsip snapshot ini dari riwayat lokal?");
+    if (!confirmed) return;
+
+    deleteSnapshot(snapshotId);
+    refreshBackupData();
+    setToastMessage("Snapshot berhasil dihapus dari riwayat");
     setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  // Pembersihan Cache dengan Konfirmasi & Safety Snapshot
+  const handleClearCache = () => {
+    const confirmed = window.confirm(
+      "PERHATIAN: Tindakan ini akan mengosongkan cache presensi dan nilai di peramban ini.\n\nSistem akan otomatis mengamankan 1 snapshot darurat sebelum dibersihkan.\n\nPastikan Anda sudah mengunduh cadangan berkas (.json) jika ingin menyimpan data secara permanen di komputer. Lanjutkan?"
+    );
+    if (!confirmed) return;
+
+    triggerAutoSnapshot("Sebelum Pengosongan Cache");
+    localStorage.removeItem("absensi_sessions_v1");
+    localStorage.removeItem("absensi_records_v1");
+    localStorage.removeItem("absensi_assessments_v1");
+    localStorage.removeItem("absensi_scores_v1");
+    setHolidays(getStoredHolidays());
+    refreshBackupData();
+    setToastMessage("Cache dibersihkan. Snapshot darurat telah disimpan.");
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
   // Tambah Hari Libur atau Pekan Agenda Baru
@@ -383,28 +553,253 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Bagian: Ketahanan Offline & Penyimpanan */}
-      <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] divide-y divide-[var(--border-hairline)] overflow-hidden shadow-xs">
-        <div className="p-3.5 flex items-center justify-between">
+      {/* Bagian: Pusat Keamanan & Cadangan Data Otomatis (Disaster Recovery & Multi-tier Vault) */}
+      <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[16px] overflow-hidden shadow-xs">
+        {/* Header Seksi Cadangan */}
+        <div className="p-4 border-b border-[var(--border-hairline)] bg-[var(--surface-card)] flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <HardDrive className="w-5 h-5 text-[var(--text-secondary)]" />
+            <div className="w-10 h-10 rounded-[12px] bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
             <div>
-              <p className="font-semibold text-sm text-[var(--text-primary)]">
-                Penyimpanan Lokal (IndexedDB &amp; LocalStorage)
-              </p>
-              <p className="text-xs text-[var(--text-secondary)]">
-                Cache data rombel, siswa, kalender, dan antrean mutasi offline
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-base text-[var(--text-primary)]">
+                  Pusat Keamanan &amp; Cadangan Data
+                </h3>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Proteksi Aktif
+                </span>
+              </div>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                Multi-tier Vault (LocalStorage + IndexedDB), rolling snapshot otomatis, &amp; ekspor JSON
               </p>
             </div>
           </div>
 
+          {/* Tombol Aksi Cepat Cadangan */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleManualSnapshot}
+              title="Buat satu titik pemulihan baru di riwayat lokal"
+              className="min-h-[40px] px-3 py-1.5 rounded-[10px] bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5 transition-all shadow-xs"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Ambil Snapshot</span>
+            </button>
+
+            {/* Input Berkas JSON Tersembunyi */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelectedForRestore}
+              accept=".json"
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={handleTriggerFileInput}
+              title="Pulihkan seluruh data dari berkas .json eksternal"
+              className="min-h-[40px] px-3 py-1.5 rounded-[10px] bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5 transition-all shadow-xs"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Pulihkan (.json)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadBackup}
+              title="Unduh seluruh data presensi, nilai, dan kalender ke komputer"
+              className="min-h-[40px] px-3.5 py-1.5 rounded-[10px] bg-[var(--color-accent)] hover:opacity-90 text-[var(--color-on-accent)] text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Unduh Cadangan (.json)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Ringkasan Status Proteksi Data */}
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 bg-[var(--surface-recessed)]/50 border-b border-[var(--border-hairline)] text-xs">
+          <div className="p-3 rounded-[12px] bg-[var(--surface-card)] border border-[var(--border-hairline)]">
+            <div className="flex items-center gap-2 text-[var(--text-secondary)] font-semibold mb-1">
+              <Database className="w-4 h-4 text-emerald-500" />
+              <span>Dual-Write Vault</span>
+            </div>
+            <p className="text-[var(--text-primary)] font-bold text-sm">
+              LocalStorage + IndexedDB
+            </p>
+            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">
+              Kebal pembersihan cookie / cache browser
+            </p>
+          </div>
+
+          <div className="p-3 rounded-[12px] bg-[var(--surface-card)] border border-[var(--border-hairline)]">
+            <div className="flex items-center gap-2 text-[var(--text-secondary)] font-semibold mb-1">
+              <History className="w-4 h-4 text-blue-500" />
+              <span>Auto-Snapshot Berkala</span>
+            </div>
+            <p className="text-[var(--text-primary)] font-bold text-sm">
+              Tiap Simpan &amp; Tiap 15 Menit
+            </p>
+            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+              Tersedia {integrityStats?.totalSnapshots ?? 0} titik rollback lokal
+            </p>
+          </div>
+
+          <div className="p-3 rounded-[12px] bg-[var(--surface-card)] border border-[var(--border-hairline)]">
+            <div className="flex items-center gap-2 text-[var(--text-secondary)] font-semibold mb-1">
+              <FileJson className="w-4 h-4 text-amber-500" />
+              <span>Cadangan Terakhir</span>
+            </div>
+            <p className="text-[var(--text-primary)] font-bold text-sm truncate">
+              {integrityStats?.lastBackupTimestamp
+                ? new Date(integrityStats.lastBackupTimestamp).toLocaleString("id-ID", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })
+                : "Belum pernah diekspor"}
+            </p>
+            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+              Disarankan unduh berkala ke komputer
+            </p>
+          </div>
+        </div>
+
+        {/* Counter Ringkasan Data yang Diamankan */}
+        <div className="p-4 border-b border-[var(--border-hairline)]">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2.5">
+            Inventaris Data Tersimpan &amp; Terlindungi:
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+            <div className="p-2.5 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)]">
+              <p className="text-lg font-bold text-[var(--text-primary)]">
+                {integrityStats?.totalSessions ?? 0}
+              </p>
+              <p className="text-[11px] text-[var(--text-secondary)]">Sesi Presensi</p>
+            </div>
+            <div className="p-2.5 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)]">
+              <p className="text-lg font-bold text-[var(--text-primary)]">
+                {integrityStats?.totalRecords ?? 0}
+              </p>
+              <p className="text-[11px] text-[var(--text-secondary)]">Rekaman Absen</p>
+            </div>
+            <div className="p-2.5 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)]">
+              <p className="text-lg font-bold text-[var(--text-primary)]">
+                {integrityStats?.totalAssessments ?? 0}
+              </p>
+              <p className="text-[11px] text-[var(--text-secondary)]">Asesmen Nilai</p>
+            </div>
+            <div className="p-2.5 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)]">
+              <p className="text-lg font-bold text-[var(--text-primary)]">
+                {integrityStats?.totalScores ?? 0}
+              </p>
+              <p className="text-[11px] text-[var(--text-secondary)]">Butir Nilai Siswa</p>
+            </div>
+            <div className="p-2.5 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] col-span-2 sm:col-span-1">
+              <p className="text-lg font-bold text-[var(--text-primary)]">
+                {integrityStats?.totalHolidays ?? 0}
+              </p>
+              <p className="text-[11px] text-[var(--text-secondary)]">Agenda Kalender</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Accordion: Riwayat Snapshot Otomatis Lokal */}
+        <div className="divide-y divide-[var(--border-hairline)]">
           <button
             type="button"
-            onClick={handleClearCache}
-            className="min-h-[40px] px-3 py-1.5 rounded-[8px] text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-recessed)] transition-all"
+            onClick={() => setIsSnapshotHistoryExpanded(!isSnapshotHistoryExpanded)}
+            className="w-full p-3.5 flex items-center justify-between text-left hover:bg-[var(--surface-recessed)] transition-colors"
           >
-            Bersihkan Cache
+            <div className="flex items-center gap-2.5">
+              <History className="w-4 h-4 text-[var(--color-accent)]" />
+              <span className="text-xs font-bold text-[var(--text-primary)]">
+                Riwayat Snapshot Otomatis ({snapshots.length} Arsip Tersimpan)
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+              <span>{isSnapshotHistoryExpanded ? "Tutup" : "Lihat Riwayat"}</span>
+              {isSnapshotHistoryExpanded ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </div>
           </button>
+
+          {isSnapshotHistoryExpanded && (
+            <div className="p-3.5 bg-[var(--surface-recessed)]/40 flex flex-col gap-2">
+              {snapshots.length === 0 ? (
+                <p className="text-xs text-[var(--text-secondary)] text-center py-4">
+                  Belum ada rekaman snapshot. Snapshot akan otomatis terisi saat Anda menyimpan absensi atau nilai.
+                </p>
+              ) : (
+                snapshots.map((snap) => (
+                  <div
+                    key={snap.id}
+                    className="p-3 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[10px] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs shadow-2xs"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-[var(--text-primary)]">
+                          {snap.trigger}
+                        </span>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-recessed)] text-[var(--text-secondary)] font-mono">
+                          {new Date(snap.timestamp).toLocaleString("id-ID", {
+                            dateStyle: "short",
+                            timeStyle: "medium",
+                          })}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                        {snap.payload.stats.totalSessions} Sesi · {snap.payload.stats.totalRecords} Rekaman Absen · {snap.payload.stats.totalAssessments} Asesmen · {snap.payload.stats.totalScores} Nilai Siswa
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 self-end sm:self-center">
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreFromSnapshot(snap.id, snap.trigger)}
+                        title="Kembalikan kondisi data ke titik snapshot ini"
+                        className="px-2.5 py-1.5 rounded-[8px] bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-semibold hover:opacity-90 flex items-center gap-1 transition-opacity text-[11px]"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Rollback</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSnapshot(snap.id)}
+                        title="Hapus snapshot ini dari memori"
+                        className="p-1.5 rounded-[8px] text-[var(--status-alpa-fg)] hover:bg-[var(--status-alpa-bg)] transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* Opsi Pengosongan Cache dengan Pengaman */}
+          <div className="p-3.5 flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-xs text-[var(--text-primary)]">
+                Pengosongan Ruang Cache
+              </p>
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                Gunakan jika ingin membersihkan peramban (snapshot pengaman akan dibuat otomatis)
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleClearCache}
+              className="min-h-[36px] px-3 py-1 rounded-[8px] text-xs font-semibold text-[var(--status-alpa-fg)] hover:bg-[var(--status-alpa-bg)]/40 transition-colors"
+            >
+              Bersihkan Cache
+            </button>
+          </div>
         </div>
       </div>
 
@@ -639,6 +1034,104 @@ export default function SettingsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Pemulihan Cadangan Data (.json) */}
+      {isRestoreModalOpen && pendingRestoreData && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[18px] p-5 shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-[12px] bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                  <Database className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[var(--text-primary)]">
+                    Konfirmasi Pemulihan Data
+                  </h3>
+                  <p className="text-xs text-[var(--text-secondary)] truncate max-w-[240px]">
+                    Berkas: {pendingRestoreFileName}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRestoreModalOpen(false);
+                  setPendingRestoreData(null);
+                }}
+                className="p-1 rounded-full text-[var(--text-secondary)] hover:bg-[var(--surface-recessed)]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Rincian Konten Berkas Cadangan */}
+            <div className="p-3.5 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[12px] flex flex-col gap-2 text-xs">
+              <div className="flex justify-between items-center pb-2 border-b border-[var(--border-hairline)]">
+                <span className="text-[var(--text-secondary)]">Waktu Pencadangan:</span>
+                <span className="font-semibold text-[var(--text-primary)] font-mono">
+                  {new Date(pendingRestoreData.exportedAt).toLocaleString("id-ID", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Sesi Presensi:</span>
+                  <span className="font-bold text-[var(--text-primary)]">{pendingRestoreData.stats.totalSessions}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Rekaman Absen:</span>
+                  <span className="font-bold text-[var(--text-primary)]">{pendingRestoreData.stats.totalRecords}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Asesmen Nilai:</span>
+                  <span className="font-bold text-[var(--text-primary)]">{pendingRestoreData.stats.totalAssessments}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Butir Nilai Siswa:</span>
+                  <span className="font-bold text-[var(--text-primary)]">{pendingRestoreData.stats.totalScores}</span>
+                </div>
+                <div className="flex justify-between col-span-2">
+                  <span className="text-[var(--text-secondary)]">Agenda Kalender:</span>
+                  <span className="font-bold text-[var(--text-primary)]">{pendingRestoreData.stats.totalHolidays}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Catatan Jaminan Keamanan */}
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-[12px] text-xs text-emerald-900 dark:text-emerald-200 flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <p className="leading-relaxed">
+                <strong>Jaminan Tanpa Risiko Kehilangan:</strong> Sistem secara otomatis membuat satu snapshot cadangan dari data Anda saat ini sebelum ditimpa. Anda selalu dapat melakukan <em>rollback</em> kapan saja.
+              </p>
+            </div>
+
+            {/* Tombol Aksi */}
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRestoreModalOpen(false);
+                  setPendingRestoreData(null);
+                }}
+                className="min-h-[40px] px-4 rounded-[10px] text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-recessed)]"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRestore}
+                className="min-h-[40px] px-4 rounded-[10px] text-xs font-bold bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:opacity-95 shadow-xs flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                <span>Konfirmasi Pulihkan Data</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

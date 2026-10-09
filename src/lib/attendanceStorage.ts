@@ -13,6 +13,7 @@ import {
   isActiveSchoolEvent,
 } from "./calendarUtils.ts";
 import { MOCK_SESSION_TODAY, MOCK_RECORDS_TODAY } from "../contracts/mocks/attendanceMocks.ts";
+import { triggerAutoSnapshot } from "./backupManager.ts";
 
 export const STORAGE_KEY_SESSIONS = "absensi_saved_sessions_v1";
 export const STORAGE_KEY_RECORDS = "absensi_saved_records_v1";
@@ -112,6 +113,9 @@ export function saveSessionAndRecords(
     const otherRecords = existingRecords.filter((r) => r.sessionId !== session.id);
     const updatedRecords = [...otherRecords, ...records];
     localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(updatedRecords));
+
+    // Picu snapshot otomatis dan pencerminan ganda ke IndexedDB
+    triggerAutoSnapshot(`Presensi ${session.sessionDate}`);
   } catch (err) {
     console.error("Gagal menyimpan presensi lokal:", err);
   }
@@ -264,6 +268,7 @@ export function updateSessionAgenda(
 
   try {
     localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(sessions));
+    triggerAutoSnapshot(`Agenda KBM ${sessionDate}`);
   } catch (err) {
     console.error("Gagal memperbarui agenda KBM lokal:", err);
   }

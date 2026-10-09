@@ -1,3 +1,22 @@
+// Polyfill minimal untuk eksekusi unit test di runtime Node.js
+if (typeof (globalThis as any).localStorage === "undefined") {
+  const store = new Map<string, string>();
+  (globalThis as any).localStorage = {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, val: string) => store.set(key, String(val)),
+    removeItem: (key: string) => store.delete(key),
+    clear: () => store.clear(),
+  };
+}
+if (typeof (globalThis as any).window === "undefined") {
+  (globalThis as any).window = {
+    localStorage: (globalThis as any).localStorage,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => true,
+  };
+}
+
 import assert from "node:assert";
 import {
   calculateAttendanceRate,
@@ -6,6 +25,14 @@ import {
   upsertSessionIdempotent,
 } from "./attendanceUtils.ts";
 import type { AttendanceSession } from "../contracts/attendance.ts";
+import {
+  createFullBackupPayload,
+  triggerAutoSnapshot,
+  getAutoSnapshots,
+  restoreFromSnapshot,
+  restoreFromUploadedJson,
+  type AppBackupPayload,
+} from "./backupManager.ts";
 import {
   DEFAULT_HOLIDAYS,
   findHolidayByDate,
@@ -16,11 +43,17 @@ import {
   isActiveSchoolEvent,
   isDateActiveEvent,
 } from "./calendarUtils.ts";
-import { generatePastTeachingDates } from "./attendanceStorage.ts";
+import {
+  generatePastTeachingDates,
+  STORAGE_KEY_SESSIONS,
+  STORAGE_KEY_RECORDS,
+} from "./attendanceStorage.ts";
 import {
   calculateStudentGradeSummary,
   calculateClassGradeStats,
   exportGradesToCSV,
+  STORAGE_KEY_ASSESSMENTS,
+  STORAGE_KEY_SCORES,
 } from "./gradeStorage.ts";
 import {
   DEFAULT_KKM,
@@ -580,6 +613,89 @@ function runSmokeTest() {
     assert.ok(csvWithAgenda.includes("Berpikir Komputasional: Algoritma Searching"), "CSV harus memuat topik materi di baris agenda");
 
     console.log("✓ LULUS: Fitur agenda materi dan jurnal KBM teruji valid dan konsisten dalam ekspor.");
+  }
+
+  // 11. Pengujian Mesin Cadangan Data, Rolling Snapshot, dan Disaster Recovery
+  {
+    console.log("[TEST 11] Menguji pembuatan payload cadangan komprehensif, rolling snapshot, dan pemulihan JSON...");
+
+    // Seed mock data ke localStorage
+    const sampleSession: AttendanceSession = {
+      id: "session-backup-1",
+      classId: "class-7a",
+      sessionDate: "2026-10-09",
+      slot: 0,
+      subject: "Informatika",
+      topic: "Keamanan Sistem & Basis Data",
+      learningActivities: "Praktik pencadangan berkas",
+      note: "Presensi normal",
+      clientRequestId: "req-backup-001",
+      createdAt: "2026-10-09T08:00:00Z",
+      updatedAt: "2026-10-09T08:00:00Z",
+    };
+    localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify([sampleSession]));
+
+    const sampleAssessment: AssessmentItem = {
+      id: "asm-backup-1",
+      classId: "class-7a",
+      subject: "Informatika",
+      type: "TUGAS",
+      title: "Tugas 1 Keamanan",
+      date: "2026-10-09",
+      maxScore: 100,
+      weight: 1,
+      createdAt: "2026-10-09T08:00:00Z",
+    };
+    localStorage.setItem(STORAGE_KEY_ASSESSMENTS, JSON.stringify([sampleAssessment]));
+
+    const sampleScore: StudentScoreRecord = {
+      id: "scr-backup-1",
+      assessmentId: "asm-backup-1",
+      studentId: "std-1",
+      score: 95,
+      updatedAt: "2026-10-09T08:00:00Z",
+    };
+    localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify([sampleScore]));
+
+    // Buat payload cadangan komprehensif
+    const payload = createFullBackupPayload();
+    assert.strictEqual(payload.version, 2, "Versi cadangan harus bernilai 2");
+    assert.strictEqual(payload.app, "Buku Presensi Digital SMPN 3 Cibungbulang");
+    assert.ok(payload.checksum.startsWith("chk-"), "Checksum integritas harus dibuat");
+    assert.strictEqual(payload.stats.totalSessions, 1, "Total sesi dalam payload harus 1");
+    assert.strictEqual(payload.stats.totalAssessments, 1, "Total asesmen dalam payload harus 1");
+    assert.strictEqual(payload.stats.totalScores, 1, "Total nilai dalam payload harus 1");
+
+    // Uji keutuhan serialisasi JSON (Round-trip)
+    const jsonString = JSON.stringify(payload);
+    const parsedPayload = JSON.parse(jsonString) as AppBackupPayload;
+    assert.deepStrictEqual(parsedPayload.stats, payload.stats, "Stats setelah JSON round-trip harus identik");
+    assert.strictEqual(parsedPayload.data.sessions[0].topic, "Keamanan Sistem & Basis Data");
+
+    // Uji mesin rolling auto-snapshot dan batas maksimal 10 snapshot
+    for (let i = 1; i <= 15; i++) {
+      triggerAutoSnapshot(`Simpan Otomatis Ke-${i}`);
+    }
+    const snapshots = getAutoSnapshots();
+    assert.strictEqual(snapshots.length, 10, "Riwayat snapshot lokal wajib dibatasi maksimal 10 item terbaru");
+    assert.strictEqual(snapshots[0].trigger, "Simpan Otomatis Ke-15", "Snapshot paling atas harus yang paling baru");
+
+    // Uji validasi pemulihan berkas eksternal (restoreFromUploadedJson)
+    const invalidJsonRes = restoreFromUploadedJson("{ broken json ");
+    assert.strictEqual(invalidJsonRes.success, false, "JSON rusak harus ditolak");
+
+    const wrongVersionRes = restoreFromUploadedJson(JSON.stringify({ version: 99, data: {} }));
+    assert.strictEqual(wrongVersionRes.success, false, "Versi cadangan asing harus ditolak");
+
+    const missingDataRes = restoreFromUploadedJson(JSON.stringify({ version: 2 }));
+    assert.strictEqual(missingDataRes.success, false, "Payload tanpa blok data harus ditolak");
+
+    // Uji pemulihan valid
+    const validRestoreRes = restoreFromUploadedJson(jsonString);
+    assert.strictEqual(validRestoreRes.success, true, "Pemulihan berkas valid harus berhasil");
+    assert.strictEqual(validRestoreRes.stats?.totalSessions, 1);
+
+    console.log("✓ LULUS: Mesin pencadangan multi-tier, rolling snapshot (max 10), dan disaster recovery teruji kokoh.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");

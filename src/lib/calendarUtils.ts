@@ -85,6 +85,13 @@ export function saveStoredHolidays(holidays: HolidayItem[]): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY_HOLIDAYS, JSON.stringify(holidays));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("absensi-data-changed", {
+          detail: { reason: "Pembaruan Kalender & Libur" },
+        })
+      );
+    }
   } catch (err) {
     console.error("Gagal menyimpan daftar hari libur lokal:", err);
   }

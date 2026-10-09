@@ -1,9 +1,14 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Calendar, Users, BarChart3, Settings, BookOpen, CheckCircle2, Award } from "lucide-react";
+import {
+  recoverFromIndexedDBIfLocalStorageEmpty,
+  triggerAutoSnapshot,
+  STORAGE_KEY_LAST_BACKUP_TIME,
+} from "@/lib/backupManager";
 
 interface NavItem {
   href: string;
@@ -26,6 +31,30 @@ const NAV_ITEMS: NavItem[] = [
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+
+  // Mesin Cadangan Otomatis Latar Belakang & Pemulihan Darurat
+  useEffect(() => {
+    // 1. Cek pemulihan darurat dari IndexedDB jika LocalStorage kosong/terhapus
+    recoverFromIndexedDBIfLocalStorageEmpty().then((recovered) => {
+      if (recovered) {
+        console.log("Data darurat dipulihkan otomatis dari IndexedDB");
+      }
+    });
+
+    // 2. Buat snapshot awal sesi jika belum ada dalam 1 jam terakhir
+    const lastBackup = localStorage.getItem(STORAGE_KEY_LAST_BACKUP_TIME);
+    const oneHourAgo = Date.now() - 3600 * 1000;
+    if (!lastBackup || new Date(lastBackup).getTime() < oneHourAgo) {
+      triggerAutoSnapshot("Snapshot Berkala Sesi Baru");
+    }
+
+    // 3. Timer otomatis membuat snapshot bergilir setiap 15 menit saat aplikasi terbuka
+    const interval = setInterval(() => {
+      triggerAutoSnapshot("Snapshot Otomatis 15 Menit");
+    }, 15 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[var(--bg-page)] text-[var(--text-primary)]">
