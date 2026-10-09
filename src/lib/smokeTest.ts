@@ -74,7 +74,10 @@ import {
   generateAttendanceExcelHtmlWithKop,
   generateGradesExcelHtmlWithKop,
   generateGradesCsvWithKop,
+  generateAttendanceXlsxWithKop,
+  generateGradesXlsxWithKop,
 } from "./exportUtils.ts";
+import XLSX from "xlsx-js-style";
 
 /**
  * Smoke Test Mandiri (Fase 4 SOP §3.5 & PRD §14)
@@ -526,7 +529,33 @@ function runSmokeTest() {
     assert.ok(gradesCsv.startsWith("\uFEFF"), "CSV Nilai harus diawali UTF-8 BOM");
     assert.ok(gradesCsv.includes("REKAPITULASI DAFTAR NILAI SISWA KELAS 7A"), "Kop nilai CSV harus sesuai");
 
-    console.log("✓ LULUS: Ekspor berkas presensi dan nilai dengan Kop Surat resmi SMPN 3 Cibungbulang terverifikasi 100%.");
+    // 9d. Ekspor Berkas OpenXML Excel (.xlsx) Presensi Ber-Kop
+    const attendanceXlsx = generateAttendanceXlsxWithKop(
+      mockClass,
+      "September 2026",
+      effectiveDates,
+      mockRecapStudents
+    );
+    assert.ok(attendanceXlsx instanceof Uint8Array, "Ekspor XLSX presensi harus menghasilkan Uint8Array");
+    assert.ok(attendanceXlsx.length > 2000, "Ukuran berkas XLSX presensi harus valid (> 2KB)");
+
+    const parsedAttendanceWb = XLSX.read(attendanceXlsx, { type: "array" });
+    assert.ok(parsedAttendanceWb.SheetNames.includes("Absensi_7A"), "Worksheet harus bernama Absensi_7A");
+
+    // 9e. Ekspor Berkas OpenXML Excel (.xlsx) Nilai Ber-Kop
+    const gradesXlsx = generateGradesXlsxWithKop(
+      "7A",
+      mockAssessments,
+      mockSummaries,
+      DEFAULT_KKM
+    );
+    assert.ok(gradesXlsx instanceof Uint8Array, "Ekspor XLSX nilai harus menghasilkan Uint8Array");
+    assert.ok(gradesXlsx.length > 2000, "Ukuran berkas XLSX nilai harus valid (> 2KB)");
+
+    const parsedGradesWb = XLSX.read(gradesXlsx, { type: "array" });
+    assert.ok(parsedGradesWb.SheetNames.includes("Nilai_7A"), "Worksheet nilai harus bernama Nilai_7A");
+
+    console.log("✓ LULUS: Ekspor berkas presensi dan nilai dengan format XLSX (.xlsx) dan CSV ber-Kop resmi terverifikasi 100%.");
   }
 
   // 10. Pengujian Jurnal Agenda Pembelajaran & Materi KBM (Catatan Pembelajaran)

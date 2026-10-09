@@ -59,6 +59,8 @@ import {
 import {
   generateGradesExcelHtmlWithKop,
   generateGradesCsvWithKop,
+  generateGradesXlsxWithKop,
+  downloadXlsxFile,
 } from "@/lib/exportUtils";
 
 function GradesPageContent() {
@@ -373,27 +375,20 @@ function GradesPageContent() {
     setIsKkmModalOpen(false);
   };
 
-  // Unduh Berkas Excel Ber-Kop Resmi
+  // Unduh Berkas Excel (.xlsx) Ber-Kop Resmi
   const handleDownloadExcel = () => {
-    const htmlContent = generateGradesExcelHtmlWithKop(
+    const xlsxBuffer = generateGradesXlsxWithKop(
       currentClass.name,
       classAssessments,
       studentSummaries,
       kkm
     );
 
-    const blob = new Blob([htmlContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute(
-      "download",
-      `Daftar_Nilai_Kelas_${currentClass.name}_Informatika_SMPN3Cibungbulang_${new Date().toISOString().slice(0, 10)}.xls`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const filename = `Daftar_Nilai_Kelas_${currentClass.name}_Informatika_SMPN3Cibungbulang_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    downloadXlsxFile(xlsxBuffer, filename);
+
+    setToastMessage(`Berkas Excel (.xlsx) Nilai Kelas ${currentClass.name} berhasil diunduh`);
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
   // Unduh Berkas CSV Ber-Kop Resmi
@@ -475,10 +470,10 @@ function GradesPageContent() {
             type="button"
             onClick={handleDownloadExcel}
             className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs active:scale-[0.98]"
-            title="Unduh berkas Excel dengan Kop Surat Resmi SMPN 3 Cibungbulang"
+            title="Unduh berkas Excel (.xlsx) dengan Kop Surat Resmi SMPN 3 Cibungbulang"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-100" />
-            <span>Ekspor Excel (.xls)</span>
+            <span>Ekspor Excel (.xlsx)</span>
           </button>
 
           {/* Tombol Ekspor CSV Ber-Kop */}

@@ -39,6 +39,8 @@ import { getSavedSessions, getSavedRecords } from "@/lib/attendanceStorage";
 import {
   generateAttendanceCsvWithKop,
   generateAttendanceExcelHtmlWithKop,
+  generateAttendanceXlsxWithKop,
+  downloadXlsxFile,
 } from "@/lib/exportUtils";
 
 const SEMESTER_MONTHS = [
@@ -304,14 +306,14 @@ export default function ReportsPage() {
     });
   }, [recapData.effectiveDates, savedSessions, savedRecords, currentClass.id, holidays]);
 
-  // Ekspor Excel (.xls) dengan Kop Surat Resmi Sekolah & Jurnal Agenda
+  // Ekspor Excel (.xlsx) dengan Kop Surat Resmi Sekolah & Jurnal Agenda
   const handleExportExcel = (targetClass: Class = currentClass) => {
     const data =
       targetClass.id === currentClass.id
         ? recapData
         : computeRecapForClass(targetClass, selectedMonth, holidays, savedSessions, savedRecords);
 
-    const htmlContent = generateAttendanceExcelHtmlWithKop(
+    const xlsxBuffer = generateAttendanceXlsxWithKop(
       targetClass,
       currentMonthLabel,
       data.effectiveDates,
@@ -321,20 +323,10 @@ export default function ReportsPage() {
       savedSessions
     );
 
-    const blob = new Blob([htmlContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute(
-      "download",
-      `Daftar_Hadir_Kelas_${targetClass.name}_${selectedMonth}_SMPN3Cibungbulang.xls`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const filename = `Daftar_Hadir_Kelas_${targetClass.name}_${selectedMonth}_SMPN3Cibungbulang.xlsx`;
+    downloadXlsxFile(xlsxBuffer, filename);
 
-    setToastMessage(`Berkas Excel Ber-Kop Kelas ${targetClass.name} berhasil diunduh`);
+    setToastMessage(`Berkas Excel (.xlsx) Ber-Kop Kelas ${targetClass.name} berhasil diunduh`);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
@@ -373,16 +365,16 @@ export default function ReportsPage() {
   };
 
   // Ekspor Seluruh Kelas Sekaligus (Batch Export)
-  const handleExportAllClasses = async (format: "xls" | "csv") => {
+  const handleExportAllClasses = async (format: "xlsx" | "csv" | "xls") => {
     setIsExportDropdownOpen(false);
     setToastMessage(`Memproses ekspor 10 kelas (${format.toUpperCase()})...`);
 
     for (let i = 0; i < MOCK_CLASSES.length; i++) {
       const cls = MOCK_CLASSES[i];
-      if (format === "xls") {
-        handleExportExcel(cls);
-      } else {
+      if (format === "csv") {
         handleExportCsv(cls);
+      } else {
+        handleExportExcel(cls);
       }
       // Jeda antar pengunduhan agar tidak diblokir browser
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -437,10 +429,10 @@ export default function ReportsPage() {
             type="button"
             onClick={() => handleExportExcel(currentClass)}
             className="min-h-[44px] px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs active:scale-[0.98]"
-            title="Unduh berkas Excel dengan Kop Surat Resmi SMPN 3 Cibungbulang"
+            title="Unduh berkas Excel (.xlsx) dengan Kop Surat Resmi SMPN 3 Cibungbulang"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
-            <span>Ekspor Excel (.xls)</span>
+            <span>Ekspor Excel (.xlsx)</span>
           </button>
 
           {/* Tombol Ekspor CSV Ber-Kop Resmi */}
@@ -478,13 +470,13 @@ export default function ReportsPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleExportAllClasses("xls")}
+                    onClick={() => handleExportAllClasses("xlsx")}
                     className="w-full px-3 py-2 text-left hover:bg-[var(--surface-recessed)] flex items-center gap-2 text-[var(--text-primary)] transition-colors"
                   >
                     <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
                     <div>
                       <div className="font-semibold">Unduh Excel Semua Kelas</div>
-                      <div className="text-[10px] text-[var(--text-secondary)]">7A–7H, 8A, 8B (.xls ber-kop)</div>
+                      <div className="text-[10px] text-[var(--text-secondary)]">7A–7H, 8A, 8B (.xlsx ber-kop)</div>
                     </div>
                   </button>
                   <button

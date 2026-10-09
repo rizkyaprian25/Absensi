@@ -15,6 +15,7 @@ import {
   MOCK_SCHOOL_NAME,
   MOCK_SUBJECT,
 } from "../contracts/mocks/attendanceMocks";
+import XLSX from "xlsx-js-style";
 
 export interface SchoolExportMetadata {
   schoolName?: string;
@@ -419,6 +420,431 @@ export function generateAttendanceExcelHtmlWithKop(
 }
 
 // ============================================================================
+// KONFIGURASI STYLE & PALET WARNA RESMI OPENXML SPREADSHEET (.XLSX)
+// ============================================================================
+
+const borderThin = {
+  top: { style: "thin", color: { rgb: "C4C8D0" } },
+  bottom: { style: "thin", color: { rgb: "C4C8D0" } },
+  left: { style: "thin", color: { rgb: "C4C8D0" } },
+  right: { style: "thin", color: { rgb: "C4C8D0" } },
+};
+
+const borderHeader = {
+  top: { style: "thin", color: { rgb: "333333" } },
+  bottom: { style: "medium", color: { rgb: "333333" } },
+  left: { style: "thin", color: { rgb: "666666" } },
+  right: { style: "thin", color: { rgb: "666666" } },
+};
+
+const styleKop1 = {
+  font: { name: "Calibri", sz: 14, bold: true, color: { rgb: "111827" } },
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const styleKop2 = {
+  font: { name: "Calibri", sz: 12, bold: true, color: { rgb: "111827" } },
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const styleKop3 = {
+  font: { name: "Calibri", sz: 11, bold: true, color: { rgb: "374151" } },
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const styleKopInfo = {
+  font: { name: "Calibri", sz: 10, italic: true, color: { rgb: "4B5563" } },
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const styleThDefault = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "111827" } },
+  fill: { fgColor: { rgb: "E2EFDA" } },
+  border: borderHeader,
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+};
+
+const styleThSpecial = {
+  font: { name: "Calibri", sz: 8, bold: true, color: { rgb: "581C87" } },
+  fill: { fgColor: { rgb: "F3E8FF" } },
+  border: borderHeader,
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+};
+
+const styleThHoliday = {
+  font: { name: "Calibri", sz: 8, bold: true, color: { rgb: "991B1B" } },
+  fill: { fgColor: { rgb: "FEE2E2" } },
+  border: borderHeader,
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+};
+
+const styleCellText = {
+  font: { name: "Calibri", sz: 9, color: { rgb: "111827" } },
+  border: borderThin,
+  alignment: { horizontal: "left", vertical: "center" },
+};
+
+const styleCellCenter = {
+  font: { name: "Calibri", sz: 9, color: { rgb: "111827" } },
+  border: borderThin,
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const styleCellCenterBold = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "111827" } },
+  border: borderThin,
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const styleStatusH = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "166534" } },
+  fill: { fgColor: { rgb: "DCFCE7" } },
+  border: borderThin,
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const styleStatusS = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "1E40AF" } },
+  fill: { fgColor: { rgb: "DBEAFE" } },
+  border: borderThin,
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const styleStatusI = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "854D0E" } },
+  fill: { fgColor: { rgb: "FEF9C3" } },
+  border: borderThin,
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const styleStatusA = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "991B1B" } },
+  fill: { fgColor: { rgb: "FEE2E2" } },
+  border: borderThin,
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const styleStatusD = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "4338CA" } },
+  fill: { fgColor: { rgb: "EEF2FF" } },
+  border: borderThin,
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const styleStatusL = {
+  font: { name: "Calibri", sz: 9, color: { rgb: "6B7280" } },
+  fill: { fgColor: { rgb: "F3F4F6" } },
+  border: borderThin,
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+/**
+ * Menghasilkan berkas Excel murni (.xlsx) berstandar OpenXML terformat dengan Kop Surat Resmi,
+ * warna sel status presensi, rekapitulasi siswa, dan jurnal agenda KBM.
+ */
+export function generateAttendanceXlsxWithKop(
+  currentClass: Class,
+  monthLabel: string,
+  effectiveDates: string[],
+  students: StudentMonthlyRecap[],
+  holidays: HolidayItem[] = [],
+  meta: SchoolExportMetadata = {},
+  sessions: AttendanceSession[] = []
+): Uint8Array {
+  const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
+  const holidayDatesMap = new Map(holidays.map((h) => [h.date, h]));
+  const totalCols = 4 + effectiveDates.length + 7;
+
+  const rows: any[][] = [];
+  const merges: any[] = [];
+
+  // 1. KOP SURAT RESMI SEKOLAH
+  rows.push([{ v: `DAFTAR HADIR SISWA KELAS ${currentClass.name.toUpperCase()}`, t: "s", s: styleKop1 }]);
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } });
+
+  rows.push([{ v: `${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR`, t: "s", s: styleKop2 }]);
+  merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } });
+
+  rows.push([{ v: `TAHUN PELAJARAN ${currentClass.academicYear}`, t: "s", s: styleKop3 }]);
+  merges.push({ s: { r: 2, c: 0 }, e: { r: 2, c: totalCols - 1 } });
+
+  rows.push([{
+    v: `Mata Pelajaran: ${currentClass.subject || mergedMeta.subject} | Semester: ${currentClass.semester ?? 1} (Ganjil) | Bulan: ${monthLabel}`,
+    t: "s",
+    s: styleKopInfo,
+  }]);
+  merges.push({ s: { r: 3, c: 0 }, e: { r: 3, c: totalCols - 1 } });
+
+  rows.push([]); // Baris kosong pemisah
+
+  // 2. HEADER TABEL PRESENSI
+  const headerRow: any[] = [
+    { v: "NO", t: "s", s: styleThDefault },
+    { v: "NIPD / NIS", t: "s", s: styleThDefault },
+    { v: "NAMA SISWA", t: "s", s: styleThDefault },
+    { v: "L/P", t: "s", s: styleThDefault },
+  ];
+
+  effectiveDates.forEach((d) => {
+    const hol = holidayDatesMap.get(d);
+    if (hol) {
+      const isSpecial = hol.category === "UTS" || hol.category === "UAS" || hol.category === "KOKURIKULER";
+      const catLabel = hol.category === "UTS" ? "UTS" : hol.category === "UAS" ? "UAS" : hol.category === "KOKURIKULER" ? "P5" : "LIBUR";
+      headerRow.push({
+        v: `${d.slice(8)}\n(${catLabel})`,
+        t: "s",
+        s: isSpecial ? styleThSpecial : styleThHoliday,
+      });
+    } else {
+      headerRow.push({
+        v: d.slice(8),
+        t: "s",
+        s: styleThDefault,
+      });
+    }
+  });
+
+  headerRow.push(
+    { v: "Hadir", t: "s", s: styleStatusH },
+    { v: "Sakit", t: "s", s: styleStatusS },
+    { v: "Izin", t: "s", s: styleStatusI },
+    { v: "Alpa", t: "s", s: styleStatusA },
+    { v: "Dispen", t: "s", s: styleStatusD },
+    { v: "Total", t: "s", s: styleThDefault },
+    { v: "% Hadir", t: "s", s: styleThDefault }
+  );
+
+  rows.push(headerRow);
+
+  // 3. BARIS DATA KEHADIRAN SISWA
+  let sumHadir = 0;
+  let sumSakit = 0;
+  let sumIzin = 0;
+  let sumAlpa = 0;
+  let sumDispen = 0;
+  let sumTotal = 0;
+
+  students.forEach((s, idx) => {
+    sumHadir += s.hadir;
+    sumSakit += s.sakit;
+    sumIzin += s.izin;
+    sumAlpa += s.alpa;
+    sumDispen += s.dispen ?? 0;
+    sumTotal += s.totalHari;
+
+    const row: any[] = [
+      { v: idx + 1, t: "n", s: styleCellCenter },
+      { v: s.nis ?? "-", t: "s", s: styleCellCenter },
+      { v: s.fullName, t: "s", s: styleCellText },
+      { v: s.gender ?? "-", t: "s", s: styleCellCenter },
+    ];
+
+    effectiveDates.forEach((date) => {
+      const raw = String(s.dailyStatus[date] ?? "-");
+      let code = raw;
+      if (raw === "HADIR") code = "H";
+      else if (raw === "SAKIT") code = "S";
+      else if (raw === "IZIN") code = "I";
+      else if (raw === "ALPA") code = "A";
+      else if (raw === "DISPEN") code = "D";
+      else if (raw === "TERLAMBAT") code = "T";
+
+      let style = styleCellCenter;
+      if (code === "H") style = styleStatusH;
+      else if (code === "S") style = styleStatusS;
+      else if (code === "I") style = styleStatusI;
+      else if (code === "A") style = styleStatusA;
+      else if (code === "D") style = styleStatusD;
+      else if (code === "L") style = styleStatusL;
+
+      row.push({ v: code, t: "s", s: style });
+    });
+
+    row.push(
+      { v: s.hadir, t: "n", s: styleStatusH },
+      { v: s.sakit, t: "n", s: styleStatusS },
+      { v: s.izin, t: "n", s: styleStatusI },
+      { v: s.alpa, t: "n", s: styleStatusA },
+      { v: s.dispen ?? 0, t: "n", s: styleStatusD },
+      { v: s.totalHari, t: "n", s: styleCellCenterBold },
+      {
+        v: `${s.persentaseKehadiran}%`,
+        t: "s",
+        s: s.needsAttention
+          ? { ...styleStatusA, font: { ...styleStatusA.font, bold: true } }
+          : styleStatusH,
+      }
+    );
+
+    rows.push(row);
+  });
+
+  // 4. BARIS REKAP TOTAL KEHADIRAN KELAS
+  const summaryRowIndex = rows.length;
+  const summaryRow: any[] = [
+    { v: "TOTAL KEHADIRAN KELAS", t: "s", s: styleCellCenterBold },
+    { v: "", t: "s", s: styleCellCenterBold },
+    { v: "", t: "s", s: styleCellCenterBold },
+    { v: "", t: "s", s: styleCellCenterBold },
+  ];
+  merges.push({ s: { r: summaryRowIndex, c: 0 }, e: { r: summaryRowIndex, c: 3 } });
+
+  effectiveDates.forEach(() => {
+    summaryRow.push({ v: "-", t: "s", s: styleCellCenter });
+  });
+
+  const avgAttendance =
+    students.length > 0
+      ? (
+          students.reduce((acc, curr) => acc + curr.persentaseKehadiran, 0) /
+          students.length
+        ).toFixed(1)
+      : "100.0";
+
+  summaryRow.push(
+    { v: sumHadir, t: "n", s: styleCellCenterBold },
+    { v: sumSakit, t: "n", s: styleCellCenterBold },
+    { v: sumIzin, t: "n", s: styleCellCenterBold },
+    { v: sumAlpa, t: "n", s: styleCellCenterBold },
+    { v: sumDispen, t: "n", s: styleCellCenterBold },
+    { v: sumTotal, t: "n", s: styleCellCenterBold },
+    { v: `${avgAttendance}%`, t: "s", s: styleCellCenterBold }
+  );
+
+  rows.push(summaryRow);
+
+  // 5. JURNAL AGENDA PEMBELAJARAN (KBM) JIKA ADA
+  if (sessions.length > 0 || effectiveDates.length > 0) {
+    rows.push([]);
+    const agendaHeaderRowIdx = rows.length;
+    rows.push([{ v: "JURNAL AGENDA PEMBELAJARAN (KBM)", t: "s", s: styleKop2 }]);
+    merges.push({ s: { r: agendaHeaderRowIdx, c: 0 }, e: { r: agendaHeaderRowIdx, c: totalCols - 1 } });
+
+    const agendaTableHeaderIdx = rows.length;
+    merges.push({ s: { r: agendaTableHeaderIdx, c: 1 }, e: { r: agendaTableHeaderIdx, c: 2 } });
+    merges.push({ s: { r: agendaTableHeaderIdx, c: 3 }, e: { r: agendaTableHeaderIdx, c: 4 } });
+    merges.push({ s: { r: agendaTableHeaderIdx, c: 5 }, e: { r: agendaTableHeaderIdx, c: totalCols - 1 } });
+
+    rows.push([
+      { v: "NO", t: "s", s: styleThDefault },
+      { v: "TANGGAL KBM", t: "s", s: styleThDefault },
+      { v: "", t: "s", s: styleThDefault },
+      { v: "STATUS KBM", t: "s", s: styleThDefault },
+      { v: "", t: "s", s: styleThDefault },
+      { v: "MATERI POKOK & URAIAN AKTIVITAS BELAJAR (KBM)", t: "s", s: styleThDefault },
+    ]);
+
+    const sessionMap = new Map(sessions.map((sess) => [sess.sessionDate, sess]));
+
+    effectiveDates.forEach((d, idx) => {
+      const hol = holidayDatesMap.get(d);
+      const sess = sessionMap.get(d);
+      let statusStr = "KBM Normal";
+      if (hol) {
+        statusStr =
+          hol.category === "UTS"
+            ? "Pekan UTS"
+            : hol.category === "UAS"
+            ? "Pekan UAS"
+            : hol.category === "KOKURIKULER"
+            ? "Projek P5"
+            : `Libur: ${hol.name}`;
+      }
+
+      const agendaRowIdx = rows.length;
+      merges.push({ s: { r: agendaRowIdx, c: 1 }, e: { r: agendaRowIdx, c: 2 } });
+      merges.push({ s: { r: agendaRowIdx, c: 3 }, e: { r: agendaRowIdx, c: 4 } });
+      merges.push({ s: { r: agendaRowIdx, c: 5 }, e: { r: agendaRowIdx, c: totalCols - 1 } });
+
+      const topicAndAct = sess
+        ? `${sess.topic ? `Topik: ${sess.topic}` : ""}${sess.learningActivities ? ` | Agenda: ${sess.learningActivities}` : ""}`.trim() || "-"
+        : "-";
+
+      rows.push([
+        { v: idx + 1, t: "n", s: styleCellCenter },
+        { v: formatIndonesianDate(d), t: "s", s: styleCellCenter },
+        { v: "", t: "s", s: styleCellCenter },
+        { v: statusStr, t: "s", s: styleCellCenter },
+        { v: "", t: "s", s: styleCellCenter },
+        { v: topicAndAct, t: "s", s: styleCellText },
+      ]);
+    });
+  }
+
+  // 6. BLOK TANDA TANGAN
+  rows.push([]);
+  rows.push([]);
+  const signRow1Idx = rows.length;
+  const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
+  const signColRight = Math.max(5, totalCols - 4);
+
+  merges.push({ s: { r: signRow1Idx, c: 1 }, e: { r: signRow1Idx, c: 3 } });
+  merges.push({ s: { r: signRow1Idx, c: signColRight }, e: { r: signRow1Idx, c: totalCols - 1 } });
+
+  const signRow1: any[] = [
+    { v: "", t: "s" },
+    { v: `Mengetahui,\nKepala ${mergedMeta.schoolName}`, t: "s", s: { alignment: { horizontal: "center", wrapText: true } } },
+    { v: "", t: "s" },
+    { v: "", t: "s" },
+  ];
+  while (signRow1.length < signColRight) signRow1.push({ v: "", t: "s" });
+  signRow1.push({
+    v: `${mergedMeta.location}, ${formattedToday}\nGuru Mata Pelajaran Informatika,`,
+    t: "s",
+    s: { alignment: { horizontal: "center", wrapText: true } },
+  });
+  rows.push(signRow1);
+
+  rows.push([]);
+  rows.push([]);
+
+  const signRow2Idx = rows.length;
+  merges.push({ s: { r: signRow2Idx, c: 1 }, e: { r: signRow2Idx, c: 3 } });
+  merges.push({ s: { r: signRow2Idx, c: signColRight }, e: { r: signRow2Idx, c: totalCols - 1 } });
+
+  const signRow2: any[] = [
+    { v: "", t: "s" },
+    { v: "( ............................................................ )\nNIP. ........................................................", t: "s", s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } } },
+    { v: "", t: "s" },
+    { v: "", t: "s" },
+  ];
+  while (signRow2.length < signColRight) signRow2.push({ v: "", t: "s" });
+  signRow2.push({
+    v: `( ${mergedMeta.teacherName} )\nNIP. ${mergedMeta.teacherNip}`,
+    t: "s",
+    s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } },
+  });
+  rows.push(signRow2);
+
+  // Buat worksheet dan workbook
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!merges"] = merges;
+
+  // Lebar kolom
+  ws["!cols"] = [
+    { wch: 5 },  // No
+    { wch: 14 }, // NIS
+    { wch: 32 }, // Nama Siswa
+    { wch: 5 },  // L/P
+    ...effectiveDates.map(() => ({ wch: 7 })), // Tanggal
+    { wch: 8 },  // Hadir
+    { wch: 8 },  // Sakit
+    { wch: 8 },  // Izin
+    { wch: 8 },  // Alpa
+    { wch: 8 },  // Dispen
+    { wch: 8 },  // Total
+    { wch: 10 }, // % Hadir
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const safeClassName = currentClass.name.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 25);
+  XLSX.utils.book_append_sheet(wb, ws, `Absensi_${safeClassName}`);
+
+  const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  return new Uint8Array(arrayBuffer);
+}
+
+// ============================================================================
 // 2. EKSPOR BUKU NILAI & ASESMEN (DENGAN KOP SURAT RESMI SEKOLAH)
 // ============================================================================
 
@@ -543,6 +969,226 @@ export function generateGradesExcelHtmlWithKop(
 </body>
 </html>
 `;
+}
+
+/**
+ * Menghasilkan berkas Excel murni (.xlsx) berstandar OpenXML terformat untuk Rekap Nilai Siswa
+ * dengan Kop Surat Resmi, pewarnaan ketuntasan KKM, predikat, dan tanda tangan pengesahan.
+ */
+export function generateGradesXlsxWithKop(
+  className: string,
+  assessments: AssessmentItem[],
+  summaries: StudentGradeSummary[],
+  kkm: number,
+  meta: SchoolExportMetadata = {}
+): Uint8Array {
+  const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
+  const totalCols = 4 + assessments.length + 3;
+
+  const rows: any[][] = [];
+  const merges: any[] = [];
+
+  // 1. KOP SURAT RESMI
+  rows.push([{ v: `REKAPITULASI DAFTAR NILAI SISWA KELAS ${className.toUpperCase()}`, t: "s", s: styleKop1 }]);
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } });
+
+  rows.push([{ v: `${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR`, t: "s", s: styleKop2 }]);
+  merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } });
+
+  rows.push([{ v: "TAHUN PELAJARAN 2026/2027", t: "s", s: styleKop3 }]);
+  merges.push({ s: { r: 2, c: 0 }, e: { r: 2, c: totalCols - 1 } });
+
+  rows.push([{
+    v: `Mata Pelajaran: ${mergedMeta.subject} | KKM Standar: ${kkm}`,
+    t: "s",
+    s: styleKopInfo,
+  }]);
+  merges.push({ s: { r: 3, c: 0 }, e: { r: 3, c: totalCols - 1 } });
+
+  rows.push([]);
+
+  // 2. HEADER TABEL NILAI
+  const headerRow: any[] = [
+    { v: "NO", t: "s", s: styleThDefault },
+    { v: "NIS", t: "s", s: styleThDefault },
+    { v: "NAMA SISWA", t: "s", s: styleThDefault },
+    { v: "L/P", t: "s", s: styleThDefault },
+  ];
+
+  assessments.forEach((a) => {
+    headerRow.push({
+      v: `${a.title}\n[${a.type}]`,
+      t: "s",
+      s: styleThDefault,
+    });
+  });
+
+  headerRow.push(
+    { v: "NILAI AKHIR", t: "s", s: { ...styleThDefault, fill: { fgColor: { rgb: "D1FAE5" } } } },
+    { v: "PREDIKAT", t: "s", s: styleThDefault },
+    { v: "STATUS KKM", t: "s", s: styleThDefault }
+  );
+
+  rows.push(headerRow);
+
+  // 3. BARIS DATA NILAI SISWA
+  let passedCount = 0;
+  let remedialCount = 0;
+  let totalFinalScore = 0;
+  let scoredStudentCount = 0;
+
+  summaries.forEach((s, idx) => {
+    if (s.isPassed) passedCount++;
+    else remedialCount++;
+
+    if (s.finalScore !== null && s.finalScore !== undefined) {
+      totalFinalScore += s.finalScore;
+      scoredStudentCount++;
+    }
+
+    const row: any[] = [
+      { v: idx + 1, t: "n", s: styleCellCenter },
+      { v: s.nis ?? "-", t: "s", s: styleCellCenter },
+      { v: s.studentName, t: "s", s: styleCellText },
+      { v: s.gender ?? "-", t: "s", s: styleCellCenter },
+    ];
+
+    assessments.forEach((a) => {
+      const val = s.scores[a.id];
+      if (val !== null && val !== undefined) {
+        row.push({ v: val, t: "n", s: styleCellCenter });
+      } else {
+        row.push({ v: "-", t: "s", s: styleCellCenter });
+      }
+    });
+
+    const finalVal = s.finalScore !== null && s.finalScore !== undefined ? s.finalScore : "-";
+    const isPass = s.finalScore !== null && s.finalScore !== undefined && s.finalScore >= kkm;
+
+    row.push(
+      {
+        v: finalVal,
+        t: typeof finalVal === "number" ? "n" : "s",
+        s: {
+          ...styleCellCenterBold,
+          font: { ...styleCellCenterBold.font, color: { rgb: isPass ? "166534" : "B45309" } },
+        },
+      },
+      { v: s.predicate, t: "s", s: styleCellCenterBold },
+      {
+        v: s.isPassed ? "Tuntas" : "Remedial",
+        t: "s",
+        s: {
+          ...styleCellCenterBold,
+          fill: { fgColor: { rgb: s.isPassed ? "DCFCE7" : "FEF3C7" } },
+          font: { ...styleCellCenterBold.font, color: { rgb: s.isPassed ? "166534" : "B45309" } },
+        },
+      }
+    );
+
+    rows.push(row);
+  });
+
+  // 4. BARIS RATA-RATA & STATISTIK KELAS
+  const avgClassScore =
+    scoredStudentCount > 0 ? (totalFinalScore / scoredStudentCount).toFixed(1) : "-";
+  const summaryRowIdx = rows.length;
+  merges.push({ s: { r: summaryRowIdx, c: 0 }, e: { r: summaryRowIdx, c: 3 } });
+
+  const summaryRow: any[] = [
+    { v: "RATA-RATA KELAS & KETUNTASAN", t: "s", s: styleCellCenterBold },
+    { v: "", t: "s", s: styleCellCenterBold },
+    { v: "", t: "s", s: styleCellCenterBold },
+    { v: "", t: "s", s: styleCellCenterBold },
+    ...Array(assessments.length).fill({ v: "-", t: "s", s: styleCellCenter }),
+    { v: avgClassScore, t: "s", s: styleCellCenterBold },
+    { v: `T:${passedCount}`, t: "s", s: styleCellCenterBold },
+    { v: `R:${remedialCount}`, t: "s", s: styleCellCenterBold },
+  ];
+  rows.push(summaryRow);
+
+  // 5. BLOK TANDA TANGAN
+  rows.push([]);
+  rows.push([]);
+  const signRow1Idx = rows.length;
+  const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
+  const signColRight = Math.max(4, totalCols - 3);
+
+  merges.push({ s: { r: signRow1Idx, c: 1 }, e: { r: signRow1Idx, c: 2 } });
+  merges.push({ s: { r: signRow1Idx, c: signColRight }, e: { r: signRow1Idx, c: totalCols - 1 } });
+
+  const signRow1: any[] = [
+    { v: "", t: "s" },
+    { v: `Mengetahui,\nKepala ${mergedMeta.schoolName}`, t: "s", s: { alignment: { horizontal: "center", wrapText: true } } },
+    { v: "", t: "s" },
+  ];
+  while (signRow1.length < signColRight) signRow1.push({ v: "", t: "s" });
+  signRow1.push({
+    v: `${mergedMeta.location}, ${formattedToday}\nGuru Mata Pelajaran Informatika,`,
+    t: "s",
+    s: { alignment: { horizontal: "center", wrapText: true } },
+  });
+  rows.push(signRow1);
+
+  rows.push([]);
+  rows.push([]);
+
+  const signRow2Idx = rows.length;
+  merges.push({ s: { r: signRow2Idx, c: 1 }, e: { r: signRow2Idx, c: 2 } });
+  merges.push({ s: { r: signRow2Idx, c: signColRight }, e: { r: signRow2Idx, c: totalCols - 1 } });
+
+  const signRow2: any[] = [
+    { v: "", t: "s" },
+    { v: "( ............................................................ )\nNIP. ........................................................", t: "s", s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } } },
+    { v: "", t: "s" },
+  ];
+  while (signRow2.length < signColRight) signRow2.push({ v: "", t: "s" });
+  signRow2.push({
+    v: `( ${mergedMeta.teacherName} )\nNIP. ${mergedMeta.teacherNip}`,
+    t: "s",
+    s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } },
+  });
+  rows.push(signRow2);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!merges"] = merges;
+
+  const colWidths = [
+    { wch: 5 },  // No
+    { wch: 14 }, // NIS
+    { wch: 32 }, // Nama Siswa
+    { wch: 5 },  // L/P
+    ...assessments.map(() => ({ wch: 13 })), // Asesmen
+    { wch: 12 }, // Nilai Akhir
+    { wch: 10 }, // Predikat
+    { wch: 12 }, // Status KKM
+  ];
+  ws["!cols"] = colWidths;
+
+  const wb = XLSX.utils.book_new();
+  const safeClassName = className.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 25);
+  XLSX.utils.book_append_sheet(wb, ws, `Nilai_${safeClassName}`);
+
+  const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  return new Uint8Array(arrayBuffer);
+}
+
+/**
+ * Memicu pengunduhan berkas binary XLSX di sisi peramban dengan MIME type OpenXML Spreadsheet
+ */
+export function downloadXlsxFile(buffer: Uint8Array | ArrayBuffer, filename: string): void {
+  if (typeof window === "undefined") return;
+  const blob = new Blob([buffer as any], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 /**

@@ -191,7 +191,7 @@ export function triggerAutoSnapshot(triggerLabel: string = "Perubahan Sistem"): 
   try {
     const payload = createFullBackupPayload();
     const newSnapshot: AutoSnapshotItem = {
-      id: `snap-${Date.now()}`,
+      id: `snap-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       timestamp: new Date().toISOString(),
       trigger: triggerLabel,
       payload,
