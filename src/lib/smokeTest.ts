@@ -29,7 +29,15 @@ import {
   AttendanceStatusSchema,
   HolidayCategorySchema,
   type Student,
+  type Class,
+  type StudentMonthlyRecap,
 } from "../contracts/attendance.ts";
+import {
+  generateAttendanceCsvWithKop,
+  generateAttendanceExcelHtmlWithKop,
+  generateGradesExcelHtmlWithKop,
+  generateGradesCsvWithKop,
+} from "./exportUtils.ts";
 
 /**
  * Smoke Test Mandiri (Fase 4 SOP §3.5 & PRD §14)
@@ -311,6 +319,149 @@ function runSmokeTest() {
     assert.ok(utsDays.some((d) => d.date === "2026-09-25"));
 
     console.log("✓ LULUS: Status DISPEN dan manajemen pekan UTS, UAS, Kokurikuler terverifikasi sempurna.");
+  }
+
+  // 9. Pengujian Ekspor dengan Kop Surat Resmi Sekolah (SMPN 3 Cibungbulang)
+  {
+    console.log("[TEST 9] Menguji pembuatan berkas ekspor ber-kop surat resmi (Excel & CSV)...");
+
+    const mockClass: Class = {
+      id: "class-7a",
+      teacherId: "teacher-1",
+      name: "7A",
+      academicYear: "2026/2027",
+      semester: 1,
+      createdAt: "2026-07-15T00:00:00Z",
+      subject: "Informatika",
+    };
+
+    const mockRecapStudents: StudentMonthlyRecap[] = [
+      {
+        studentId: "std-1",
+        nis: "262707001",
+        fullName: "ABDULLAH AL SAFWA",
+        gender: "L",
+        hadir: 4,
+        sakit: 0,
+        izin: 0,
+        alpa: 0,
+        terlambat: 0,
+        dispen: 0,
+        totalHari: 4,
+        persentaseKehadiran: 100.0,
+        dailyStatus: {
+          "2026-09-07": "H",
+          "2026-09-14": "H",
+          "2026-09-21": "H",
+          "2026-09-28": "H",
+        },
+        needsAttention: false,
+      },
+      {
+        studentId: "std-2",
+        nis: "262707002",
+        fullName: "AINUN DEPIRJA SOLEGAR",
+        gender: "P",
+        hadir: 3,
+        sakit: 0,
+        izin: 0,
+        alpa: 0,
+        terlambat: 0,
+        dispen: 1,
+        totalHari: 4,
+        persentaseKehadiran: 100.0,
+        dailyStatus: {
+          "2026-09-07": "H",
+          "2026-09-14": "H",
+          "2026-09-21": "D",
+          "2026-09-28": "H",
+        },
+        needsAttention: false,
+      },
+    ];
+
+    const effectiveDates = ["2026-09-07", "2026-09-14", "2026-09-21", "2026-09-28"];
+
+    // 9a. Ekspor CSV Presensi Ber-Kop
+    const attendanceCsv = generateAttendanceCsvWithKop(
+      mockClass,
+      "September 2026",
+      effectiveDates,
+      mockRecapStudents
+    );
+
+    assert.ok(attendanceCsv.startsWith("\uFEFF"), "CSV Presensi wajib diawali UTF-8 BOM");
+    assert.ok(attendanceCsv.includes("DAFTAR HADIR SISWA KELAS 7A"), "Kop harus memuat judul daftar hadir kelas");
+    assert.ok(attendanceCsv.includes("SMP NEGERI 3 CIBUNGBULANG KABUPATEN BOGOR"), "Kop harus memuat nama sekolah resmi");
+    assert.ok(attendanceCsv.includes("TAHUN PELAJARAN 2026/2027"), "Kop harus memuat tahun pelajaran");
+    assert.ok(attendanceCsv.includes("Muhamad Rizky Aprian, S.Kom"), "Tanda tangan harus memuat nama guru");
+    assert.ok(attendanceCsv.includes("19940825 202221 1 004"), "Tanda tangan harus memuat NIP guru");
+    assert.ok(attendanceCsv.includes("Dispen"), "Header CSV harus memuat kolom Dispen");
+    assert.ok(attendanceCsv.includes("ABDULLAH AL SAFWA"), "CSV harus memuat nama siswa");
+
+    // 9b. Ekspor Excel Presensi Ber-Kop
+    const attendanceExcel = generateAttendanceExcelHtmlWithKop(
+      mockClass,
+      "September 2026",
+      effectiveDates,
+      mockRecapStudents
+    );
+
+    assert.ok(attendanceExcel.includes("xmlns:x=\"urn:schemas-microsoft-com:office:excel\""), "Format Excel harus Spreadsheet HTML Office XML");
+    assert.ok(attendanceExcel.includes("DAFTAR HADIR SISWA KELAS 7A"), "Excel harus memuat Kop baris 1");
+    assert.ok(attendanceExcel.includes("SMP NEGERI 3 CIBUNGBULANG"), "Excel harus memuat nama sekolah");
+    assert.ok(attendanceExcel.includes("DisplayGridlines"), "Excel harus menyertakan gridlines");
+    assert.ok(attendanceExcel.includes("Muhamad Rizky Aprian, S.Kom"), "Excel harus memuat blok tanda tangan guru");
+
+    // 9c. Ekspor Excel & CSV Nilai Ber-Kop
+    const mockAssessments: AssessmentItem[] = [
+      {
+        id: "a1",
+        classId: "class-7a",
+        subject: "Informatika",
+        title: "Tugas 1",
+        type: "TUGAS",
+        date: "2026-08-01",
+        maxScore: 100,
+        weight: 1,
+        createdAt: "2026-08-01",
+      },
+    ];
+    const mockSummaries = [
+      {
+        studentId: "std-1",
+        nis: "262707001",
+        studentName: "ABDULLAH AL SAFWA",
+        gender: "L" as const,
+        scores: { a1: 90 },
+        finalScore: 90,
+        predicate: "A" as const,
+        isPassed: true,
+        gradedCount: 1,
+        totalCount: 1,
+        categoryAverages: { TUGAS: 90, UH: null, QUIZ: null, UTS: null, UAS: null, PRAKTIK: null, LAINNYA: null },
+      },
+    ];
+
+    const gradesExcel = generateGradesExcelHtmlWithKop(
+      "7A",
+      mockAssessments,
+      mockSummaries,
+      DEFAULT_KKM
+    );
+    assert.ok(gradesExcel.includes("REKAPITULASI DAFTAR NILAI SISWA KELAS 7A"), "Kop nilai Excel harus sesuai");
+    assert.ok(gradesExcel.includes("SMP NEGERI 3 CIBUNGBULANG"), "Nama sekolah di kop nilai harus sesuai");
+
+    const gradesCsv = generateGradesCsvWithKop(
+      "7A",
+      mockAssessments,
+      mockSummaries,
+      DEFAULT_KKM
+    );
+    assert.ok(gradesCsv.startsWith("\uFEFF"), "CSV Nilai harus diawali UTF-8 BOM");
+    assert.ok(gradesCsv.includes("REKAPITULASI DAFTAR NILAI SISWA KELAS 7A"), "Kop nilai CSV harus sesuai");
+
+    console.log("✓ LULUS: Ekspor berkas presensi dan nilai dengan Kop Surat resmi SMPN 3 Cibungbulang terverifikasi 100%.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");

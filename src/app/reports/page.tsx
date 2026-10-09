@@ -12,19 +12,26 @@ import {
   CheckCircle2,
   Calendar,
   Filter,
+  Layers,
+  ChevronDown,
 } from "lucide-react";
 import {
   MOCK_CLASSES,
   getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
 import type {
+  Class,
   HolidayItem,
   ScheduleDay,
   AttendanceSession,
   AttendanceRecord,
 } from "@/contracts/attendance";
-import { getStoredHolidays, findHolidayByDate, getCategoryLabel } from "@/lib/calendarUtils";
+import { getStoredHolidays, findHolidayByDate, getCategoryLabel, formatIndonesianDate } from "@/lib/calendarUtils";
 import { getSavedSessions, getSavedRecords } from "@/lib/attendanceStorage";
+import {
+  generateAttendanceCsvWithKop,
+  generateAttendanceExcelHtmlWithKop,
+} from "@/lib/exportUtils";
 
 const SEMESTER_MONTHS = [
   { value: "2026-07", label: "Juli 2026" },
@@ -88,8 +95,121 @@ function getDatesForClassMonth(
 }
 
 /**
- * Halaman Rekapitulasi Bulanan & Ekspor (L8 Stitch)
- * Memuat matriks presensi siswa x tanggal, ringkasan persentase, ekspor CSV UTF-8 BOM, dan cetak native
+ * Menghitung rekapitulasi data kehadiran untuk kelas tertentu pada bulan tertentu
+ */
+function computeRecapForClass(
+  cls: Class,
+  month: string,
+  holidays: HolidayItem[],
+  savedSessions: AttendanceSession[],
+  savedRecords: AttendanceRecord[]
+) {
+  const students = getStudentsForClass(cls.id);
+  const effectiveDates = getDatesForClassMonth(
+    month,
+    cls.scheduleDay,
+    cls.id,
+    savedSessions
+  );
+  const holidayDatesSet = new Set(holidays.map((h) => h.date));
+  const classSessions = savedSessions.filter(
+    (s) => s.classId === cls.id && s.sessionDate.startsWith(month)
+  );
+
+  const studentRecaps = students.map((s) => {
+    let hadir = 0;
+    let sakit = 0;
+    let izin = 0;
+    let alpa = 0;
+    let terlambat = 0;
+    let dispen = 0;
+    const dailyStatus: Record<string, string> = {};
+
+    effectiveDates.forEach((date) => {
+      if (holidayDatesSet.has(date)) {
+        dailyStatus[date] = "L";
+        return;
+      }
+
+      const session = classSessions.find((sess) => sess.sessionDate === date);
+      if (session) {
+        const rec = savedRecords.find(
+          (r) => r.sessionId === session.id && r.studentId === s.id
+        );
+        const st = rec ? rec.status : "HADIR";
+        if (st === "HADIR") {
+          hadir++;
+          dailyStatus[date] = "H";
+        } else if (st === "SAKIT") {
+          sakit++;
+          dailyStatus[date] = "S";
+        } else if (st === "IZIN") {
+          izin++;
+          dailyStatus[date] = "I";
+        } else if (st === "ALPA") {
+          alpa++;
+          dailyStatus[date] = "A";
+        } else if (st === "TERLAMBAT") {
+          terlambat++;
+          dailyStatus[date] = "T";
+        } else if (st === "DISPEN") {
+          dispen++;
+          dailyStatus[date] = "D";
+        }
+      } else {
+        dailyStatus[date] = "-";
+      }
+    });
+
+    const totalRecordedDays = hadir + sakit + izin + alpa + terlambat + dispen;
+    const persentase =
+      totalRecordedDays > 0
+        ? Number((((hadir + dispen) / totalRecordedDays) * 100).toFixed(1))
+        : 100;
+
+    return {
+      studentId: s.id,
+      nis: s.nis ?? null,
+      fullName: s.fullName,
+      gender: s.gender ?? null,
+      hadir,
+      sakit,
+      izin,
+      alpa,
+      terlambat,
+      dispen,
+      totalHari: totalRecordedDays,
+      persentaseKehadiran: persentase,
+      dailyStatus,
+      needsAttention: totalRecordedDays > 0 && persentase < 85,
+    };
+  });
+
+  const recordedStudents = studentRecaps.filter((s) => s.totalHari > 0);
+  const averageAttendance =
+    recordedStudents.length > 0
+      ? Number(
+          (
+            recordedStudents.reduce((acc, curr) => acc + curr.persentaseKehadiran, 0) /
+            recordedStudents.length
+          ).toFixed(1)
+        )
+      : 100;
+
+  return {
+    classId: cls.id,
+    className: cls.name,
+    academicYear: cls.academicYear,
+    month,
+    effectiveDates,
+    averageAttendance,
+    students: studentRecaps,
+  };
+}
+
+/**
+ * Halaman Rekapitulasi Bulanan & Ekspor Ber-Kop Resmi (L8 Stitch)
+ * Memuat matriks presensi siswa x tanggal, ringkasan persentase, ekspor Excel .xls, CSV UTF-8 BOM, dan cetak native
  */
 export default function ReportsPage() {
   const [selectedClassId, setSelectedClassId] = useState("class-7a");
@@ -99,6 +219,7 @@ export default function ReportsPage() {
   const [holidays, setHolidays] = useState<HolidayItem[]>([]);
   const [savedSessions, setSavedSessions] = useState<AttendanceSession[]>([]);
   const [savedRecords, setSavedRecords] = useState<AttendanceRecord[]>([]);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
 
   useEffect(() => {
     setHolidays(getStoredHolidays());
@@ -109,118 +230,21 @@ export default function ReportsPage() {
   const currentClass =
     MOCK_CLASSES.find((c) => c.id === selectedClassId) ?? MOCK_CLASSES[0];
 
-  // Ambil data siswa otentik untuk kelas terpilih
-  const classStudents = useMemo(() => {
-    return getStudentsForClass(selectedClassId);
-  }, [selectedClassId]);
+  const currentMonthLabel = useMemo(() => {
+    const found = SEMESTER_MONTHS.find((m) => m.value === selectedMonth);
+    return found ? found.label : selectedMonth;
+  }, [selectedMonth]);
 
   // Data rekapitulasi bulanan dinamis sesuai kelas yang dipilih & hari libur
   const recapData = useMemo(() => {
-    const effectiveDates = getDatesForClassMonth(
+    return computeRecapForClass(
+      currentClass,
       selectedMonth,
-      currentClass.scheduleDay,
-      selectedClassId,
-      savedSessions
+      holidays,
+      savedSessions,
+      savedRecords
     );
-    const holidayDatesSet = new Set(holidays.map((h) => h.date));
-
-    // Ambil seluruh sesi kelas ini pada bulan terpilih
-    const classSessions = savedSessions.filter(
-      (s) => s.classId === selectedClassId && s.sessionDate.startsWith(selectedMonth)
-    );
-
-    const studentRecaps = classStudents.map((s) => {
-      let hadir = 0;
-      let sakit = 0;
-      let izin = 0;
-      let alpa = 0;
-      let terlambat = 0;
-      let dispen = 0;
-      const dailyStatus: Record<string, string> = {};
-
-      effectiveDates.forEach((date) => {
-        if (holidayDatesSet.has(date)) {
-          dailyStatus[date] = "L";
-          return;
-        }
-
-        const session = classSessions.find((sess) => sess.sessionDate === date);
-        if (session) {
-          const rec = savedRecords.find(
-            (r) => r.sessionId === session.id && r.studentId === s.id
-          );
-          const st = rec ? rec.status : "HADIR";
-          if (st === "HADIR") {
-            hadir++;
-            dailyStatus[date] = "H";
-          } else if (st === "SAKIT") {
-            sakit++;
-            dailyStatus[date] = "S";
-          } else if (st === "IZIN") {
-            izin++;
-            dailyStatus[date] = "I";
-          } else if (st === "ALPA") {
-            alpa++;
-            dailyStatus[date] = "A";
-          } else if (st === "TERLAMBAT") {
-            terlambat++;
-            dailyStatus[date] = "T";
-          } else if (st === "DISPEN") {
-            dispen++;
-            dailyStatus[date] = "D";
-          }
-        } else {
-          // Tanggal belum direkam absensinya
-          dailyStatus[date] = "-";
-        }
-      });
-
-      const totalRecordedDays = hadir + sakit + izin + alpa + terlambat + dispen;
-      const persentase =
-        totalRecordedDays > 0
-          ? Number((((hadir + dispen) / totalRecordedDays) * 100).toFixed(1))
-          : 100;
-
-      return {
-        studentId: s.id,
-        nis: s.nis ?? null,
-        fullName: s.fullName,
-        hadir,
-        sakit,
-        izin,
-        alpa,
-        terlambat,
-        dispen,
-        totalHari: totalRecordedDays,
-        persentaseKehadiran: persentase,
-        dailyStatus,
-        needsAttention: totalRecordedDays > 0 && persentase < 85,
-      };
-    });
-
-    const recordedStudents = studentRecaps.filter((s) => s.totalHari > 0);
-    const averageAttendance =
-      recordedStudents.length > 0
-        ? Number(
-            (
-              recordedStudents.reduce((acc, curr) => acc + curr.persentaseKehadiran, 0) /
-              recordedStudents.length
-            ).toFixed(1)
-          )
-        : 100;
-
-    return {
-      classId: selectedClassId,
-      className: currentClass.name,
-      academicYear: currentClass.academicYear,
-      month: selectedMonth,
-      effectiveDates,
-      averageAttendance,
-      students: studentRecaps,
-    };
   }, [
-    classStudents,
-    selectedClassId,
     currentClass,
     selectedMonth,
     holidays,
@@ -233,81 +257,88 @@ export default function ReportsPage() {
     return recapData.students.filter((s) => s.needsAttention);
   }, [recapData]);
 
-  const currentMonthLabel = useMemo(() => {
-    const found = SEMESTER_MONTHS.find((m) => m.value === selectedMonth);
-    return found ? found.label : selectedMonth;
-  }, [selectedMonth]);
+  // Ekspor Excel (.xls) dengan Kop Surat Resmi Sekolah
+  const handleExportExcel = (targetClass: Class = currentClass) => {
+    const data =
+      targetClass.id === currentClass.id
+        ? recapData
+        : computeRecapForClass(targetClass, selectedMonth, holidays, savedSessions, savedRecords);
 
-  // Ekspor CSV Native dengan UTF-8 BOM (PRD §5 FR-8 & ADR-0004)
-  const handleExportCsv = () => {
-    const holidayDatesSet = new Set(holidays.map((h) => h.date));
-    // Header CSV
-    const headers = [
-      "No",
-      "NIS",
-      "Nama Siswa",
-      ...recapData.effectiveDates.map((d) => {
-        const isHol = holidayDatesSet.has(d);
-        return isHol ? `${d.slice(8)}(L)` : d.slice(8);
-      }),
-      "Hadir",
-      "Sakit",
-      "Izin",
-      "Alpa",
-      "Terlambat",
-      "Dispen",
-      "% Kehadiran",
-    ];
+    const htmlContent = generateAttendanceExcelHtmlWithKop(
+      targetClass,
+      currentMonthLabel,
+      data.effectiveDates,
+      data.students,
+      holidays
+    );
 
-    // Baris Siswa
-    const rows = recapData.students.map((student, idx) => {
-      const dailyCols = recapData.effectiveDates.map((date) => {
-        return student.dailyStatus[date] ?? "-";
-      });
-
-      return [
-        idx + 1,
-        student.nis ?? "-",
-        `"${student.fullName}"`,
-        ...dailyCols,
-        student.hadir,
-        student.sakit,
-        student.izin,
-        student.alpa,
-        student.terlambat,
-        student.dispen,
-        `"${student.persentaseKehadiran}%"`,
-      ].join(",");
-    });
-
-    // Metadata & Konten CSV dengan UTF-8 BOM (\uFEFF)
-    const csvContent =
-      "\uFEFF" +
-      [
-        `"REKAP PRESENSI KELAS ${currentClass.name} - BULAN ${currentMonthLabel.toUpperCase()}"`,
-        `"Tahun Ajaran: ${currentClass.academicYear} | Semester: ${currentClass.semester ?? 1}"`,
-        `"Rata-rata Kehadiran Kelas: ${recapData.averageAttendance}%"`,
-        "",
-        headers.join(","),
-        ...rows,
-      ].join("\r\n");
-
-    // Unduh berkas via Blob Native
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([htmlContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", url);
+    link.href = url;
     link.setAttribute(
       "download",
-      `rekap-presensi-${currentClass.name.toLowerCase()}-${selectedMonth}.csv`
+      `Daftar_Hadir_Kelas_${targetClass.name}_${selectedMonth}_SMPN3Cibungbulang.xls`
     );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    setToastMessage(`Berkas CSV Rekap ${currentMonthLabel} berhasil diunduh`);
+    setToastMessage(`Berkas Excel Ber-Kop Kelas ${targetClass.name} berhasil diunduh`);
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Ekspor CSV Native dengan UTF-8 BOM & Kop Surat Resmi
+  const handleExportCsv = (targetClass: Class = currentClass) => {
+    const data =
+      targetClass.id === currentClass.id
+        ? recapData
+        : computeRecapForClass(targetClass, selectedMonth, holidays, savedSessions, savedRecords);
+
+    const csvContent = generateAttendanceCsvWithKop(
+      targetClass,
+      currentMonthLabel,
+      data.effectiveDates,
+      data.students,
+      holidays
+    );
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `Daftar_Hadir_Kelas_${targetClass.name}_${selectedMonth}_SMPN3Cibungbulang.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setToastMessage(`Berkas CSV Ber-Kop Kelas ${targetClass.name} berhasil diunduh`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Ekspor Seluruh Kelas Sekaligus (Batch Export)
+  const handleExportAllClasses = async (format: "xls" | "csv") => {
+    setIsExportDropdownOpen(false);
+    setToastMessage(`Memproses ekspor 10 kelas (${format.toUpperCase()})...`);
+
+    for (let i = 0; i < MOCK_CLASSES.length; i++) {
+      const cls = MOCK_CLASSES[i];
+      if (format === "xls") {
+        handleExportExcel(cls);
+      } else {
+        handleExportCsv(cls);
+      }
+      // Jeda antar pengunduhan agar tidak diblokir browser
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    setToastMessage(`Semua 10 kelas (${format.toUpperCase()}) berhasil diunduh dengan Kop Surat!`);
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
   // Cetak Dokumen via Native Window Print (PRD §5 FR-8)
@@ -349,15 +380,79 @@ export default function ReportsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Tombol Ekspor Excel Ber-Kop Resmi */}
           <button
             type="button"
-            onClick={handleExportCsv}
+            onClick={() => handleExportExcel(currentClass)}
+            className="min-h-[44px] px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs active:scale-[0.98]"
+            title="Unduh berkas Excel dengan Kop Surat Resmi SMPN 3 Cibungbulang"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
+            <span>Ekspor Excel (.xls)</span>
+          </button>
+
+          {/* Tombol Ekspor CSV Ber-Kop Resmi */}
+          <button
+            type="button"
+            onClick={() => handleExportCsv(currentClass)}
             className="min-h-[44px] px-3.5 py-2 bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs active:scale-[0.98]"
+            title="Unduh berkas CSV dengan Kop Surat Resmi"
           >
             <Download className="w-4 h-4 text-[var(--color-accent)]" />
-            <span>Unduh CSV</span>
+            <span>Ekspor CSV</span>
           </button>
+
+          {/* Menu Dropdown Ekspor Kolektif Semua Kelas */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+              className="min-h-[44px] px-3 py-2 bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[10px] text-xs font-semibold flex items-center gap-1 transition-all shadow-xs active:scale-[0.98]"
+            >
+              <Layers className="w-4 h-4 text-[var(--text-secondary)]" />
+              <span>Semua Kelas</span>
+              <ChevronDown className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+            </button>
+
+            {isExportDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setIsExportDropdownOpen(false)}
+                />
+                <div className="absolute right-0 top-full mt-1.5 w-60 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[12px] shadow-lg py-1.5 z-50 text-xs">
+                  <div className="px-3 py-1.5 border-b border-[var(--border-hairline)] text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                    Ekspor Kolektif (10 Kelas)
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleExportAllClasses("xls")}
+                    className="w-full px-3 py-2 text-left hover:bg-[var(--surface-recessed)] flex items-center gap-2 text-[var(--text-primary)] transition-colors"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                    <div>
+                      <div className="font-semibold">Unduh Excel Semua Kelas</div>
+                      <div className="text-[10px] text-[var(--text-secondary)]">7A–7H, 8A, 8B (.xls ber-kop)</div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExportAllClasses("csv")}
+                    className="w-full px-3 py-2 text-left hover:bg-[var(--surface-recessed)] flex items-center gap-2 text-[var(--text-primary)] transition-colors"
+                  >
+                    <Download className="w-4 h-4 text-[var(--color-accent)]" />
+                    <div>
+                      <div className="font-semibold">Unduh CSV Semua Kelas</div>
+                      <div className="text-[10px] text-[var(--text-secondary)]">7A–7H, 8A, 8B (.csv ber-kop)</div>
+                    </div>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Tombol Cetak Native */}
           <button
             type="button"
             onClick={handlePrint}
@@ -370,12 +465,18 @@ export default function ReportsPage() {
       </header>
 
       {/* Tampilan Header Khusus Cetak (Hanya tampil saat print) */}
-      <div className="hidden print:block mb-4 border-b pb-2">
-        <h1 className="text-xl font-bold">
-          LAPORAN REKAPITULASI PRESENSI SISWA
+      <div className="hidden print:block mb-4 border-b-2 border-black pb-3 text-center">
+        <h1 className="text-xl font-bold uppercase tracking-wider">
+          DAFTAR HADIR SISWA KELAS {currentClass.name.toUpperCase()}
         </h1>
-        <p className="text-sm">
-          Kelas: {currentClass.name} | Periode: {currentMonthLabel} | Tahun Ajaran: {currentClass.academicYear}
+        <h2 className="text-base font-bold uppercase tracking-wide">
+          SMP NEGERI 3 CIBUNGBULANG KABUPATEN BOGOR
+        </h2>
+        <p className="text-xs font-semibold">
+          TAHUN PELAJARAN {currentClass.academicYear}
+        </p>
+        <p className="text-xs text-gray-700 mt-1">
+          Mata Pelajaran: <strong>{currentClass.subject || "Informatika"}</strong> | Semester: <strong>{currentClass.semester ?? 1} (Ganjil)</strong> | Bulan: <strong>{currentMonthLabel}</strong>
         </p>
       </div>
 
@@ -706,9 +807,27 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      {/* Blok Tanda Tangan Cetak (Kop Bawah) */}
+      <div className="hidden print:flex justify-between items-start mt-8 pt-4 px-6 text-xs text-black">
+        <div className="text-left">
+          <p>Mengetahui,</p>
+          <p className="font-semibold">Kepala SMP Negeri 3 Cibungbulang</p>
+          <div className="h-16"></div>
+          <p className="font-bold underline">( ............................................................ )</p>
+          <p>NIP. ........................................................</p>
+        </div>
+        <div className="text-right">
+          <p>Cibungbulang, {formatIndonesianDate(new Date().toISOString().slice(0, 10))}</p>
+          <p className="font-semibold">Guru Mata Pelajaran Informatika,</p>
+          <div className="h-16"></div>
+          <p className="font-bold underline">Muhamad Rizky Aprian, S.Kom</p>
+          <p>NIP. 19940825 202221 1 004</p>
+        </div>
+      </div>
+
       {/* Footer Berita Acara Rekap */}
-      <footer className="text-center text-xs text-[var(--text-secondary)] py-2 border-t border-[var(--border-hairline)] mt-2">
-        Dicetak secara otomatis oleh Sistem Buku Presensi Digital · Terakhir diperbarui: 29 Sep 2026, 14:00 WIB
+      <footer className="text-center text-xs text-[var(--text-secondary)] py-2 border-t border-[var(--border-hairline)] mt-2 print:hidden">
+        Dicetak secara otomatis oleh Sistem Buku Presensi Digital · SMP Negeri 3 Cibungbulang
       </footer>
     </div>
   );

@@ -239,6 +239,7 @@ export interface StudentMonthlyRecap {
   studentId: string;
   nis: string | null;
   fullName: string;
+  gender?: Gender | null;
   hadir: number;
   sakit: number;
   izin: number;
@@ -247,7 +248,7 @@ export interface StudentMonthlyRecap {
   dispen: number;
   totalHari: number;
   persentaseKehadiran: number; // Skala 0 - 100 dengan 1 desimal (contoh: 94.1)
-  dailyStatus: Record<string, AttendanceStatus>; // Format key: "YYYY-MM-DD"
+  dailyStatus: Record<string, AttendanceStatus | "H" | "S" | "I" | "A" | "T" | "D" | "L" | "-" | string>; // Format key: "YYYY-MM-DD"
   needsAttention: boolean; // Flag jika kehadiran di bawah 85%
 }
 

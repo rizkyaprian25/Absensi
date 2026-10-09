@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   Sparkles,
   Users,
+  Download,
 } from "lucide-react";
 
 import {
@@ -54,6 +55,10 @@ import {
   calculateClassGradeStats,
   exportGradesToCSV,
 } from "@/lib/gradeStorage";
+import {
+  generateGradesExcelHtmlWithKop,
+  generateGradesCsvWithKop,
+} from "@/lib/exportUtils";
 
 function GradesPageContent() {
   const searchParams = useSearchParams();
@@ -301,9 +306,32 @@ function GradesPageContent() {
     setIsKkmModalOpen(false);
   };
 
-  // Unduh Berkas CSV
+  // Unduh Berkas Excel Ber-Kop Resmi
+  const handleDownloadExcel = () => {
+    const htmlContent = generateGradesExcelHtmlWithKop(
+      currentClass.name,
+      classAssessments,
+      studentSummaries,
+      kkm
+    );
+
+    const blob = new Blob([htmlContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `Daftar_Nilai_Kelas_${currentClass.name}_Informatika_SMPN3Cibungbulang_${new Date().toISOString().slice(0, 10)}.xls`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Unduh Berkas CSV Ber-Kop Resmi
   const handleDownloadCSV = () => {
-    const csvContent = exportGradesToCSV(
+    const csvContent = generateGradesCsvWithKop(
       currentClass.name,
       classAssessments,
       studentSummaries,
@@ -316,7 +344,7 @@ function GradesPageContent() {
     link.href = url;
     link.setAttribute(
       "download",
-      `Daftar_Nilai_${currentClass.name}_Informatika_${new Date().toISOString().slice(0, 10)}.csv`
+      `Daftar_Nilai_Kelas_${currentClass.name}_Informatika_SMPN3Cibungbulang_${new Date().toISOString().slice(0, 10)}.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -356,12 +384,25 @@ function GradesPageContent() {
             <span>KKM: <strong className="font-mono text-[var(--color-accent)]">{kkm}</strong></span>
           </button>
 
+          {/* Tombol Ekspor Excel Ber-Kop */}
+          <button
+            type="button"
+            onClick={handleDownloadExcel}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs active:scale-[0.98]"
+            title="Unduh berkas Excel dengan Kop Surat Resmi SMPN 3 Cibungbulang"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-100" />
+            <span>Ekspor Excel (.xls)</span>
+          </button>
+
+          {/* Tombol Ekspor CSV Ber-Kop */}
           <button
             type="button"
             onClick={handleDownloadCSV}
-            className="px-3 py-2 bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+            className="px-3 py-2 bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs active:scale-[0.98]"
+            title="Unduh berkas CSV dengan format Kop Surat Resmi"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <Download className="w-3.5 h-3.5 text-[var(--color-accent)]" />
             <span>Ekspor CSV</span>
           </button>
 
