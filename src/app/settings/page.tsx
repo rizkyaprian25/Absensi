@@ -27,7 +27,22 @@ import {
   RefreshCw,
   FileJson,
   Check,
+  Cloud,
+  CloudUpload,
+  CloudDownload,
+  Server,
 } from "lucide-react";
+import {
+  checkSupabaseHealth,
+  isSupabaseConfigured,
+  supabaseUrl,
+  type SupabaseHealthStatus,
+} from "@/lib/supabaseClient";
+import {
+  syncLocalDataToCloud,
+  syncCloudDataToLocal,
+  getLastCloudSyncTime,
+} from "@/lib/syncManager";
 import {
   HolidayItem,
   HolidayCategory,
@@ -81,18 +96,45 @@ export default function SettingsPage() {
   const [pendingRestoreFileName, setPendingRestoreFileName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // State Integrasi Cloud Supabase (PostgreSQL Vault)
+  const [cloudHealth, setCloudHealth] = useState<SupabaseHealthStatus | null>(null);
+  const [isCheckingCloud, setIsCheckingCloud] = useState(false);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [lastCloudSync, setLastCloudSync] = useState<string | null>(null);
+  const [cloudSyncMessage, setCloudSyncMessage] = useState<{ text: string; isError: boolean } | null>(null);
+
   const refreshBackupData = () => {
     setIntegrityStats(getDataIntegrityStats());
     setSnapshots(getAutoSnapshots());
   };
 
+  const refreshCloudStatus = async () => {
+    setIsCheckingCloud(true);
+    try {
+      setLastCloudSync(getLastCloudSyncTime());
+      const health = await checkSupabaseHealth();
+      setCloudHealth(health);
+    } catch {
+      setCloudHealth({
+        isConfigured: isSupabaseConfigured,
+        connected: false,
+        tableReady: false,
+        message: "Gagal terhubung ke Supabase",
+      });
+    } finally {
+      setIsCheckingCloud(false);
+    }
+  };
+
   useEffect(() => {
     setHolidays(getStoredHolidays());
     refreshBackupData();
+    refreshCloudStatus();
 
     // Dengarkan perubahan data lokal secara reaktif
     const handleDataChanged = () => {
       refreshBackupData();
+      setLastCloudSync(getLastCloudSyncTime());
     };
 
     window.addEventListener("absensi-data-changed", handleDataChanged);
@@ -100,6 +142,69 @@ export default function SettingsPage() {
       window.removeEventListener("absensi-data-changed", handleDataChanged);
     };
   }, []);
+
+  const handleRefreshCloudHealth = async () => {
+    setIsCheckingCloud(true);
+    setCloudSyncMessage(null);
+    try {
+      setLastCloudSync(getLastCloudSyncTime());
+      const health = await checkSupabaseHealth();
+      setCloudHealth(health);
+      setToastMessage(health.message);
+      setTimeout(() => setToastMessage(null), 3500);
+    } finally {
+      setIsCheckingCloud(false);
+    }
+  };
+
+  const handlePushToCloud = async () => {
+    setIsSyncingCloud(true);
+    setCloudSyncMessage(null);
+    try {
+      const res = await syncLocalDataToCloud();
+      if (res.success) {
+        setLastCloudSync(res.syncedAt || new Date().toISOString());
+        setCloudSyncMessage({ text: res.message, isError: false });
+        setToastMessage("Data berhasil dicadangkan ke Supabase Cloud!");
+        const health = await checkSupabaseHealth();
+        setCloudHealth(health);
+      } else {
+        setCloudSyncMessage({ text: res.message, isError: true });
+      }
+    } catch (err: any) {
+      setCloudSyncMessage({ text: `Gagal: ${err?.message || "Kesalahan jaringan"}`, isError: true });
+    } finally {
+      setIsSyncingCloud(false);
+      setTimeout(() => setCloudSyncMessage(null), 8000);
+    }
+  };
+
+  const handlePullFromCloud = async () => {
+    const isConfirmed = window.confirm(
+      "Apakah Anda yakin ingin menarik data dari Supabase Cloud?\\n\\nData lokal Anda saat ini akan secara otomatis disimpan ke titik snapshot sebelum digantikan dengan data dari cloud."
+    );
+    if (!isConfirmed) return;
+
+    setIsSyncingCloud(true);
+    setCloudSyncMessage(null);
+    try {
+      const res = await syncCloudDataToLocal();
+      if (res.success) {
+        setLastCloudSync(res.syncedAt || new Date().toISOString());
+        setCloudSyncMessage({ text: res.message, isError: false });
+        setToastMessage("Data dari Supabase Cloud berhasil ditarik dan dipulihkan!");
+        refreshBackupData();
+        setHolidays(getStoredHolidays());
+      } else {
+        setCloudSyncMessage({ text: res.message, isError: true });
+      }
+    } catch (err: any) {
+      setCloudSyncMessage({ text: `Gagal: ${err?.message || "Kesalahan jaringan"}`, isError: true });
+    } finally {
+      setIsSyncingCloud(false);
+      setTimeout(() => setCloudSyncMessage(null), 8000);
+    }
+  };
 
   /**
    * Membuka modal dengan preset agenda pekan khusus (UTS, UAS, Kokurikuler, atau Libur Harian)
@@ -551,6 +656,182 @@ export default function SettingsPage() {
             Aman
           </span>
         </div>
+      </div>
+
+      {/* Bagian: Sinkronisasi Cloud Supabase PostgreSQL (Multi-Device & Cloud Vault) */}
+      <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[16px] overflow-hidden shadow-xs">
+        {/* Header Seksi Cloud */}
+        <div className="p-4 border-b border-[var(--border-hairline)] bg-[var(--surface-card)] flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-[12px] bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+              <Cloud className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-base text-[var(--text-primary)]">
+                  Supabase Cloud Database (PostgreSQL)
+                </h3>
+                {cloudHealth?.tableReady ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Terkoneksi &amp; Database Siap
+                  </span>
+                ) : cloudHealth?.connected ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    Terkoneksi (Tabel Belum Dibuat)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                    <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                    Tidak Terkoneksi / Offline
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                Sinkronisasi multi-perangkat real-time, pencadangan PostgreSQL online, &amp; pemulihan instan
+              </p>
+            </div>
+          </div>
+
+          {/* Tombol Aksi Cloud */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleRefreshCloudHealth}
+              disabled={isCheckingCloud}
+              title="Periksa status koneksi ke Supabase"
+              className="min-h-[40px] px-3 py-1.5 rounded-[10px] bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isCheckingCloud ? "animate-spin" : ""}`} />
+              <span>Cek Status</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePullFromCloud}
+              disabled={isSyncingCloud}
+              title="Tarik data terbaru dari Supabase Cloud ke perangkat ini"
+              className="min-h-[40px] px-3.5 py-1.5 rounded-[10px] bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+            >
+              <CloudDownload className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+              <span>Tarik dari Cloud (Pull)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePushToCloud}
+              disabled={isSyncingCloud}
+              title="Cadangkan seluruh data presensi, nilai, dan snapshot lokal ke Supabase PostgreSQL"
+              className="min-h-[40px] px-4 py-1.5 rounded-[10px] bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+            >
+              <CloudUpload className={`w-4 h-4 ${isSyncingCloud ? "animate-bounce" : ""}`} />
+              <span>{isSyncingCloud ? "Menyinkronkan..." : "Cadangkan ke Cloud (Push)"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Notifikasi / Feedback Sinkronisasi */}
+        {cloudSyncMessage && (
+          <div
+            className={`p-3 text-xs font-medium border-b border-[var(--border-hairline)] flex items-center justify-between gap-2 ${
+              cloudSyncMessage.isError
+                ? "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
+                : "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {cloudSyncMessage.isError ? (
+                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+              ) : (
+                <Check className="w-4 h-4 shrink-0 text-emerald-500" />
+              )}
+              <span>{cloudSyncMessage.text}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCloudSyncMessage(null)}
+              className="p-1 hover:opacity-75"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Ringkasan Status Koneksi & Proyek */}
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 bg-[var(--surface-recessed)]/50 border-b border-[var(--border-hairline)] text-xs">
+          <div className="p-3 rounded-[12px] bg-[var(--surface-card)] border border-[var(--border-hairline)]">
+            <div className="flex items-center gap-2 text-[var(--text-secondary)] font-semibold mb-1">
+              <Server className="w-4 h-4 text-sky-500" />
+              <span>Supabase Host</span>
+            </div>
+            <p className="text-[var(--text-primary)] font-bold text-xs truncate">
+              {cloudHealth?.projectUrl?.replace(/^https?:\/\//, "") || "Belum dikonfigurasi"}
+            </p>
+            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+              Region: Southeast Asia / Singapore
+            </p>
+          </div>
+
+          <div className="p-3 rounded-[12px] bg-[var(--surface-card)] border border-[var(--border-hairline)]">
+            <div className="flex items-center gap-2 text-[var(--text-secondary)] font-semibold mb-1">
+              <Database className="w-4 h-4 text-emerald-500" />
+              <span>Status Skema Database</span>
+            </div>
+            <p className="text-[var(--text-primary)] font-bold text-xs">
+              {cloudHealth?.tableReady
+                ? "Tabel Lengkap (classes, sessions, scores)"
+                : cloudHealth?.connected
+                ? "Menunggu Eksekusi schema.sql"
+                : "Tidak Terhubung"}
+            </p>
+            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+              {cloudHealth?.tableReady ? "Siap sinkronisasi otomatis" : "Jalankan SQL di Supabase"}
+            </p>
+          </div>
+
+          <div className="p-3 rounded-[12px] bg-[var(--surface-card)] border border-[var(--border-hairline)]">
+            <div className="flex items-center gap-2 text-[var(--text-secondary)] font-semibold mb-1">
+              <History className="w-4 h-4 text-purple-500" />
+              <span>Sinkronisasi Terakhir</span>
+            </div>
+            <p className="text-[var(--text-primary)] font-bold text-xs truncate">
+              {lastCloudSync
+                ? new Date(lastCloudSync).toLocaleString("id-ID", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })
+                : "Belum pernah disinkronkan"}
+            </p>
+            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+              {lastCloudSync ? "Snapshot cloud diperbarui" : "Tekan tombol 'Cadangkan ke Cloud'"}
+            </p>
+          </div>
+        </div>
+
+        {/* Panduan Eksekusi schema.sql jika tabel belum dibuat */}
+        {cloudHealth?.connected && !cloudHealth?.tableReady && (
+          <div className="p-4 bg-amber-50/70 dark:bg-amber-950/20 border-t border-amber-200 dark:border-amber-800 text-xs">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-1.5 text-amber-900 dark:text-amber-200">
+                <p className="font-bold text-sm">
+                  Langkah Terakhir: Jalankan Script Database di Supabase
+                </p>
+                <p className="leading-relaxed">
+                  Koneksi API berhasil terhubung, namun tabel PostgreSQL belum ada. File skema telah disiapkan secara otomatis di direktori proyek: <code className="px-1.5 py-0.5 rounded bg-amber-200 dark:bg-amber-900 font-mono text-[11px]">supabase/schema.sql</code>.
+                </p>
+                <ol className="list-decimal list-inside space-y-1 mt-1 text-[11px] text-amber-800 dark:text-amber-300">
+                  <li>Buka browser dan login ke akun Supabase Anda.</li>
+                  <li>Buka proyek Anda, lalu klik menu <strong>SQL Editor</strong> di bilah navigasi kiri.</li>
+                  <li>Klik <strong>New query</strong>, salin dan tempel (paste) seluruh isi file <code className="font-mono">supabase/schema.sql</code>.</li>
+                  <li>Klik tombol hijau <strong>Run</strong> (atau tekan Ctrl+Enter).</li>
+                  <li>Setelah selesai, kembali ke halaman ini dan klik tombol <strong>Cek Status</strong> di atas.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Bagian: Pusat Keamanan & Cadangan Data Otomatis (Disaster Recovery & Multi-tier Vault) */}

@@ -210,6 +210,15 @@ export function triggerAutoSnapshot(triggerLabel: string = "Perubahan Sistem"): 
     // Salin ganda (dual-write) ke IndexedDB untuk proteksi level browser storage
     mirrorToIndexedDB(payload);
 
+    // Siarkan event keberhasilan snapshot agar syncManager dapat melakukan sinkronisasi cloud di latar belakang
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("absensi-snapshot-saved", {
+          detail: { id: newSnapshot.id, timestamp: newSnapshot.timestamp },
+        })
+      );
+    }
+
     return newSnapshot;
   } catch (err) {
     console.error("Gagal membuat snapshot otomatis:", err);
@@ -220,6 +229,8 @@ export function triggerAutoSnapshot(triggerLabel: string = "Perubahan Sistem"): 
 // Inisialisasi pendengar event otomatis di sisi browser
 if (typeof window !== "undefined") {
   window.addEventListener("absensi-data-changed", (event: any) => {
+    // Abaikan jika data baru saja ditarik dari cloud untuk mencegah redundansi
+    if (event?.detail?.source === "cloud-pull") return;
     const reason = event?.detail?.reason || "Pembaruan Data Otomatis";
     triggerAutoSnapshot(reason);
   });

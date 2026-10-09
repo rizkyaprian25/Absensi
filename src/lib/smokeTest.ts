@@ -33,6 +33,8 @@ import {
   restoreFromUploadedJson,
   type AppBackupPayload,
 } from "./backupManager.ts";
+import { isSupabaseConfigured, supabaseUrl } from "./supabaseClient.ts";
+import { getLastCloudSyncTime, setLastCloudSyncTime } from "./syncManager.ts";
 import {
   DEFAULT_HOLIDAYS,
   findHolidayByDate,
@@ -725,6 +727,35 @@ function runSmokeTest() {
     assert.strictEqual(validRestoreRes.stats?.totalSessions, 1);
 
     console.log("✓ LULUS: Mesin pencadangan multi-tier, rolling snapshot (max 10), dan disaster recovery teruji kokoh.");
+  }
+
+  // --------------------------------------------------------------------------
+  // TEST 12: Integrasi Supabase PostgreSQL & Cloud Sync State
+  // --------------------------------------------------------------------------
+  {
+    console.log("[TEST 12] Menguji konfigurasi klien Supabase & utilitas sync manager...");
+
+    // Uji sanitasi dan pembersihan URL Supabase
+    assert.strictEqual(typeof supabaseUrl, "string", "URL Supabase harus string");
+    assert.ok(!supabaseUrl.endsWith("/rest/v1/"), "URL Supabase tidak boleh berakhiran /rest/v1/");
+    assert.ok(!supabaseUrl.endsWith("/rest/v1"), "URL Supabase tidak boleh berakhiran /rest/v1");
+
+    // Uji persistensi waktu sinkronisasi cloud
+    const testSyncTime = "2026-10-09T23:30:00.000Z";
+    setLastCloudSyncTime(testSyncTime);
+    assert.strictEqual(getLastCloudSyncTime(), testSyncTime, "Timestamp cloud sync harus tersimpan dan terbaca");
+
+    // Uji payload cadangan yang dipersiapkan untuk tabel cloud app_snapshots
+    const fullBackup = createFullBackupPayload();
+    assert.strictEqual(fullBackup.version, 2, "Versi payload cadangan harus 2");
+    assert.ok(fullBackup.stats.totalSessions >= 0, "Stats totalSessions harus ada");
+    assert.ok(fullBackup.stats.totalRecords >= 0, "Stats totalRecords harus ada");
+    assert.ok(fullBackup.data.sessions !== undefined, "Blok sesi harus ada");
+    assert.ok(fullBackup.data.records !== undefined, "Blok rekaman harus ada");
+    assert.ok(fullBackup.data.assessments !== undefined, "Blok asesmen harus ada");
+    assert.ok(fullBackup.data.scores !== undefined, "Blok nilai harus ada");
+
+    console.log("✓ LULUS: Konfigurasi klien Supabase dan struktur payload cloud sync teruji siap.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");
