@@ -606,12 +606,15 @@ export default function TodayDashboardPage() {
                 <select
                   value={holidayCategoryInput}
                   onChange={(e) => setHolidayCategoryInput(e.target.value as HolidayCategory)}
-                  className="w-full min-h-[42px] px-3 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                  className="w-full min-h-[42px] px-3 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] cursor-pointer"
                 >
                   <option value="SEKOLAH">Libur / Kegiatan Khusus Sekolah</option>
+                  <option value="UTS">Minggu / Pekan UTS (Penilaian Tengah Semester)</option>
+                  <option value="UAS">Minggu / Pekan UAS (Penilaian Akhir Semester)</option>
+                  <option value="KOKURIKULER">Minggu Kokurikuler / Projek P5 / Classmeeting</option>
+                  <option value="KHUSUS">Diliburkan Khusus Guru / Rapat</option>
                   <option value="NASIONAL">Libur Nasional / Tanggal Merah</option>
                   <option value="CUTI_BERSAMA">Cuti Bersama</option>
-                  <option value="KHUSUS">Diliburkan Khusus Guru / Rapat</option>
                 </select>
               </div>
 

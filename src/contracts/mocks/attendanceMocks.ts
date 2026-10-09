@@ -276,6 +276,7 @@ export const MOCK_MONTHLY_RECAP_8B: MonthlyClassRecap = {
       izin,
       alpa,
       terlambat: 0,
+      dispen: 0,
       totalHari,
       persentaseKehadiran: persentase,
       dailyStatus: {},

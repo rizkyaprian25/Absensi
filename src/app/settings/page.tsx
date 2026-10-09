@@ -27,6 +27,7 @@ import {
   saveStoredHolidays,
   formatIndonesianDate,
   getCategoryLabel,
+  addOrUpdateSpecialPeriod,
 } from "@/lib/calendarUtils";
 
 /**
@@ -36,10 +37,12 @@ export default function SettingsPage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // State Hari Libur
+  // State Hari Libur & Agenda Khusus
   const [holidays, setHolidays] = useState<HolidayItem[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isRangeMode, setIsRangeMode] = useState(false);
   const [newDate, setNewDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState<HolidayCategory>("SEKOLAH");
   const [newDesc, setNewDesc] = useState("");
@@ -65,10 +68,28 @@ export default function SettingsPage() {
     setTimeout(() => setToastMessage(null), 2500);
   };
 
-  // Tambah Hari Libur Baru
+  // Tambah Hari Libur atau Pekan Agenda Baru
   const handleAddHoliday = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDate || !newName.trim()) return;
+
+    if (isRangeMode && endDate) {
+      if (endDate < newDate) {
+        alert("Tanggal selesai tidak boleh lebih awal dari tanggal mulai.");
+        return;
+      }
+      const updated = addOrUpdateSpecialPeriod(newDate, endDate, newName.trim(), newCategory, newDesc.trim());
+      setHolidays(updated);
+      setIsAddModalOpen(false);
+      setNewDate("");
+      setEndDate("");
+      setNewName("");
+      setNewDesc("");
+      setIsRangeMode(false);
+      setToastMessage(`Agenda "${newName.trim()}" (${newDate} s/d ${endDate}) berhasil ditambahkan`);
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
 
     const newHolidayItem: HolidayItem = {
       id: `hld-${newDate}-${Date.now()}`,
@@ -86,10 +107,11 @@ export default function SettingsPage() {
     saveStoredHolidays(updated);
     setIsAddModalOpen(false);
     setNewDate("");
+    setEndDate("");
     setNewName("");
     setNewDesc("");
 
-    setToastMessage(`Hari libur "${newHolidayItem.name}" (${newHolidayItem.date}) berhasil ditambahkan`);
+    setToastMessage(`Hari libur / agenda "${newHolidayItem.name}" (${newHolidayItem.date}) berhasil ditambahkan`);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
@@ -207,7 +229,15 @@ export default function SettingsPage() {
                     <span className="font-mono text-xs font-bold text-[var(--text-primary)]">
                       {h.date}
                     </span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[var(--surface-recessed)] text-[var(--text-secondary)] font-semibold font-mono">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-[4px] font-semibold font-mono ${
+                      h.category === "UTS"
+                        ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
+                        : h.category === "UAS"
+                        ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                        : h.category === "KOKURIKULER"
+                        ? "bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300"
+                        : "bg-[var(--surface-recessed)] text-[var(--text-secondary)]"
+                    }`}>
                       {getCategoryLabel(h.category)}
                     </span>
                   </div>
@@ -357,17 +387,48 @@ export default function SettingsPage() {
             </div>
 
             <form onSubmit={handleAddHoliday} className="flex flex-col gap-3">
-              <div>
-                <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1">
-                  Tanggal Libur
-                </label>
+              {/* Pilihan Mode: 1 Hari atau Rentang Pekan (Minggu UTS, UAS, Kokurikuler) */}
+              <div className="flex items-center gap-2 p-2 bg-[var(--surface-recessed)] rounded-[10px]">
                 <input
-                  type="date"
-                  required
-                  value={newDate}
-                  onChange={(e) => setNewDate(e.target.value)}
-                  className="w-full min-h-[42px] px-3 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                  type="checkbox"
+                  id="rangeModeToggle"
+                  checked={isRangeMode}
+                  onChange={(e) => setIsRangeMode(e.target.checked)}
+                  className="w-4 h-4 accent-[var(--color-accent)] cursor-pointer"
                 />
+                <label htmlFor="rangeModeToggle" className="text-xs font-semibold text-[var(--text-primary)] cursor-pointer">
+                  Tandai Rentang Pekan Penuh (Misal: 1 Minggu UTS / UAS / Kokurikuler)
+                </label>
+              </div>
+
+              <div className={isRangeMode ? "grid grid-cols-2 gap-2" : ""}>
+                <div>
+                  <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1">
+                    {isRangeMode ? "Tanggal Mulai (Senin)" : "Tanggal Libur / Agenda"}
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
+                    className="w-full min-h-[42px] px-3 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] font-mono"
+                  />
+                </div>
+
+                {isRangeMode && (
+                  <div>
+                    <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1">
+                      Tanggal Selesai (Jumat)
+                    </label>
+                    <input
+                      type="date"
+                      required={isRangeMode}
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full min-h-[42px] px-3 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] font-mono"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>
@@ -377,7 +438,7 @@ export default function SettingsPage() {
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: Classmeeting, Maulid Nabi, Rapat Guru"
+                  placeholder="Contoh: Minggu Penilaian Tengah Semester (UTS), Pekan P5"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   className="w-full min-h-[42px] px-3 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
@@ -386,17 +447,20 @@ export default function SettingsPage() {
 
               <div>
                 <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1">
-                  Kategori Libur
+                  Kategori Libur / Agenda
                 </label>
                 <select
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value as HolidayCategory)}
-                  className="w-full min-h-[42px] px-3 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                  className="w-full min-h-[42px] px-3 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] cursor-pointer"
                 >
                   <option value="SEKOLAH">Libur / Kegiatan Khusus Sekolah</option>
+                  <option value="UTS">Minggu / Pekan UTS (Penilaian Tengah Semester)</option>
+                  <option value="UAS">Minggu / Pekan UAS (Penilaian Akhir Semester)</option>
+                  <option value="KOKURIKULER">Minggu Kokurikuler / Projek P5 / Classmeeting</option>
+                  <option value="KHUSUS">Diliburkan Khusus Guru / Rapat</option>
                   <option value="NASIONAL">Libur Nasional / Tanggal Merah</option>
                   <option value="CUTI_BERSAMA">Cuti Bersama</option>
-                  <option value="KHUSUS">Diliburkan Khusus Guru / Rapat</option>
                 </select>
               </div>
 

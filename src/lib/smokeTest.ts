@@ -11,6 +11,7 @@ import {
   findHolidayByDate,
   isDateHoliday,
   getDateForWeekday,
+  addOrUpdateSpecialPeriod,
 } from "./calendarUtils.ts";
 import { generatePastTeachingDates } from "./attendanceStorage.ts";
 import {
@@ -24,7 +25,11 @@ import {
   type AssessmentItem,
   type StudentScoreRecord,
 } from "../contracts/grades.ts";
-import type { Student } from "../contracts/attendance.ts";
+import {
+  AttendanceStatusSchema,
+  HolidayCategorySchema,
+  type Student,
+} from "../contracts/attendance.ts";
 
 /**
  * Smoke Test Mandiri (Fase 4 SOP §3.5 & PRD §14)
@@ -46,7 +51,10 @@ function runSmokeTest() {
 
     const rateZero = calculateAttendanceRate(0, 0);
     assert.strictEqual(rateZero, 100.0, "Hari 0 harus menghasilkan default 100.0%");
-    console.log("✓ LULUS: Kalkulasi persentase akurat.");
+
+    const rateWithDispen = calculateAttendanceRate(18, 20, 2);
+    assert.strictEqual(rateWithDispen, 100.0, "18 hadir + 2 dispen dari 20 hari harus menghasilkan 100.0%");
+    console.log("✓ LULUS: Kalkulasi persentase akurat (termasuk status dispensasi sah).");
   }
 
   // 2. Pengujian Parser CSV Siswa
@@ -279,8 +287,35 @@ function runSmokeTest() {
     console.log("✓ LULUS: Mesin penilaian, kalkulasi rata-rata berbobot, KKM, dan ekspor CSV berfungsi sempurna.");
   }
 
+  // 8. Pengujian Status Kehadiran DISPEN & Agenda Khusus (Minggu UTS, UAS, Kokurikuler)
+  {
+    console.log("[TEST 8] Menguji status kehadiran DISPEN & penetapan agenda pekan (UTS, UAS, Kokurikuler)...");
+
+    // Validasi skema enum
+    assert.strictEqual(AttendanceStatusSchema.parse("DISPEN"), "DISPEN", "Status DISPEN harus valid dalam skema");
+    assert.strictEqual(HolidayCategorySchema.parse("UTS"), "UTS", "Kategori UTS harus valid");
+    assert.strictEqual(HolidayCategorySchema.parse("UAS"), "UAS", "Kategori UAS harus valid");
+    assert.strictEqual(HolidayCategorySchema.parse("KOKURIKULER"), "KOKURIKULER", "Kategori KOKURIKULER harus valid");
+
+    // Uji pembuatan rentang pekan khusus
+    const sampleWeek = addOrUpdateSpecialPeriod(
+      "2026-09-21",
+      "2026-09-25",
+      "Minggu Penilaian Tengah Semester (UTS)",
+      "UTS"
+    );
+
+    const utsDays = sampleWeek.filter((item) => item.category === "UTS");
+    assert.ok(utsDays.length >= 5, "Harus menghasilkan minimal 5 hari UTS untuk satu pekan");
+    assert.ok(utsDays.some((d) => d.date === "2026-09-21"));
+    assert.ok(utsDays.some((d) => d.date === "2026-09-25"));
+
+    console.log("✓ LULUS: Status DISPEN dan manajemen pekan UTS, UAS, Kokurikuler terverifikasi sempurna.");
+  }
+
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");
 }
+
 
 
 runSmokeTest();

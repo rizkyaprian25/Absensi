@@ -20,6 +20,7 @@ import {
   CalendarOff,
   History,
   RotateCcw,
+  Award,
 } from "lucide-react";
 import {
   MOCK_CLASSES,
@@ -176,6 +177,7 @@ function AttendanceTakingContent() {
     let izin = 0;
     let alpa = 0;
     let terlambat = 0;
+    let dispen = 0;
 
     Object.values(attendanceMap).forEach((item) => {
       if (item.status === "HADIR") hadir++;
@@ -183,9 +185,10 @@ function AttendanceTakingContent() {
       else if (item.status === "IZIN") izin++;
       else if (item.status === "ALPA") alpa++;
       else if (item.status === "TERLAMBAT") terlambat++;
+      else if (item.status === "DISPEN") dispen++;
     });
 
-    return { hadir, sakit, izin, alpa, terlambat, total: classStudents.length };
+    return { hadir, sakit, izin, alpa, terlambat, dispen, total: classStudents.length };
   }, [attendanceMap, classStudents.length]);
 
   // Filter siswa berdasarkan input pencarian
@@ -418,27 +421,59 @@ function AttendanceTakingContent() {
         </div>
       )}
 
-      {/* Banner Peringatan Jika Hari Libur */}
+      {/* Banner Peringatan Jika Hari Libur atau Agenda Khusus (UTS, UAS, Kokurikuler) */}
       {currentHoliday && (
-        <div className="p-4 rounded-[14px] bg-[var(--status-alpa-bg)] border border-[var(--status-alpa-fg)]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in">
+        <div className={`p-4 rounded-[14px] border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in ${
+          currentHoliday.category === "UTS"
+            ? "bg-purple-500/10 border-purple-500/30"
+            : currentHoliday.category === "UAS"
+            ? "bg-rose-500/10 border-rose-500/30"
+            : currentHoliday.category === "KOKURIKULER"
+            ? "bg-teal-500/10 border-teal-500/30"
+            : "bg-[var(--status-alpa-bg)] border-[var(--status-alpa-fg)]/20"
+        }`}>
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-[10px] bg-[var(--status-alpa-fg)] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-              <CalendarOff className="w-4 h-4" />
+            <div className={`w-9 h-9 rounded-[10px] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs ${
+              currentHoliday.category === "UTS"
+                ? "bg-purple-600"
+                : currentHoliday.category === "UAS"
+                ? "bg-rose-600"
+                : currentHoliday.category === "KOKURIKULER"
+                ? "bg-teal-600"
+                : "bg-[var(--status-alpa-fg)]"
+            }`}>
+              {currentHoliday.category === "UTS" || currentHoliday.category === "UAS" ? (
+                <FileCheck className="w-4 h-4" />
+              ) : currentHoliday.category === "KOKURIKULER" ? (
+                <Award className="w-4 h-4" />
+              ) : (
+                <CalendarOff className="w-4 h-4" />
+              )}
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <p className="font-bold text-sm text-[var(--status-alpa-fg)]">
-                  Tanggal Ini Ditetapkan Sebagai Hari Libur: {currentHoliday.name}
+                <p className={`font-bold text-sm ${
+                  currentHoliday.category === "UTS"
+                    ? "text-purple-800 dark:text-purple-300"
+                    : currentHoliday.category === "UAS"
+                    ? "text-rose-800 dark:text-rose-300"
+                    : currentHoliday.category === "KOKURIKULER"
+                    ? "text-teal-800 dark:text-teal-300"
+                    : "text-[var(--status-alpa-fg)]"
+                }`}>
+                  {currentHoliday.category === "UTS" || currentHoliday.category === "UAS" || currentHoliday.category === "KOKURIKULER"
+                    ? `Agenda Khusus: ${currentHoliday.name}`
+                    : `Tanggal Ini Ditetapkan Sebagai Hari Libur: ${currentHoliday.name}`}
                 </p>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[var(--status-alpa-fg)]/10 text-[var(--status-alpa-fg)] font-bold font-mono">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-black/10 dark:bg-white/10 font-bold font-mono">
                   {getCategoryLabel(currentHoliday.category)}
                 </span>
               </div>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                {currentHoliday.description || "Tidak ada kegiatan KBM terjadwal. Seluruh siswa bebas presensi (tidak dihitung alpa)."}
+                {currentHoliday.description || "Agenda terjadwal di kalender akademik."}
               </p>
               <p className="text-[11px] text-[var(--text-secondary)] mt-1">
-                💡 Jika ada jam pengganti atau kegiatan ekstra yang tetap berlangsung, Anda tetap dapat merekam presensi siswa di bawah.
+                💡 Anda dapat merekam presensi pelaksanaan kegiatan ini atau mencatat siswa yang bertugas dengan status Dispensasi (D).
               </p>
             </div>
           </div>
@@ -449,37 +484,43 @@ function AttendanceTakingContent() {
               onClick={handleRemoveHoliday}
               className="min-h-[36px] px-3.5 py-1.5 rounded-[8px] bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] transition-all shadow-xs"
             >
-              Batalkan Status Libur
+              Batalkan Agenda Ini
             </button>
           </div>
         </div>
       )}
 
       {/* Live Tally Ledger Bar (Menghitung Real-Time) */}
-      <div className="p-3 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] flex items-center justify-between gap-1 shadow-xs font-tabular">
+      <div className="p-3 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] flex items-center justify-between gap-1.5 shadow-xs font-tabular overflow-x-auto">
         {/* Hadir */}
-        <div className="flex-1 flex items-center justify-center gap-1.5 py-1 px-2 rounded-[8px] bg-[var(--status-hadir-bg)] text-[var(--status-hadir-fg)] font-bold text-xs">
+        <div className="flex-1 min-w-[56px] flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-[8px] bg-[var(--status-hadir-bg)] text-[var(--status-hadir-fg)] font-bold text-xs" title="Hadir">
           <Check className="w-3.5 h-3.5 stroke-[3]" />
           <span>H:</span>
           <span className="text-sm font-extrabold">{tally.hadir}</span>
         </div>
         {/* Sakit */}
-        <div className="flex-1 flex items-center justify-center gap-1.5 py-1 px-2 rounded-[8px] bg-[var(--status-sakit-bg)] text-[var(--status-sakit-fg)] font-bold text-xs">
+        <div className="flex-1 min-w-[56px] flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-[8px] bg-[var(--status-sakit-bg)] text-[var(--status-sakit-fg)] font-bold text-xs" title="Sakit">
           <Plus className="w-3.5 h-3.5 stroke-[3]" />
           <span>S:</span>
           <span className="text-sm font-extrabold">{tally.sakit}</span>
         </div>
         {/* Izin */}
-        <div className="flex-1 flex items-center justify-center gap-1.5 py-1 px-2 rounded-[8px] bg-[var(--status-izin-bg)] text-[var(--status-izin-fg)] font-bold text-xs">
+        <div className="flex-1 min-w-[56px] flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-[8px] bg-[var(--status-izin-bg)] text-[var(--status-izin-fg)] font-bold text-xs" title="Izin">
           <FileText className="w-3.5 h-3.5" />
           <span>I:</span>
           <span className="text-sm font-extrabold">{tally.izin}</span>
         </div>
         {/* Alpa */}
-        <div className="flex-1 flex items-center justify-center gap-1.5 py-1 px-2 rounded-[8px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold text-xs">
+        <div className="flex-1 min-w-[56px] flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-[8px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold text-xs" title="Alpa">
           <X className="w-3.5 h-3.5 stroke-[3]" />
           <span>A:</span>
           <span className="text-sm font-extrabold">{tally.alpa}</span>
+        </div>
+        {/* Dispensasi */}
+        <div className="flex-1 min-w-[56px] flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-[8px] bg-[var(--status-dispen-bg)] text-[var(--status-dispen-fg)] font-bold text-xs" title="Dispensasi (Tugas Sekolah / Lomba / OSIS)">
+          <Award className="w-3.5 h-3.5" />
+          <span>D:</span>
+          <span className="text-sm font-extrabold">{tally.dispen}</span>
         </div>
       </div>
 
@@ -495,9 +536,10 @@ function AttendanceTakingContent() {
         </button>
 
         <span className="text-xs text-[var(--text-secondary)] font-mono">
-          {tally.hadir}/{tally.total} Siswa Hadir ({Math.round((tally.hadir / (tally.total || 1)) * 100)}%)
+          {tally.hadir + tally.dispen}/{tally.total} Hadir &amp; Dispen ({Math.round(((tally.hadir + tally.dispen) / (tally.total || 1)) * 100)}%)
         </span>
       </div>
+
 
       {/* Input Pencarian Siswa (Debounced via React state) */}
       <div className="relative">
@@ -552,13 +594,13 @@ function AttendanceTakingContent() {
                   </div>
                 </div>
 
-                {/* 4 Segmented Control Buttons (H, S, I, A) */}
+                {/* 5 Segmented Control Buttons (H, S, I, A, D) */}
                 <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
                   {/* Hadir (H) */}
                   <button
                     type="button"
                     onClick={() => handleStatusChange(student.id, "HADIR")}
-                    className={`min-w-[44px] min-h-[44px] px-3 rounded-[10px] text-xs font-extrabold flex items-center justify-center transition-all ${
+                    className={`min-w-[38px] md:min-w-[42px] min-h-[44px] px-2.5 rounded-[10px] text-xs font-extrabold flex items-center justify-center transition-all ${
                       currentStatus === "HADIR"
                         ? "bg-[var(--status-hadir-bg)] text-[var(--status-hadir-fg)] ring-2 ring-[var(--status-hadir-fg)] shadow-xs scale-105"
                         : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-hairline)]"
@@ -571,7 +613,7 @@ function AttendanceTakingContent() {
                   <button
                     type="button"
                     onClick={() => handleStatusChange(student.id, "SAKIT")}
-                    className={`min-w-[44px] min-h-[44px] px-3 rounded-[10px] text-xs font-extrabold flex items-center justify-center transition-all ${
+                    className={`min-w-[38px] md:min-w-[42px] min-h-[44px] px-2.5 rounded-[10px] text-xs font-extrabold flex items-center justify-center transition-all ${
                       currentStatus === "SAKIT"
                         ? "bg-[var(--status-sakit-bg)] text-[var(--status-sakit-fg)] ring-2 ring-[var(--status-sakit-fg)] shadow-xs scale-105"
                         : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-hairline)]"
@@ -584,7 +626,7 @@ function AttendanceTakingContent() {
                   <button
                     type="button"
                     onClick={() => handleStatusChange(student.id, "IZIN")}
-                    className={`min-w-[44px] min-h-[44px] px-3 rounded-[10px] text-xs font-extrabold flex items-center justify-center transition-all ${
+                    className={`min-w-[38px] md:min-w-[42px] min-h-[44px] px-2.5 rounded-[10px] text-xs font-extrabold flex items-center justify-center transition-all ${
                       currentStatus === "IZIN"
                         ? "bg-[var(--status-izin-bg)] text-[var(--status-izin-fg)] ring-2 ring-[var(--status-izin-fg)] shadow-xs scale-105"
                         : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-hairline)]"
@@ -597,13 +639,27 @@ function AttendanceTakingContent() {
                   <button
                     type="button"
                     onClick={() => handleStatusChange(student.id, "ALPA")}
-                    className={`min-w-[44px] min-h-[44px] px-3 rounded-[10px] text-xs font-extrabold flex items-center justify-center transition-all ${
+                    className={`min-w-[38px] md:min-w-[42px] min-h-[44px] px-2.5 rounded-[10px] text-xs font-extrabold flex items-center justify-center transition-all ${
                       currentStatus === "ALPA"
                         ? "bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] ring-2 ring-[var(--status-alpa-fg)] shadow-xs scale-105"
                         : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-hairline)]"
                     }`}
                   >
                     A
+                  </button>
+
+                  {/* Dispensasi (D) */}
+                  <button
+                    type="button"
+                    onClick={() => handleStatusChange(student.id, "DISPEN")}
+                    title="Dispensasi (D) - Tugas resmi sekolah, lomba, OSIS"
+                    className={`min-w-[38px] md:min-w-[42px] min-h-[44px] px-2.5 rounded-[10px] text-xs font-extrabold flex items-center justify-center transition-all ${
+                      currentStatus === "DISPEN"
+                        ? "bg-[var(--status-dispen-bg)] text-[var(--status-dispen-fg)] ring-2 ring-[var(--status-dispen-fg)] shadow-xs scale-105"
+                        : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-hairline)]"
+                    }`}
+                  >
+                    D
                   </button>
                 </div>
               </div>
@@ -696,6 +752,9 @@ function AttendanceTakingContent() {
                   className="min-h-[42px] px-3 py-2 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] cursor-pointer"
                 >
                   <option value="SEKOLAH">Libur / Kegiatan Sekolah</option>
+                  <option value="UTS">Minggu / Pekan UTS (Penilaian Tengah Semester)</option>
+                  <option value="UAS">Minggu / Pekan UAS (Penilaian Akhir Semester)</option>
+                  <option value="KOKURIKULER">Minggu Kokurikuler / Projek P5 / Classmeeting</option>
                   <option value="KHUSUS">Diliburkan Khusus Guru</option>
                   <option value="NASIONAL">Libur Nasional / Tanggal Merah</option>
                   <option value="CUTI_BERSAMA">Cuti Bersama</option>

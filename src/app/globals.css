@@ -23,6 +23,8 @@
     --status-alpa-bg: #FBE4E2;
     --status-terlambat-fg: #A24A0A;
     --status-terlambat-bg: #FBE7D8;
+    --status-dispen-fg: #4F46E5;
+    --status-dispen-bg: #EEF2FF;
   }
 
   .dark {
@@ -47,6 +49,8 @@
     --status-alpa-bg: #4A1C1A;
     --status-terlambat-fg: #F0A46A;
     --status-terlambat-bg: #45260F;
+    --status-dispen-fg: #A5B4FC;
+    --status-dispen-bg: #1E1B4B;
   }
 
   body {

@@ -10,9 +10,15 @@ import { MAX_IMPORT_ROWS } from "../contracts/attendance.ts";
  * Menghitung persentase kehadiran siswa secara akurat (skala 0 - 100 dengan 1 desimal)
  * Sesuai PRD §5 FR-7
  */
-export function calculateAttendanceRate(hadir: number, totalHari: number): number {
+export function calculateAttendanceRate(
+  hadir: number,
+  totalHari: number,
+  dispen: number = 0
+): number {
   if (totalHari <= 0) return 100.0;
-  const rate = (hadir / totalHari) * 100;
+  // Siswa dengan status Dispensasi resmi sekolah dihitung sah hadir (tidak mengurangi persentase)
+  const effectivePresent = hadir + dispen;
+  const rate = (effectivePresent / totalHari) * 100;
   return Number(rate.toFixed(1));
 }
 

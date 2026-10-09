@@ -756,6 +756,9 @@ export default function ClassDetailPage() {
                   className="min-h-[42px] px-3 py-2 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] cursor-pointer"
                 >
                   <option value="SEKOLAH">Libur / Kegiatan Sekolah</option>
+                  <option value="UTS">Minggu / Pekan UTS (Penilaian Tengah Semester)</option>
+                  <option value="UAS">Minggu / Pekan UAS (Penilaian Akhir Semester)</option>
+                  <option value="KOKURIKULER">Minggu Kokurikuler / Projek P5 / Classmeeting</option>
                   <option value="KHUSUS">Diliburkan Khusus Guru</option>
                   <option value="NASIONAL">Libur Nasional / Tanggal Merah</option>
                   <option value="CUTI_BERSAMA">Cuti Bersama</option>

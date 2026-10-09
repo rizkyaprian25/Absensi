@@ -23,7 +23,7 @@ import type {
   AttendanceSession,
   AttendanceRecord,
 } from "@/contracts/attendance";
-import { getStoredHolidays, findHolidayByDate } from "@/lib/calendarUtils";
+import { getStoredHolidays, findHolidayByDate, getCategoryLabel } from "@/lib/calendarUtils";
 import { getSavedSessions, getSavedRecords } from "@/lib/attendanceStorage";
 
 const SEMESTER_MONTHS = [
@@ -135,6 +135,7 @@ export default function ReportsPage() {
       let izin = 0;
       let alpa = 0;
       let terlambat = 0;
+      let dispen = 0;
       const dailyStatus: Record<string, string> = {};
 
       effectiveDates.forEach((date) => {
@@ -164,6 +165,9 @@ export default function ReportsPage() {
           } else if (st === "TERLAMBAT") {
             terlambat++;
             dailyStatus[date] = "T";
+          } else if (st === "DISPEN") {
+            dispen++;
+            dailyStatus[date] = "D";
           }
         } else {
           // Tanggal belum direkam absensinya
@@ -171,10 +175,10 @@ export default function ReportsPage() {
         }
       });
 
-      const totalRecordedDays = hadir + sakit + izin + alpa + terlambat;
+      const totalRecordedDays = hadir + sakit + izin + alpa + terlambat + dispen;
       const persentase =
         totalRecordedDays > 0
-          ? Number(((hadir / totalRecordedDays) * 100).toFixed(1))
+          ? Number((((hadir + dispen) / totalRecordedDays) * 100).toFixed(1))
           : 100;
 
       return {
@@ -186,6 +190,7 @@ export default function ReportsPage() {
         izin,
         alpa,
         terlambat,
+        dispen,
         totalHari: totalRecordedDays,
         persentaseKehadiran: persentase,
         dailyStatus,
@@ -250,6 +255,7 @@ export default function ReportsPage() {
       "Izin",
       "Alpa",
       "Terlambat",
+      "Dispen",
       "% Kehadiran",
     ];
 
@@ -269,6 +275,7 @@ export default function ReportsPage() {
         student.izin,
         student.alpa,
         student.terlambat,
+        student.dispen,
         `"${student.persentaseKehadiran}%"`,
       ].join(",");
     });
@@ -509,6 +516,12 @@ export default function ReportsPage() {
         <span className="px-2 py-0.5 rounded-[4px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-mono font-bold">
           A (Alpa)
         </span>
+        <span className="px-2 py-0.5 rounded-[4px] bg-[var(--status-dispen-bg)] text-[var(--status-dispen-fg)] font-mono font-bold">
+          D (Dispensasi)
+        </span>
+        <span className="px-2 py-0.5 rounded-[4px] bg-[var(--surface-recessed)] text-[var(--text-secondary)] font-mono font-bold border border-[var(--border-hairline)]">
+          L (Libur / Agenda)
+        </span>
       </div>
 
       {/* Matriks Presensi Harian (Tabel Scrollable Horizontal dengan Kolom Sticky) */}
@@ -535,38 +548,55 @@ export default function ReportsPage() {
                 {/* Kolom Tanggal-Tanggal Efektif */}
                 {recapData.effectiveDates.map((date) => {
                   const hol = findHolidayByDate(date, holidays);
+                  const isSpecial = hol?.category === "UTS" || hol?.category === "UAS" || hol?.category === "KOKURIKULER";
+                  const badgeText = hol?.category === "UTS" ? "UTS" : hol?.category === "UAS" ? "UAS" : hol?.category === "KOKURIKULER" ? "P5" : "L";
+
                   return (
                     <th
                       key={date}
-                      title={hol ? `Hari Libur: ${hol.name}` : `Tanggal ${date}`}
-                      className={`p-2 text-center font-mono font-semibold min-w-[32px] border-r border-[var(--border-hairline)]/60 text-[11px] ${
-                        hol ? "bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold" : ""
+                      title={hol ? `${getCategoryLabel(hol.category)}: ${hol.name}` : `Tanggal ${date}`}
+                      className={`p-2 text-center font-mono font-semibold min-w-[34px] border-r border-[var(--border-hairline)]/60 text-[11px] ${
+                        isSpecial
+                          ? "bg-purple-100/70 text-purple-900 dark:bg-purple-950/40 dark:text-purple-300 font-bold"
+                          : hol
+                          ? "bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold"
+                          : ""
                       }`}
                     >
                       <span>{date.slice(8)}</span>
-                      {hol && <span className="block text-[8px] leading-tight font-sans">L</span>}
+                      {hol && (
+                        <span className={`block text-[8px] leading-tight font-sans uppercase font-extrabold ${
+                          isSpecial ? "text-purple-700 dark:text-purple-300" : ""
+                        }`}>
+                          {badgeText}
+                        </span>
+                      )}
                     </th>
                   );
                 })}
 
                 {/* Kolom Ringkasan Total */}
-                <th className="p-2 text-center font-bold text-[var(--status-hadir-fg)] min-w-[28px] border-l border-[var(--border-hairline)]">
+                <th className="p-2 text-center font-bold text-[var(--status-hadir-fg)] min-w-[28px] border-l border-[var(--border-hairline)]" title="Hadir">
                   H
                 </th>
-                <th className="p-2 text-center font-bold text-[var(--status-sakit-fg)] min-w-[28px]">
+                <th className="p-2 text-center font-bold text-[var(--status-sakit-fg)] min-w-[28px]" title="Sakit">
                   S
                 </th>
-                <th className="p-2 text-center font-bold text-[var(--status-izin-fg)] min-w-[28px]">
+                <th className="p-2 text-center font-bold text-[var(--status-izin-fg)] min-w-[28px]" title="Izin">
                   I
                 </th>
-                <th className="p-2 text-center font-bold text-[var(--status-alpa-fg)] min-w-[28px]">
+                <th className="p-2 text-center font-bold text-[var(--status-alpa-fg)] min-w-[28px]" title="Alpa">
                   A
+                </th>
+                <th className="p-2 text-center font-bold text-[var(--status-dispen-fg)] min-w-[28px]" title="Dispensasi">
+                  D
                 </th>
                 <th className="p-2 text-center font-bold text-[var(--text-primary)] min-w-[50px] border-l border-[var(--border-hairline)]">
                   %
                 </th>
               </tr>
             </thead>
+
             <tbody className="divide-y divide-[var(--border-hairline)]">
               {recapData.students.map((student, idx) => {
                 const indexStr = String(idx + 1).padStart(2, "0");
@@ -632,6 +662,8 @@ export default function ReportsPage() {
                                 ? "bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)]"
                                 : code === "T"
                                 ? "bg-amber-100 text-amber-800"
+                                : code === "D"
+                                ? "bg-[var(--status-dispen-bg)] text-[var(--status-dispen-fg)] ring-1 ring-[var(--status-dispen-fg)]/30 font-bold"
                                 : "text-[var(--text-secondary)]/50 font-normal"
                             }`}
                           >
@@ -653,6 +685,9 @@ export default function ReportsPage() {
                     </td>
                     <td className="p-2 text-center font-mono font-semibold text-[var(--status-alpa-fg)]">
                       {student.alpa}
+                    </td>
+                    <td className="p-2 text-center font-mono font-semibold text-[var(--status-dispen-fg)]">
+                      {student.dispen}
                     </td>
                     <td
                       className={`p-2 text-center font-mono font-bold border-l border-[var(--border-hairline)] ${

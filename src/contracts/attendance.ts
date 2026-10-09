@@ -30,6 +30,7 @@ export const AttendanceStatusSchema = z.enum([
   "IZIN",
   "ALPA",
   "TERLAMBAT",
+  "DISPEN", // Dispensasi (Tugas resmi sekolah, lomba O2SN/FLS2N/OSN, OSIS, atau tugas kedinasan)
 ]);
 
 export type AttendanceStatus = z.infer<typeof AttendanceStatusSchema>;
@@ -65,8 +66,11 @@ export type ScheduleDay = z.infer<typeof ScheduleDaySchema>;
 export const HolidayCategorySchema = z.enum([
   "NASIONAL",     // Libur Nasional / Tanggal Merah Resmi
   "CUTI_BERSAMA", // Cuti Bersama
-  "SEKOLAH",      // Libur Khusus Sekolah / Kegiatan Tengah Semester / Classmeeting
+  "SEKOLAH",      // Libur Khusus Sekolah / Kegiatan Sekolah
   "KHUSUS",       // Diliburkan Guru / Rapat Dinas / Acara Khusus
+  "UTS",          // Minggu / Pekan Penilaian Tengah Semester (PTS / UTS)
+  "UAS",          // Minggu / Pekan Penilaian Akhir Semester (PAS / UAS / SAS)
+  "KOKURIKULER",  // Minggu / Kegiatan Kokurikuler / P5 / Classmeeting / Jeda Semester
 ]);
 
 export type HolidayCategory = z.infer<typeof HolidayCategorySchema>;
@@ -226,6 +230,7 @@ export interface AttendanceTally {
   izin: number;
   alpa: number;
   terlambat: number;
+  dispen: number;
   total: number;
 }
 
@@ -239,6 +244,7 @@ export interface StudentMonthlyRecap {
   izin: number;
   alpa: number;
   terlambat: number;
+  dispen: number;
   totalHari: number;
   persentaseKehadiran: number; // Skala 0 - 100 dengan 1 desimal (contoh: 94.1)
   dailyStatus: Record<string, AttendanceStatus>; // Format key: "YYYY-MM-DD"
