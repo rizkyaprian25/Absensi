@@ -32,6 +32,8 @@ import {
   restoreFromSnapshot,
   restoreFromUploadedJson,
   type AppBackupPayload,
+  MAX_ROLLING_SNAPSHOTS,
+  saveSnapshotsWithQuotaProtection,
 } from "./backupManager.ts";
 import { isSupabaseConfigured, supabaseUrl } from "./supabaseClient.ts";
 import { getLastCloudSyncTime, setLastCloudSyncTime } from "./syncManager.ts";
@@ -703,13 +705,31 @@ function runSmokeTest() {
     assert.deepStrictEqual(parsedPayload.stats, payload.stats, "Stats setelah JSON round-trip harus identik");
     assert.strictEqual(parsedPayload.data.sessions[0].topic, "Keamanan Sistem & Basis Data");
 
-    // Uji mesin rolling auto-snapshot dan batas maksimal 10 snapshot
+    // Uji mesin rolling auto-snapshot dan batas maksimal sesuai MAX_ROLLING_SNAPSHOTS
     for (let i = 1; i <= 15; i++) {
       triggerAutoSnapshot(`Simpan Otomatis Ke-${i}`);
     }
     const snapshots = getAutoSnapshots();
-    assert.strictEqual(snapshots.length, 10, "Riwayat snapshot lokal wajib dibatasi maksimal 10 item terbaru");
+    assert.strictEqual(snapshots.length, MAX_ROLLING_SNAPSHOTS, `Riwayat snapshot lokal wajib dibatasi maksimal ${MAX_ROLLING_SNAPSHOTS} item terbaru`);
     assert.strictEqual(snapshots[0].trigger, "Simpan Otomatis Ke-15", "Snapshot paling atas harus yang paling baru");
+
+    // Uji proteksi kuota adaptif (QuotaExceededError recovery)
+    const originalSetItem = (globalThis as any).localStorage.setItem;
+    let failCount = 1;
+    (globalThis as any).localStorage.setItem = (key: string, val: string) => {
+      if (key === "absensi_auto_snapshots_v1" && failCount > 0) {
+        failCount--;
+        const err = new Error("Setting the value exceeded the quota.");
+        err.name = "QuotaExceededError";
+        throw err;
+      }
+      return originalSetItem(key, val);
+    };
+
+    saveSnapshotsWithQuotaProtection(snapshots);
+    (globalThis as any).localStorage.setItem = originalSetItem;
+    const prunedSnapshots = getAutoSnapshots();
+    assert.ok(prunedSnapshots.length <= snapshots.length, "Sistem harus otomatis memangkas snapshot jika kuota terlampaui tanpa melempar crash unhandled");
 
     // Uji validasi pemulihan berkas eksternal (restoreFromUploadedJson)
     const invalidJsonRes = restoreFromUploadedJson("{ broken json ");
@@ -726,7 +746,7 @@ function runSmokeTest() {
     assert.strictEqual(validRestoreRes.success, true, "Pemulihan berkas valid harus berhasil");
     assert.strictEqual(validRestoreRes.stats?.totalSessions, 1);
 
-    console.log("✓ LULUS: Mesin pencadangan multi-tier, rolling snapshot (max 10), dan disaster recovery teruji kokoh.");
+    console.log("✓ LULUS: Mesin pencadangan multi-tier, rolling snapshot berpelindung kuota, dan disaster recovery teruji kokoh.");
   }
 
   // --------------------------------------------------------------------------

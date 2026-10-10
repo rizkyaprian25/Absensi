@@ -161,10 +161,101 @@ export function createFullBackupPayload(): AppBackupPayload {
 }
 
 // ============================================================================
-// 3. MESIN SNAPSHOT OTOMATIS BERKALA (ROLLING AUTO-SNAPSHOTS)
+// 3. MESIN SNAPSHOT OTOMATIS BERKALA (ROLLING AUTO-SNAPSHOTS DENGAN PROTEKSI KUOTA)
 // ============================================================================
 
-const MAX_ROLLING_SNAPSHOTS = 10;
+/**
+ * Batas maksimal snapshot yang disimpan di LocalStorage (5MB limit).
+ * Dibatasi 3 item untuk menghemat ruang memori bagi data operasional presensi & nilai.
+ * Riwayat lengkap tetap diarsipkan di IndexedDB (kapasitas ratusan MB) & Supabase Cloud.
+ */
+export const MAX_ROLLING_SNAPSHOTS = 3;
+
+/**
+ * Menyimpan daftar snapshot ke LocalStorage dengan proteksi kuota adaptif.
+ * Jika kuota browser (5MB) terlampaui, sistem otomatis memangkas snapshot tertua
+ * sehingga data operasional utama (presensi & nilai) tidak pernah terblokir atau crash.
+ */
+export function saveSnapshotsWithQuotaProtection(snapshots: AutoSnapshotItem[]): void {
+  if (typeof window === "undefined") return;
+
+  let candidateList = snapshots;
+
+  while (candidateList.length > 0) {
+    try {
+      localStorage.setItem(STORAGE_KEY_AUTO_SNAPSHOTS, JSON.stringify(candidateList));
+      return; // Berhasil disimpan tanpa melampaui kuota
+    } catch (err: any) {
+      const isQuotaError =
+        err?.name === "QuotaExceededError" ||
+        err?.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+        err?.code === 22 ||
+        err?.number === -2147024882 ||
+        (typeof err?.message === "string" && err.message.toLowerCase().includes("quota"));
+
+      if (isQuotaError) {
+        console.warn(
+          `[Storage Vault] Kuota LocalStorage browser mendekati batas (${candidateList.length} snapshot). Memangkas snapshot lawas untuk membebaskan ruang...`
+        );
+        // Pangkas snapshot paling lama (elemen terakhir)
+        candidateList = candidateList.slice(0, candidateList.length - 1);
+      } else {
+        console.error("Gagal menyimpan snapshot ke LocalStorage:", err);
+        return;
+      }
+    }
+  }
+
+  // Jika bahkan 1 snapshot pun tidak muat karena data presensi aktif sangat masif:
+  // Hapus kunci snapshot lokal agar penyimpanan presensi & nilai guru tidak terganggu.
+  try {
+    localStorage.removeItem(STORAGE_KEY_AUTO_SNAPSHOTS);
+    console.warn(
+      "[Storage Vault] Ruang LocalStorage diprioritaskan untuk rekaman presensi & nilai. Snapshot cadangan tetap aman di IndexedDB & Cloud."
+    );
+  } catch (cleanErr) {
+    console.warn("Gagal membersihkan kunci snapshot lokal:", cleanErr);
+  }
+}
+
+/**
+ * Membebaskan ruang darurat di LocalStorage jika kuota terancam habis
+ */
+export function freeEmergencyStorageSpace(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (localStorage.getItem(STORAGE_KEY_AUTO_SNAPSHOTS)) {
+      localStorage.removeItem(STORAGE_KEY_AUTO_SNAPSHOTS);
+      console.warn("[Storage Vault] Ruang darurat LocalStorage berhasil dibebaskan dengan membersihkan riwayat snapshot lokal.");
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+/**
+ * Membersihkan snapshot berlebih yang tersimpan dari versi sebelumnya (self-healing)
+ */
+export function purgeBloatedSnapshots(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_AUTO_SNAPSHOTS);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > MAX_ROLLING_SNAPSHOTS) {
+      saveSnapshotsWithQuotaProtection(parsed.slice(0, MAX_ROLLING_SNAPSHOTS));
+    }
+  } catch {
+    try {
+      localStorage.removeItem(STORAGE_KEY_AUTO_SNAPSHOTS);
+    } catch {}
+  }
+}
+
+// Inisialisasi pembersihan proaktif saat modul pertama kali dimuat di browser
+if (typeof window !== "undefined") {
+  purgeBloatedSnapshots();
+}
 
 /**
  * Mengambil seluruh riwayat snapshot otomatis dari localStorage
@@ -183,13 +274,29 @@ export function getAutoSnapshots(): AutoSnapshotItem[] {
 }
 
 /**
- * Menyimpan satu snapshot baru ke dalam riwayat lokal (maksimal 10 item terbaru)
+ * Menyimpan satu snapshot baru ke dalam riwayat lokal dengan deduplikasi & proteksi kuota
  */
 export function triggerAutoSnapshot(triggerLabel: string = "Perubahan Sistem"): AutoSnapshotItem | null {
   if (typeof window === "undefined") return null;
 
   try {
     const payload = createFullBackupPayload();
+    const existing = getAutoSnapshots();
+
+    // Jika snapshot paling mutakhir memiliki pemicu & checksum yang identik (misal timer berkala saat data tidak berubah),
+    // cukup perbarui timestamp tanpa menduplikasi payload berukuran besar di LocalStorage.
+    if (
+      existing.length > 0 &&
+      existing[0].trigger === triggerLabel &&
+      existing[0].payload &&
+      existing[0].payload.checksum === payload.checksum
+    ) {
+      existing[0].timestamp = new Date().toISOString();
+      saveSnapshotsWithQuotaProtection(existing);
+      mirrorToIndexedDB(payload, existing[0]);
+      return existing[0];
+    }
+
     const newSnapshot: AutoSnapshotItem = {
       id: `snap-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       timestamp: new Date().toISOString(),
@@ -197,18 +304,23 @@ export function triggerAutoSnapshot(triggerLabel: string = "Perubahan Sistem"): 
       payload,
     };
 
-    const existing = getAutoSnapshots();
-    // Tambahkan snapshot baru di depan, batasi maksimal 10 item
+    // Tambahkan snapshot baru di depan, batasi maksimal sesuai MAX_ROLLING_SNAPSHOTS
     const updated = [newSnapshot, ...existing.filter((s) => s.id !== newSnapshot.id)].slice(
       0,
       MAX_ROLLING_SNAPSHOTS
     );
 
-    localStorage.setItem(STORAGE_KEY_AUTO_SNAPSHOTS, JSON.stringify(updated));
-    localStorage.setItem(STORAGE_KEY_LAST_BACKUP_TIME, newSnapshot.timestamp);
+    // Simpan dengan perlindungan kuota adaptif
+    saveSnapshotsWithQuotaProtection(updated);
+
+    try {
+      localStorage.setItem(STORAGE_KEY_LAST_BACKUP_TIME, newSnapshot.timestamp);
+    } catch {
+      // Abaikan jika timestamp gagal disimpan
+    }
 
     // Salin ganda (dual-write) ke IndexedDB untuk proteksi level browser storage
-    mirrorToIndexedDB(payload);
+    mirrorToIndexedDB(payload, newSnapshot);
 
     // Siarkan event keberhasilan snapshot agar syncManager dapat melakukan sinkronisasi cloud di latar belakang
     if (typeof window !== "undefined") {
@@ -267,7 +379,10 @@ function openVaultDB(): Promise<IDBDatabase> {
 /**
  * Menyimpan replika cadangan mutakhir ke IndexedDB
  */
-export async function mirrorToIndexedDB(payload: AppBackupPayload): Promise<void> {
+export async function mirrorToIndexedDB(
+  payload: AppBackupPayload,
+  snapshotMeta?: AutoSnapshotItem
+): Promise<void> {
   // Abaikan secara senyap jika peramban/lingkungan tidak mendukung IndexedDB (misal: SSR atau CLI test)
   if (typeof window === "undefined" || !window.indexedDB) return;
 
@@ -281,6 +396,14 @@ export async function mirrorToIndexedDB(payload: AppBackupPayload): Promise<void
       savedAt: new Date().toISOString(),
       payload,
     });
+
+    if (snapshotMeta) {
+      store.put({
+        key: `snap_${snapshotMeta.id}`,
+        savedAt: snapshotMeta.timestamp,
+        snapshot: snapshotMeta,
+      });
+    }
 
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve();

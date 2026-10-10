@@ -75,7 +75,26 @@ export function getStoredAssessments(): AssessmentItem[] {
 export function saveStoredAssessments(assessments: AssessmentItem[]): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY_ASSESSMENTS, JSON.stringify(assessments));
+    try {
+      localStorage.setItem(STORAGE_KEY_ASSESSMENTS, JSON.stringify(assessments));
+    } catch (saveErr: any) {
+      const isQuotaError =
+        saveErr?.name === "QuotaExceededError" ||
+        saveErr?.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+        saveErr?.code === 22 ||
+        (typeof saveErr?.message === "string" && saveErr.message.toLowerCase().includes("quota"));
+
+      if (isQuotaError) {
+        console.warn("Membebaskan ruang penyimpanan darurat untuk menyimpan asesmen...");
+        try {
+          localStorage.removeItem("absensi_auto_snapshots_v1");
+        } catch {}
+        localStorage.setItem(STORAGE_KEY_ASSESSMENTS, JSON.stringify(assessments));
+      } else {
+        throw saveErr;
+      }
+    }
+
     triggerAutoSnapshot("Pembaruan Data Asesmen");
   } catch (err) {
     console.error("Gagal menyimpan daftar asesmen ke localStorage:", err);
@@ -113,7 +132,26 @@ export function getStoredScores(): StudentScoreRecord[] {
 export function saveStoredScores(scores: StudentScoreRecord[]): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify(scores));
+    try {
+      localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify(scores));
+    } catch (saveErr: any) {
+      const isQuotaError =
+        saveErr?.name === "QuotaExceededError" ||
+        saveErr?.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+        saveErr?.code === 22 ||
+        (typeof saveErr?.message === "string" && saveErr.message.toLowerCase().includes("quota"));
+
+      if (isQuotaError) {
+        console.warn("Membebaskan ruang penyimpanan darurat untuk menyimpan nilai siswa...");
+        try {
+          localStorage.removeItem("absensi_auto_snapshots_v1");
+        } catch {}
+        localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify(scores));
+      } else {
+        throw saveErr;
+      }
+    }
+
     triggerAutoSnapshot("Pemberian Nilai Siswa");
   } catch (err) {
     console.error("Gagal menyimpan catatan nilai ke localStorage:", err);

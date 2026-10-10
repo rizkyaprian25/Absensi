@@ -107,12 +107,31 @@ export function saveSessionAndRecords(
       (s) => !(s.classId === session.classId && s.sessionDate === session.sessionDate)
     );
     const updatedSessions = [...otherSessions, session];
-    localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(updatedSessions));
-
     // Perbarui catatan siswa untuk sesi ini
     const otherRecords = existingRecords.filter((r) => r.sessionId !== session.id);
     const updatedRecords = [...otherRecords, ...records];
-    localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(updatedRecords));
+
+    try {
+      localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(updatedSessions));
+      localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(updatedRecords));
+    } catch (saveErr: any) {
+      const isQuotaError =
+        saveErr?.name === "QuotaExceededError" ||
+        saveErr?.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+        saveErr?.code === 22 ||
+        (typeof saveErr?.message === "string" && saveErr.message.toLowerCase().includes("quota"));
+
+      if (isQuotaError) {
+        console.warn("Membebaskan ruang penyimpanan darurat untuk menyimpan presensi...");
+        try {
+          localStorage.removeItem("absensi_auto_snapshots_v1");
+        } catch {}
+        localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(updatedSessions));
+        localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(updatedRecords));
+      } else {
+        throw saveErr;
+      }
+    }
 
     // Picu snapshot otomatis dan pencerminan ganda ke IndexedDB
     triggerAutoSnapshot(`Presensi ${session.sessionDate}`);

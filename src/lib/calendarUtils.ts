@@ -84,7 +84,26 @@ export function getStoredHolidays(): HolidayItem[] {
 export function saveStoredHolidays(holidays: HolidayItem[]): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY_HOLIDAYS, JSON.stringify(holidays));
+    try {
+      localStorage.setItem(STORAGE_KEY_HOLIDAYS, JSON.stringify(holidays));
+    } catch (saveErr: any) {
+      const isQuotaError =
+        saveErr?.name === "QuotaExceededError" ||
+        saveErr?.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+        saveErr?.code === 22 ||
+        (typeof saveErr?.message === "string" && saveErr.message.toLowerCase().includes("quota"));
+
+      if (isQuotaError) {
+        console.warn("Membebaskan ruang penyimpanan darurat untuk menyimpan kalender libur...");
+        try {
+          localStorage.removeItem("absensi_auto_snapshots_v1");
+        } catch {}
+        localStorage.setItem(STORAGE_KEY_HOLIDAYS, JSON.stringify(holidays));
+      } else {
+        throw saveErr;
+      }
+    }
+
     if (typeof window !== "undefined") {
       window.dispatchEvent(
         new CustomEvent("absensi-data-changed", {
