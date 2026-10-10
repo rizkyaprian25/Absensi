@@ -523,7 +523,7 @@ export function deleteSnapshot(snapshotId: string): void {
   try {
     const snapshots = getAutoSnapshots();
     const updated = snapshots.filter((s) => s.id !== snapshotId);
-    localStorage.setItem(STORAGE_KEY_AUTO_SNAPSHOTS, JSON.stringify(updated));
+    saveSnapshotsWithQuotaProtection(updated);
   } catch (err) {
     console.error("Gagal menghapus snapshot:", err);
   }

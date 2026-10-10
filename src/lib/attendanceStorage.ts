@@ -286,7 +286,24 @@ export function updateSessionAgenda(
   }
 
   try {
-    localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(sessions));
+    try {
+      localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(sessions));
+    } catch (saveErr: any) {
+      const isQuotaError =
+        saveErr?.name === "QuotaExceededError" ||
+        saveErr?.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+        saveErr?.code === 22 ||
+        (typeof saveErr?.message === "string" && saveErr.message.toLowerCase().includes("quota"));
+
+      if (isQuotaError) {
+        try {
+          localStorage.removeItem("absensi_auto_snapshots_v1");
+        } catch {}
+        localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(sessions));
+      } else {
+        throw saveErr;
+      }
+    }
     triggerAutoSnapshot(`Agenda KBM ${sessionDate}`);
   } catch (err) {
     console.error("Gagal memperbarui agenda KBM lokal:", err);
