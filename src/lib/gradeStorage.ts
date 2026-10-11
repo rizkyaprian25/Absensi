@@ -3,8 +3,14 @@ import type {
   AssessmentType,
   StudentScoreRecord,
   StudentGradeSummary,
+  GradeLevelKkmMap,
 } from "../contracts/grades";
-import { DEFAULT_KKM, getGradePredicate } from "../contracts/grades";
+import {
+  DEFAULT_KKM,
+  DEFAULT_KKM_BY_GRADE,
+  getGradePredicate,
+  extractGradeLevel,
+} from "../contracts/grades";
 import type { Student } from "../contracts/attendance";
 import {
   INITIAL_MOCK_ASSESSMENTS,
@@ -15,6 +21,7 @@ import { triggerAutoSnapshot } from "./backupManager.ts";
 export const STORAGE_KEY_ASSESSMENTS = "absensi_grade_assessments_v2";
 export const STORAGE_KEY_SCORES = "absensi_student_scores_v2";
 export const STORAGE_KEY_KKM = "absensi_grade_kkm_v1";
+export const STORAGE_KEY_KKM_BY_GRADE = "absensi_grade_kkm_by_grade_v1";
 export const STORAGE_KEY_ASSESSMENT_ORDER = "absensi_grade_assessment_order_v1";
 
 // ============================================================================
@@ -183,28 +190,89 @@ export function clearAssessmentsForClass(classId?: string): void {
 }
 
 /**
- * Mengambil nilai KKM yang disetel atau default 75
+ * Mengambil peta KKM seluruh angkatan (Kelas 7, 8, 9)
  */
-export function getStoredKKM(): number {
+export function getStoredKkmByGrade(): Record<string, number> {
+  if (typeof window === "undefined") return { ...DEFAULT_KKM_BY_GRADE };
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_KKM_BY_GRADE);
+    if (!raw) {
+      // Periksa apakah ada KKM global lama
+      const legacyRaw = localStorage.getItem(STORAGE_KEY_KKM);
+      const legacyVal = legacyRaw ? Number(legacyRaw) : DEFAULT_KKM;
+      const validVal = isNaN(legacyVal) || legacyVal < 0 || legacyVal > 100 ? DEFAULT_KKM : legacyVal;
+      return {
+        "7": validVal,
+        "8": validVal,
+        "9": validVal,
+      };
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      "7": typeof parsed?.["7"] === "number" && parsed["7"] >= 0 && parsed["7"] <= 100 ? parsed["7"] : DEFAULT_KKM,
+      "8": typeof parsed?.["8"] === "number" && parsed["8"] >= 0 && parsed["8"] <= 100 ? parsed["8"] : DEFAULT_KKM,
+      "9": typeof parsed?.["9"] === "number" && parsed["9"] >= 0 && parsed["9"] <= 100 ? parsed["9"] : DEFAULT_KKM,
+    };
+  } catch {
+    return { ...DEFAULT_KKM_BY_GRADE };
+  }
+}
+
+/**
+ * Menyimpan peta KKM seluruh angkatan ke localStorage
+ */
+export function saveStoredKkmByGrade(kkmMap: Record<string, number>): void {
+  if (typeof window === "undefined") return;
+  try {
+    const cleanMap: Record<string, number> = {
+      "7": Number(kkmMap["7"]) || DEFAULT_KKM,
+      "8": Number(kkmMap["8"]) || DEFAULT_KKM,
+      "9": Number(kkmMap["9"]) || DEFAULT_KKM,
+    };
+    localStorage.setItem(STORAGE_KEY_KKM_BY_GRADE, JSON.stringify(cleanMap));
+
+    // Sinkronkan juga ke key KKM global untuk kompatibilitas ke belakang
+    localStorage.setItem(STORAGE_KEY_KKM, String(cleanMap["7"]));
+    triggerAutoSnapshot("Pembaruan Nilai KKM per Angkatan");
+  } catch (err) {
+    console.error("Gagal menyimpan KKM per angkatan:", err);
+  }
+}
+
+/**
+ * Mengambil nilai KKM untuk kelas atau angkatan tertentu (atau default 75)
+ * Jika gradeOrClassName diberikan (misal "7A", "8B", "7"), akan mengambil KKM spesifik angkatan tersebut.
+ */
+export function getStoredKKM(gradeOrClassName?: string): number {
   if (typeof window === "undefined") return DEFAULT_KKM;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_KKM);
-    if (!raw) return DEFAULT_KKM;
-    const parsed = Number(raw);
-    return isNaN(parsed) || parsed < 0 || parsed > 100 ? DEFAULT_KKM : parsed;
+    const map = getStoredKkmByGrade();
+    if (gradeOrClassName) {
+      const grade = extractGradeLevel(gradeOrClassName);
+      return map[grade] ?? map["7"] ?? DEFAULT_KKM;
+    }
+    return map["7"] ?? DEFAULT_KKM;
   } catch {
     return DEFAULT_KKM;
   }
 }
 
 /**
- * Menyimpan nilai KKM
+ * Menyimpan nilai KKM (bisa global atau untuk angkatan tertentu)
  */
-export function saveStoredKKM(kkm: number): void {
+export function saveStoredKKM(kkm: number, gradeOrClassName?: string): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY_KKM, String(kkm));
-    triggerAutoSnapshot("Pembaruan Nilai KKM");
+    const map = getStoredKkmByGrade();
+    if (gradeOrClassName) {
+      const grade = extractGradeLevel(gradeOrClassName);
+      map[grade] = kkm;
+    } else {
+      map["7"] = kkm;
+      map["8"] = kkm;
+      map["9"] = kkm;
+    }
+    saveStoredKkmByGrade(map);
   } catch (err) {
     console.error("Gagal menyimpan KKM:", err);
   }

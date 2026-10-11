@@ -141,17 +141,51 @@ export interface StudentGradeSummary {
   totalCount: number; // Total tugas di kelas
 }
 
+/** Daftar angkatan standar SMP */
+export const DEFAULT_GRADE_LEVELS = ["7", "8", "9"] as const;
+export type GradeLevel = (typeof DEFAULT_GRADE_LEVELS)[number];
+
+/** Peta KKM per angkatan kelas */
+export type GradeLevelKkmMap = Record<string, number>;
+
+/** Nilai default KKM per angkatan (Informatika SMPN 3 Cibungbulang) */
+export const DEFAULT_KKM_BY_GRADE: GradeLevelKkmMap = {
+  "7": DEFAULT_KKM,
+  "8": DEFAULT_KKM,
+  "9": DEFAULT_KKM,
+};
+
 /**
- * Predikat Nilai SMP:
- * A (Sangat Baik): 90 - 100
- * B (Baik): 80 - 89
- * C (Cukup): 75 - 79 (KKM)
- * D (Perlu Bimbingan / Remedial): < 75
+ * Mengekstrak tingkat / angkatan kelas dari nama kelas
+ * Contoh: "7A" -> "7", "8B" -> "8", "Kelas 9A" -> "9", "VII-A" -> "7"
+ */
+export function extractGradeLevel(classNameOrGrade?: string | null): string {
+  if (!classNameOrGrade) return "7";
+  const str = classNameOrGrade.trim().toUpperCase();
+
+  // Deteksi angka langsung (7, 8, 9)
+  const matchNum = str.match(/\b(7|8|9)\b/) || str.match(/^(7|8|9)/) || str.match(/(?:KELAS\s*|TINGKAT\s*)?(7|8|9)/);
+  if (matchNum) return matchNum[1];
+
+  // Deteksi Romawi (VII, VIII, IX)
+  if (str.includes("VIII") || str.startsWith("8")) return "8";
+  if (str.includes("VII") || str.startsWith("7")) return "7";
+  if (str.includes("IX") || str.startsWith("9")) return "9";
+
+  return "7";
+}
+
+/**
+ * Predikat Nilai SMP Berdasarkan KKM Angkatan:
+ * - Skor < KKM: D (Perlu Bimbingan / Remedial)
+ * - Skor >= 90: A (Sangat Baik)
+ * - Skor >= 80: B (Baik)
+ * - Skor >= KKM: C (Cukup / Tuntas)
  */
 export function getGradePredicate(score: number | null, kkm: number = DEFAULT_KKM): "A" | "B" | "C" | "D" | "-" {
   if (score === null || isNaN(score)) return "-";
+  if (score < kkm) return "D";
   if (score >= 90) return "A";
   if (score >= 80) return "B";
-  if (score >= kkm) return "C";
-  return "D";
+  return "C";
 }

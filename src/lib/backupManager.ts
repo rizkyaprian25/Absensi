@@ -19,9 +19,12 @@ import {
   STORAGE_KEY_ASSESSMENTS,
   STORAGE_KEY_SCORES,
   STORAGE_KEY_KKM,
+  STORAGE_KEY_KKM_BY_GRADE,
   getStoredAssessments,
   getStoredScores,
   getStoredKKM,
+  getStoredKkmByGrade,
+  saveStoredKkmByGrade,
 } from "./gradeStorage.ts";
 import {
   STORAGE_KEY_HOLIDAYS,
@@ -58,6 +61,7 @@ export interface AppBackupPayload {
     scores: StudentScoreRecord[];
     holidays: HolidayItem[];
     kkm: number;
+    kkmByGrade?: Record<string, number>;
     customStudents?: Record<string, Student[]>;
   };
 }
@@ -129,6 +133,7 @@ export function createFullBackupPayload(): AppBackupPayload {
   const scores = getStoredScores();
   const holidays = getStoredHolidays();
   const kkm = getStoredKKM();
+  const kkmByGrade = getStoredKkmByGrade();
   const customStudents = getStoredCustomStudents();
 
   const dataPayload = {
@@ -138,6 +143,7 @@ export function createFullBackupPayload(): AppBackupPayload {
     scores,
     holidays,
     kkm,
+    kkmByGrade,
     customStudents,
   };
 
@@ -483,7 +489,9 @@ export function applyBackupPayloadToLocalStorage(payload: AppBackupPayload): voi
     localStorage.setItem(STORAGE_KEY_HOLIDAYS, JSON.stringify(data.holidays));
   }
 
-  if (typeof data.kkm === "number") {
+  if (data.kkmByGrade && typeof data.kkmByGrade === "object") {
+    saveStoredKkmByGrade(data.kkmByGrade);
+  } else if (typeof data.kkm === "number") {
     localStorage.setItem(STORAGE_KEY_KKM, String(data.kkm));
   }
 

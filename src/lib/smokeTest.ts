@@ -59,12 +59,19 @@ import {
   STORAGE_KEY_ASSESSMENTS,
   STORAGE_KEY_SCORES,
   STORAGE_KEY_ASSESSMENT_ORDER,
+  STORAGE_KEY_KKM_BY_GRADE,
   getAssessmentOrderForClass,
   saveAssessmentOrderForClass,
   getAssessmentsByClass,
+  getStoredKkmByGrade,
+  saveStoredKkmByGrade,
+  getStoredKKM,
+  saveStoredKKM,
 } from "./gradeStorage.ts";
 import {
   DEFAULT_KKM,
+  DEFAULT_KKM_BY_GRADE,
+  extractGradeLevel,
   getGradePredicate,
   type AssessmentItem,
   type StudentScoreRecord,
@@ -940,6 +947,58 @@ function runSmokeTest() {
       "Header CSV harus menempatkan Tugas 1 sebelum UTS sesuai urutan yang digeser");
 
     console.log("✓ LULUS: Kustomisasi urutan kolom penilaian (Reordering / Drag & Drop) dan persistensi ke ekspor terverifikasi 100%.");
+  }
+
+  // 15. Pengujian Kustomisasi KKM per Angkatan (Tingkat Kelas 7, 8, 9), Skala Predikat, dan Snapshot
+  {
+    console.log("[TEST 15] Menguji kustomisasi KKM per angkatan kelas dan skala predikat...");
+
+    // Uji ekstraksi tingkat / angkatan dari nama kelas
+    assert.strictEqual(extractGradeLevel("7A"), "7");
+    assert.strictEqual(extractGradeLevel("7H"), "7");
+    assert.strictEqual(extractGradeLevel("8B"), "8");
+    assert.strictEqual(extractGradeLevel("8A"), "8");
+    assert.strictEqual(extractGradeLevel("9A"), "9");
+    assert.strictEqual(extractGradeLevel("Kelas 7D"), "7");
+    assert.strictEqual(extractGradeLevel("VII-B"), "7");
+    assert.strictEqual(extractGradeLevel("VIII-C"), "8");
+
+    // Simpan KKM yang berbeda per angkatan: Kelas 7 = 82, Kelas 8 = 83, Kelas 9 = 75
+    localStorage.removeItem(STORAGE_KEY_KKM_BY_GRADE);
+    saveStoredKkmByGrade({
+      "7": 82,
+      "8": 83,
+      "9": 75,
+    });
+
+    // Verifikasi pembacaan KKM spesifik untuk tiap angkatan
+    const kkm7A = getStoredKKM("7A");
+    const kkm7H = getStoredKKM("7H");
+    const kkm8B = getStoredKKM("8B");
+    const kkm9A = getStoredKKM("9A");
+
+    assert.strictEqual(kkm7A, 82, "KKM kelas 7A harus 82");
+    assert.strictEqual(kkm7H, 82, "KKM kelas 7H harus 82");
+    assert.strictEqual(kkm8B, 83, "KKM kelas 8B harus 83");
+    assert.strictEqual(kkm9A, 75, "KKM kelas 9A harus 75");
+
+    // Verifikasi predikat ketuntasan sesuai KKM angkatan masing-masing
+    // Kasus 1: Nilai 81 di Kelas 7 (KKM 82) -> Belum Tuntas (D)
+    assert.strictEqual(getGradePredicate(81, kkm7A), "D", "Nilai 81 di bawah KKM 82 harus berpredikat D");
+    // Kasus 2: Nilai 82 di Kelas 7 (KKM 82) -> Tuntas (B)
+    assert.strictEqual(getGradePredicate(82, kkm7A), "B", "Nilai 82 memenuhi KKM 82 dan >= 80 berpredikat B");
+    // Kasus 3: Nilai 82 di Kelas 8 (KKM 83) -> Belum Tuntas (D) karena KKM Kelas 8 adalah 83!
+    assert.strictEqual(getGradePredicate(82, kkm8B), "D", "Nilai 82 di bawah KKM 83 harus berpredikat D");
+    // Kasus 4: Nilai 83 di Kelas 8 (KKM 83) -> Tuntas (B)
+    assert.strictEqual(getGradePredicate(83, kkm8B), "B", "Nilai 83 memenuhi KKM 83 berpredikat B");
+
+    // Verifikasi pencadangan otomatis menyertakan kkmByGrade
+    const backup = createFullBackupPayload();
+    assert.ok(backup.data.kkmByGrade !== undefined, "Payload cadangan harus menyertakan kkmByGrade");
+    assert.strictEqual(backup.data.kkmByGrade?.["7"], 82);
+    assert.strictEqual(backup.data.kkmByGrade?.["8"], 83);
+
+    console.log("✓ LULUS: Kustomisasi KKM per angkatan (Kls 7: 82, Kls 8: 83), skala predikat ketuntasan, dan disaster recovery teruji 100%.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");

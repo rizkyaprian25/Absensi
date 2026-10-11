@@ -43,6 +43,8 @@ import type {
 } from "@/contracts/grades";
 import {
   DEFAULT_KKM,
+  DEFAULT_KKM_BY_GRADE,
+  extractGradeLevel,
   ASSESSMENT_TYPE_METAS,
   getGradePredicate,
 } from "@/contracts/grades";
@@ -51,6 +53,8 @@ import {
   getStoredScores,
   getStoredKKM,
   saveStoredKKM,
+  getStoredKkmByGrade,
+  saveStoredKkmByGrade,
   createAssessment,
   updateAssessment,
   deleteAssessment,
@@ -82,7 +86,8 @@ function GradesPageContent() {
   // 2. Data Penilaian & Nilai
   const [assessments, setAssessments] = useState<AssessmentItem[]>([]);
   const [scores, setScores] = useState<ReturnType<typeof getStoredScores>>([]);
-  const [kkm, setKkm] = useState<number>(DEFAULT_KKM);
+  const [kkmByGrade, setKkmByGrade] = useState<Record<string, number>>({ ...DEFAULT_KKM_BY_GRADE });
+  const [tempKkmByGrade, setTempKkmByGrade] = useState<Record<string, number>>({ ...DEFAULT_KKM_BY_GRADE });
 
   // 3. Filter & Pencarian
   const [categoryFilter, setCategoryFilter] = useState<AssessmentType | "ALL">("ALL");
@@ -107,7 +112,6 @@ function GradesPageContent() {
   };
 
   const [isKkmModalOpen, setIsKkmModalOpen] = useState(false);
-  const [tempKkm, setTempKkm] = useState<number>(DEFAULT_KKM);
 
   // 5. Active Inline Score Edit
   const [editingCell, setEditingCell] = useState<{ studentId: string; assessmentId: string } | null>(null);
@@ -125,9 +129,9 @@ function GradesPageContent() {
   const refreshData = () => {
     setAssessments(getStoredAssessments());
     setScores(getStoredScores());
-    const savedKkm = getStoredKKM();
-    setKkm(savedKkm);
-    setTempKkm(savedKkm);
+    const savedKkmMap = getStoredKkmByGrade();
+    setKkmByGrade(savedKkmMap);
+    setTempKkmByGrade(savedKkmMap);
   };
 
   useEffect(() => {
@@ -142,6 +146,12 @@ function GradesPageContent() {
   };
 
   const currentClass = MOCK_CLASSES.find((c) => c.id === selectedClassId) ?? MOCK_CLASSES[0];
+  const activeGradeLevel = useMemo(() => extractGradeLevel(currentClass.name), [currentClass.name]);
+
+  // Nilai KKM aktif untuk angkatan kelas yang sedang dipilih
+  const kkm = useMemo(() => {
+    return kkmByGrade[activeGradeLevel] ?? kkmByGrade["7"] ?? DEFAULT_KKM;
+  }, [kkmByGrade, activeGradeLevel]);
   const students: Student[] = useMemo(() => {
     return getStudentsForClass(selectedClassId);
   }, [selectedClassId]);
@@ -436,15 +446,36 @@ function GradesPageContent() {
     showToast(`Nilai massal ${num} diterapkan untuk ${targetStudents.length} siswa.`);
   };
 
-  // Simpan Pengaturan KKM
+  // Simpan Pengaturan KKM per Angkatan
   const handleSaveKkm = () => {
-    if (tempKkm < 1 || tempKkm > 100) {
-      alert("KKM harus berada di antara 1 sampai 100.");
+    const kkm7 = Number(tempKkmByGrade["7"]) || DEFAULT_KKM;
+    const kkm8 = Number(tempKkmByGrade["8"]) || DEFAULT_KKM;
+    const kkm9 = Number(tempKkmByGrade["9"]) || DEFAULT_KKM;
+
+    if (
+      kkm7 < 1 || kkm7 > 100 ||
+      kkm8 < 1 || kkm8 > 100 ||
+      kkm9 < 1 || kkm9 > 100
+    ) {
+      alert("Seluruh nilai KKM harus berada di antara rentang 1 sampai 100.");
       return;
     }
-    saveStoredKKM(tempKkm);
-    setKkm(tempKkm);
+
+    const newMap: Record<string, number> = {
+      "7": kkm7,
+      "8": kkm8,
+      "9": kkm9,
+    };
+
+    saveStoredKkmByGrade(newMap);
+    setKkmByGrade(newMap);
     setIsKkmModalOpen(false);
+    showToast(`KKM per angkatan disimpan: Kelas 7 (${kkm7}), Kelas 8 (${kkm8}), Kelas 9 (${kkm9})`);
+  };
+
+  // Reset seluruh KKM ke nilai standar default (75)
+  const handleResetKkmToDefault = () => {
+    setTempKkmByGrade({ ...DEFAULT_KKM_BY_GRADE });
   };
 
   // Unduh Berkas Excel (.xlsx) Ber-Kop Resmi
@@ -530,11 +561,17 @@ function GradesPageContent() {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
-            onClick={() => setIsKkmModalOpen(true)}
-            className="px-3 py-2 bg-[var(--surface-recessed)] hover:bg-[var(--surface-recessed)]/80 text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            onClick={() => {
+              setTempKkmByGrade({ ...kkmByGrade });
+              setIsKkmModalOpen(true);
+            }}
+            className="px-3 py-2 bg-[var(--surface-recessed)] hover:bg-[var(--surface-recessed)]/80 text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            title={`Atur KKM per angkatan (Saat ini: Kls ${activeGradeLevel} = ${kkm})`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--color-accent)]" />
-            <span>KKM: <strong className="font-mono text-[var(--color-accent)]">{kkm}</strong></span>
+            <span>
+              KKM Kls {activeGradeLevel}: <strong className="font-mono text-[var(--color-accent)]">{kkm}</strong>
+            </span>
           </button>
 
           {/* Tombol Ekspor Excel Ber-Kop */}
@@ -1648,59 +1685,136 @@ function GradesPageContent() {
         </div>
       )}
 
-      {/* MODAL: Pengaturan KKM */}
+      {/* MODAL: Pengaturan KKM per Angkatan */}
       {isKkmModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-          <div className="w-full max-w-sm bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[16px] shadow-xl p-5 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-[var(--border-hairline)] pb-3 mb-4">
+          <div className="w-full max-w-md bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[16px] shadow-xl p-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-[var(--border-hairline)] pb-3 mb-3">
               <div className="flex items-center gap-2">
                 <SlidersHorizontal className="w-4 h-4 text-[var(--color-accent)]" />
-                <h3 className="font-bold text-sm text-[var(--text-primary)]">
-                  Kriteria Ketuntasan Minimal (KKM)
-                </h3>
+                <div>
+                  <h3 className="font-bold text-sm text-[var(--text-primary)] leading-tight">
+                    Kriteria Ketuntasan Minimal (KKM)
+                  </h3>
+                  <p className="text-[11px] text-[var(--text-secondary)]">
+                    Kustomisasi Batas KKM per Angkatan / Tingkat Kelas
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsKkmModalOpen(false)}
-                className="p-1 rounded-full text-[var(--text-secondary)] hover:bg-[var(--surface-recessed)]"
+                className="p-1 rounded-full text-[var(--text-secondary)] hover:bg-[var(--surface-recessed)] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-[var(--text-secondary)] mb-4">
-              Nilai standar ketuntasan belajar siswa untuk mata pelajaran Informatika SMPN 3 Cibungbulang.
+            <p className="text-xs text-[var(--text-secondary)] mb-3">
+              Nilai standar ketuntasan belajar siswa mata pelajaran Informatika SMPN 3 Cibungbulang dihitung spesifik per jenjang angkatan.
             </p>
 
-            <div className="mb-5">
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
-                Batas Nilai KKM (0 - 100)
-              </label>
-              <input
-                type="number"
-                min={50}
-                max={100}
-                value={tempKkm}
-                onChange={(e) => setTempKkm(Number(e.target.value))}
-                className="w-full px-3 py-2 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[8px] font-mono text-base font-bold text-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-              />
+            {/* Banner Kelas Aktif */}
+            <div className="mb-4 p-2.5 rounded-[10px] bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20 flex items-center justify-between">
+              <div className="text-xs text-[var(--text-primary)]">
+                <span>Rombel aktif: </span>
+                <strong className="text-[var(--color-accent)] font-bold">Kelas {currentClass.name}</strong>
+                <span className="text-[var(--text-secondary)]"> (Tingkat {activeGradeLevel})</span>
+              </div>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--color-accent)] text-[var(--color-on-accent)]">
+                KKM: {tempKkmByGrade[activeGradeLevel] ?? DEFAULT_KKM}
+              </span>
             </div>
 
-            <div className="flex items-center justify-end gap-2">
+            {/* Daftar Input KKM per Angkatan */}
+            <div className="space-y-3 mb-5">
+              {[
+                { grade: "7", roman: "VII", desc: "Berlaku untuk seluruh Kelas 7A – 7H" },
+                { grade: "8", roman: "VIII", desc: "Berlaku untuk seluruh Kelas 8A – 8B" },
+                { grade: "9", roman: "IX", desc: "Berlaku untuk seluruh Kelas 9" },
+              ].map((item) => {
+                const isActive = activeGradeLevel === item.grade;
+                const currentVal = tempKkmByGrade[item.grade] ?? DEFAULT_KKM;
+
+                return (
+                  <div
+                    key={item.grade}
+                    className={`p-3 rounded-[12px] border transition-all ${
+                      isActive
+                        ? "bg-[var(--surface-card)] border-[var(--color-accent)] shadow-2xs ring-1 ring-[var(--color-accent)]/30"
+                        : "bg-[var(--surface-recessed)]/60 border-[var(--border-hairline)]"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="font-bold text-xs text-[var(--text-primary)]">
+                            Tingkat Kelas {item.grade} (Angkatan {item.roman})
+                          </span>
+                          {isActive && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-[var(--color-accent)] text-[var(--color-on-accent)]">
+                              Aktif
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[var(--text-secondary)]">
+                          {item.desc}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-xs font-semibold text-[var(--text-secondary)]">
+                          KKM:
+                        </span>
+                        <input
+                          type="number"
+                          min={50}
+                          max={100}
+                          value={currentVal}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setTempKkmByGrade((prev) => ({
+                              ...prev,
+                              [item.grade]: val,
+                            }));
+                          }}
+                          className="w-16 px-2 py-1.5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[8px] font-mono text-sm font-bold text-center text-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-[var(--border-hairline)]">
               <button
                 type="button"
-                onClick={() => setIsKkmModalOpen(false)}
-                className="px-3.5 py-2 rounded-[8px] text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-recessed)]"
+                onClick={handleResetKkmToDefault}
+                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
               >
-                Batal
+                Reset ke Standar (75)
               </button>
-              <button
-                type="button"
-                onClick={handleSaveKkm}
-                className="px-4 py-2 bg-[var(--color-accent)] text-[var(--color-on-accent)] rounded-[8px] text-xs font-semibold hover:bg-[var(--color-accent)]/90 shadow-xs"
-              >
-                Terapkan KKM
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTempKkmByGrade({ ...kkmByGrade });
+                    setIsKkmModalOpen(false);
+                  }}
+                  className="px-3.5 py-2 rounded-[8px] text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-recessed)] cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveKkm}
+                  className="px-4 py-2 bg-[var(--color-accent)] text-[var(--color-on-accent)] rounded-[8px] text-xs font-semibold hover:bg-[var(--color-accent)]/90 shadow-xs cursor-pointer"
+                >
+                  Terapkan KKM
+                </button>
+              </div>
             </div>
           </div>
         </div>
