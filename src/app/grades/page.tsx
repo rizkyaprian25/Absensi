@@ -118,6 +118,9 @@ function GradesPageContent() {
   const [dragOverAssessmentId, setDragOverAssessmentId] = useState<string | null>(null);
   const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
 
+  // 7. State Mounted untuk perlindungan hidrasi SSR (Hydration Mismatch Shield)
+  const [isMounted, setIsMounted] = useState(false);
+
   // Muat data awal dari localStorage
   const refreshData = () => {
     setAssessments(getStoredAssessments());
@@ -128,6 +131,7 @@ function GradesPageContent() {
   };
 
   useEffect(() => {
+    setIsMounted(true);
     refreshData();
   }, []);
 
@@ -143,9 +147,11 @@ function GradesPageContent() {
   }, [selectedClassId]);
 
   // Asesmen untuk kelas yang dipilih (mempertimbangkan urutan kustom yang telah diatur)
+  // Menjaga agar pada SSR dan first hydration render tidak membaca storage browser secara prematur
   const classAssessments = useMemo(() => {
-    return getAssessmentsByClass(selectedClassId);
-  }, [assessments, selectedClassId]);
+    if (!isMounted || assessments.length === 0) return [];
+    return getAssessmentsByClass(selectedClassId, assessments);
+  }, [isMounted, assessments, selectedClassId]);
 
   // Handler memindahkan urutan asesmen (Drag & Drop atau tombol geser)
   const handleReorderAssessments = (sourceId: string, targetId: string) => {

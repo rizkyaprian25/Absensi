@@ -263,8 +263,11 @@ export function saveAssessmentOrderForClass(classId: string, orderedIds: string[
 /**
  * Mengambil asesmen berdasarkan ID kelas tertentu (mempertimbangkan urutan kustom yang telah diatur)
  */
-export function getAssessmentsByClass(classId: string): AssessmentItem[] {
-  const all = getStoredAssessments();
+export function getAssessmentsByClass(
+  classId: string,
+  allAssessments?: AssessmentItem[]
+): AssessmentItem[] {
+  const all = allAssessments ?? getStoredAssessments();
   const classItems = all.filter((a) => a.classId === classId);
   const customOrder = getAssessmentOrderForClass(classId);
 
