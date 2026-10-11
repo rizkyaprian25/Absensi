@@ -267,6 +267,49 @@ export interface MonthlyClassRecap {
   averageAttendance: number; // Rata-rata kehadiran kelas (%)
 }
 
+/** Rincian kehadiran bulanan seorang siswa di dalam semester */
+export interface StudentMonthStats {
+  hadir: number;
+  sakit: number;
+  izin: number;
+  alpa: number;
+  terlambat: number;
+  dispen: number;
+  totalHari: number;
+  persentase: number;
+}
+
+/** Rekapitulasi total kehadiran satu siswa selama 1 semester penuh (Buku Raport) */
+export interface StudentSemesterRecap {
+  studentId: string;
+  nis: string | null;
+  fullName: string;
+  gender?: Gender | null;
+  monthlyStats: Record<string, StudentMonthStats>; // key: "YYYY-MM" (misal "2026-07")
+  totalHadir: number;
+  totalSakit: number;
+  totalIzin: number;
+  totalAlpa: number;
+  totalTerlambat: number;
+  totalDispen: number;
+  totalHari: number;
+  persentaseSemester: number; // Skala 0 - 100 dengan 1 desimal
+  needsAttention: boolean;
+  predikat: "Sangat Baik" | "Baik" | "Cukup" | "Kurang";
+}
+
+/** Rekapitulasi total semester kelas */
+export interface SemesterClassRecap {
+  classId: string;
+  className: string;
+  academicYear: string;
+  semester: number;
+  months: { value: string; label: string }[];
+  totalEffectiveSessions: number;
+  averageAttendance: number;
+  students: StudentSemesterRecap[];
+}
+
 // ============================================================================
 // FORMAT RESPON & ERROR API STANDAR
 // ============================================================================

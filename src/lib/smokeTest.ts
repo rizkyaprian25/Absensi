@@ -80,7 +80,11 @@ import {
   generateGradesCsvWithKop,
   generateAttendanceXlsxWithKop,
   generateGradesXlsxWithKop,
+  generateSemesterAttendanceCsvWithKop,
+  generateSemesterAttendanceXlsxWithKop,
 } from "./exportUtils.ts";
+import { computeSemesterRecapForClass } from "../app/reports/page.tsx";
+import type { SemesterClassRecap, StudentSemesterRecap } from "../contracts/attendance.ts";
 import XLSX from "xlsx-js-style";
 
 /**
@@ -776,6 +780,63 @@ function runSmokeTest() {
     assert.ok(fullBackup.data.scores !== undefined, "Blok nilai harus ada");
 
     console.log("✓ LULUS: Konfigurasi klien Supabase dan struktur payload cloud sync teruji siap.");
+  }
+
+  // --------------------------------------------------------------------------
+  // TEST 13: Rekapitulasi Kehadiran Kumulatif Semester & Ekspor XLSX/CSV
+  // --------------------------------------------------------------------------
+  {
+    console.log("[TEST 13] Menguji kalkulasi rekapitulasi kumulatif semester & ekspor ber-kop resmi...");
+
+    const dummyClass: Class = {
+      id: "class-7a",
+      teacherId: "teacher-1",
+      name: "7A",
+      academicYear: "2026/2027",
+      semester: 1,
+      createdAt: "2026-07-01T00:00:00.000Z",
+      scheduleDay: "Senin",
+      schedulePeriod: "Jam ke 1-2 (07:30 - 08:50)",
+      subject: "Informatika",
+    };
+
+    const semesterRecap = computeSemesterRecapForClass(
+      dummyClass,
+      DEFAULT_HOLIDAYS,
+      [],
+      []
+    );
+
+    assert.strictEqual(semesterRecap.classId, "class-7a");
+    assert.strictEqual(semesterRecap.months.length, 6, "Semester ganjil harus mencakup 6 bulan (Juli-Desember)");
+    assert.ok(semesterRecap.students.length > 0, "Daftar siswa semester harus terisi");
+    assert.ok(semesterRecap.totalEffectiveSessions > 0, "Pertemuan efektif semester harus terhitung");
+
+    const sampleStudent = semesterRecap.students[0];
+    assert.ok(sampleStudent.monthlyStats["2026-07"] !== undefined, "Statistik bulan Juli harus ada");
+    assert.ok(sampleStudent.monthlyStats["2026-12"] !== undefined, "Statistik bulan Desember harus ada");
+    assert.ok(["Sangat Baik", "Baik", "Cukup", "Kurang"].includes(sampleStudent.predikat), "Predikat harus valid");
+
+    // Uji pembuatan berkas Excel murni (.xlsx) dengan Kop Resmi untuk Semester
+    const xlsxBytes = generateSemesterAttendanceXlsxWithKop(dummyClass, semesterRecap, {
+      schoolName: "SMP NEGERI 3 CIBUNGBULANG",
+      teacherName: "Muhamad Rizky Aprian, S.Kom",
+    });
+    assert.ok(xlsxBytes instanceof Uint8Array, "Output ekspor XLSX harus berformat Uint8Array");
+    assert.ok(xlsxBytes.length > 1000, "Ukuran file XLSX semester harus valid");
+
+    // Verifikasi workbook XLSX semester dapat dibaca ulang
+    const wb = XLSX.read(xlsxBytes, { type: "array" });
+    assert.ok(wb.SheetNames.length > 0, "Worksheet semester harus terbuat");
+    assert.ok(wb.SheetNames[0].startsWith("Semester_"), "Nama worksheet harus diawali Semester_");
+
+    // Uji pembuatan berkas CSV Semester dengan UTF-8 BOM
+    const csvContent = generateSemesterAttendanceCsvWithKop(dummyClass, semesterRecap);
+    assert.ok(csvContent.startsWith("\uFEFF"), "CSV semester wajib memiliki awalan UTF-8 BOM");
+    assert.ok(csvContent.includes("DAFTAR HADIR SISWA KUMULATIF SEMESTER 1 (GANJIL)"), "Kop CSV semester harus ada");
+    assert.ok(csvContent.includes("TOTAL KUMULATIF SEMESTER") || csvContent.includes("Semester Hadir"), "Kolom total semester harus ada");
+
+    console.log("✓ LULUS: Rekapitulasi kumulatif semester (Buku Raport & 6 bulan) dan ekspor ber-kop resmi terverifikasi 100%.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");

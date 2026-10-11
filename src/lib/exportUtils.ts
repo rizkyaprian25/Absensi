@@ -3,6 +3,8 @@ import type {
   HolidayItem,
   StudentMonthlyRecap,
   AttendanceSession,
+  StudentSemesterRecap,
+  SemesterClassRecap,
 } from "../contracts/attendance";
 import type {
   AssessmentItem,
@@ -842,6 +844,462 @@ export function generateAttendanceXlsxWithKop(
 
   const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
   return new Uint8Array(arrayBuffer);
+}
+
+// ============================================================================
+// 1.B EKSPOR REKAPITULASI PRESENSI KUMULATIF SEMESTER (BUKU RAPORT & LEGER)
+// ============================================================================
+
+const stylePredikatSangatBaik = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "166534" } },
+  fill: { fgColor: { rgb: "DCFCE7" } },
+  border: borderThin,
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const stylePredikatBaik = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "1E40AF" } },
+  fill: { fgColor: { rgb: "DBEAFE" } },
+  border: borderThin,
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const stylePredikatCukup = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "854D0E" } },
+  fill: { fgColor: { rgb: "FEF9C3" } },
+  border: borderThin,
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const stylePredikatKurang = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "991B1B" } },
+  fill: { fgColor: { rgb: "FEE2E2" } },
+  border: borderThin,
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+/**
+ * Menghasilkan berkas Excel murni (.xlsx) berstandar OpenXML untuk Rekapitulasi Kumulatif Semester
+ * Memuat rincian tiap bulan (H/S/I/A/D), total semester, persentase kehadiran, dan predikat buku raport
+ */
+export function generateSemesterAttendanceXlsxWithKop(
+  currentClass: Class,
+  semesterRecap: SemesterClassRecap,
+  meta: SchoolExportMetadata = {}
+): Uint8Array {
+  const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
+  const months = semesterRecap.months;
+  const totalCols = 4 + months.length * 5 + 8;
+
+  const rows: any[][] = [];
+  const merges: any[] = [];
+
+  // 1. KOP SURAT RESMI SEKOLAH
+  rows.push([{
+    v: `DAFTAR HADIR SISWA KUMULATIF SEMESTER ${currentClass.semester ?? 1} (GANJIL)`,
+    t: "s",
+    s: styleKop1,
+  }]);
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } });
+
+  rows.push([{
+    v: `${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR`,
+    t: "s",
+    s: styleKop2,
+  }]);
+  merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } });
+
+  rows.push([{
+    v: `TAHUN PELAJARAN ${currentClass.academicYear}`,
+    t: "s",
+    s: styleKop3,
+  }]);
+  merges.push({ s: { r: 2, c: 0 }, e: { r: 2, c: totalCols - 1 } });
+
+  rows.push([{
+    v: `Kelas: ${currentClass.name} | Mata Pelajaran: ${currentClass.subject || mergedMeta.subject} | Semester: ${currentClass.semester ?? 1} (Ganjil) | Periode: Juli - Desember 2026`,
+    t: "s",
+    s: styleKopInfo,
+  }]);
+  merges.push({ s: { r: 3, c: 0 }, e: { r: 3, c: totalCols - 1 } });
+
+  rows.push([]); // Baris kosong pemisah
+
+  // 2. HEADER TINGKAT 1 (KOLOM IDENTITAS, BULAN, TOTAL SEMESTER)
+  const header1RowIdx = rows.length;
+  const headerRow1: any[] = [
+    { v: "NO", t: "s", s: styleThDefault },
+    { v: "NIPD / NIS", t: "s", s: styleThDefault },
+    { v: "NAMA SISWA", t: "s", s: styleThDefault },
+    { v: "L/P", t: "s", s: styleThDefault },
+  ];
+
+  // Merge No, NIS, Nama, L/P secara vertikal (row 5 ke row 6)
+  merges.push({ s: { r: header1RowIdx, c: 0 }, e: { r: header1RowIdx + 1, c: 0 } });
+  merges.push({ s: { r: header1RowIdx, c: 1 }, e: { r: header1RowIdx + 1, c: 1 } });
+  merges.push({ s: { r: header1RowIdx, c: 2 }, e: { r: header1RowIdx + 1, c: 2 } });
+  merges.push({ s: { r: header1RowIdx, c: 3 }, e: { r: header1RowIdx + 1, c: 3 } });
+
+  // Tiap Bulan: Colspan 5 (H, S, I, A, D)
+  months.forEach((m, mIdx) => {
+    const colStart = 4 + mIdx * 5;
+    headerRow1.push({ v: m.label.toUpperCase(), t: "s", s: styleThDefault });
+    headerRow1.push({ v: "", t: "s", s: styleThDefault });
+    headerRow1.push({ v: "", t: "s", s: styleThDefault });
+    headerRow1.push({ v: "", t: "s", s: styleThDefault });
+    headerRow1.push({ v: "", t: "s", s: styleThDefault });
+    merges.push({ s: { r: header1RowIdx, c: colStart }, e: { r: header1RowIdx, c: colStart + 4 } });
+  });
+
+  // Total Semester: Colspan 8 (Hadir, Sakit, Izin, Alpa, Dispen, Total, % Hadir, Predikat)
+  const totalSemColStart = 4 + months.length * 5;
+  headerRow1.push({ v: "TOTAL KUMULATIF SEMESTER", t: "s", s: styleThDefault });
+  for (let k = 1; k < 8; k++) {
+    headerRow1.push({ v: "", t: "s", s: styleThDefault });
+  }
+  merges.push({ s: { r: header1RowIdx, c: totalSemColStart }, e: { r: header1RowIdx, c: totalCols - 1 } });
+
+  rows.push(headerRow1);
+
+  // 3. HEADER TINGKAT 2 (SUB-HEADER H, S, I, A, D & TOTAL)
+  const headerRow2: any[] = [
+    { v: "", t: "s", s: styleThDefault },
+    { v: "", t: "s", s: styleThDefault },
+    { v: "", t: "s", s: styleThDefault },
+    { v: "", t: "s", s: styleThDefault },
+  ];
+
+  months.forEach(() => {
+    headerRow2.push(
+      { v: "H", t: "s", s: styleStatusH },
+      { v: "S", t: "s", s: styleStatusS },
+      { v: "I", t: "s", s: styleStatusI },
+      { v: "A", t: "s", s: styleStatusA },
+      { v: "D", t: "s", s: styleStatusD }
+    );
+  });
+
+  headerRow2.push(
+    { v: "Hadir", t: "s", s: styleStatusH },
+    { v: "Sakit", t: "s", s: styleStatusS },
+    { v: "Izin", t: "s", s: styleStatusI },
+    { v: "Alpa", t: "s", s: styleStatusA },
+    { v: "Dispen", t: "s", s: styleStatusD },
+    { v: "Total", t: "s", s: styleThDefault },
+    { v: "% Hadir", t: "s", s: styleThDefault },
+    { v: "Predikat", t: "s", s: styleThDefault }
+  );
+
+  rows.push(headerRow2);
+
+  // 4. BARIS DATA SISWA
+  const monthSums: Record<string, { hadir: number; sakit: number; izin: number; alpa: number; dispen: number }> = {};
+  months.forEach((m) => {
+    monthSums[m.value] = { hadir: 0, sakit: 0, izin: 0, alpa: 0, dispen: 0 };
+  });
+
+  let sumHadirSem = 0;
+  let sumSakitSem = 0;
+  let sumIzinSem = 0;
+  let sumAlpaSem = 0;
+  let sumDispenSem = 0;
+  let sumTotalSem = 0;
+
+  semesterRecap.students.forEach((s, idx) => {
+    sumHadirSem += s.totalHadir;
+    sumSakitSem += s.totalSakit;
+    sumIzinSem += s.totalIzin;
+    sumAlpaSem += s.totalAlpa;
+    sumDispenSem += s.totalDispen;
+    sumTotalSem += s.totalHari;
+
+    const row: any[] = [
+      { v: idx + 1, t: "n", s: styleCellCenter },
+      { v: s.nis ?? "-", t: "s", s: styleCellCenter },
+      { v: s.fullName, t: "s", s: styleCellText },
+      { v: s.gender ?? "-", t: "s", s: styleCellCenter },
+    ];
+
+    // Rincian per bulan
+    months.forEach((m) => {
+      const stats = s.monthlyStats[m.value] || {
+        hadir: 0,
+        sakit: 0,
+        izin: 0,
+        alpa: 0,
+        dispen: 0,
+      };
+
+      monthSums[m.value].hadir += stats.hadir;
+      monthSums[m.value].sakit += stats.sakit;
+      monthSums[m.value].izin += stats.izin;
+      monthSums[m.value].alpa += stats.alpa;
+      monthSums[m.value].dispen += stats.dispen;
+
+      row.push(
+        { v: stats.hadir, t: "n", s: styleStatusH },
+        { v: stats.sakit, t: "n", s: styleStatusS },
+        { v: stats.izin, t: "n", s: styleStatusI },
+        { v: stats.alpa, t: "n", s: styleStatusA },
+        { v: stats.dispen, t: "n", s: styleStatusD }
+      );
+    });
+
+    // Gaya predikat
+    let predStyle = stylePredikatBaik;
+    if (s.predikat === "Sangat Baik") predStyle = stylePredikatSangatBaik;
+    else if (s.predikat === "Cukup") predStyle = stylePredikatCukup;
+    else if (s.predikat === "Kurang") predStyle = stylePredikatKurang;
+
+    row.push(
+      { v: s.totalHadir, t: "n", s: styleStatusH },
+      { v: s.totalSakit, t: "n", s: styleStatusS },
+      { v: s.totalIzin, t: "n", s: styleStatusI },
+      { v: s.totalAlpa, t: "n", s: styleStatusA },
+      { v: s.totalDispen, t: "n", s: styleStatusD },
+      { v: s.totalHari, t: "n", s: styleCellCenterBold },
+      {
+        v: `${s.persentaseSemester}%`,
+        t: "s",
+        s: s.needsAttention
+          ? { ...styleStatusA, font: { ...styleStatusA.font, bold: true } }
+          : styleStatusH,
+      },
+      { v: s.predikat, t: "s", s: predStyle }
+    );
+
+    rows.push(row);
+  });
+
+  // 5. BARIS TOTAL KEHADIRAN KELAS
+  const summaryRowIdx = rows.length;
+  const summaryRow: any[] = [
+    { v: "TOTAL KEHADIRAN KELAS", t: "s", s: styleCellCenterBold },
+    { v: "", t: "s", s: styleCellCenterBold },
+    { v: "", t: "s", s: styleCellCenterBold },
+    { v: "", t: "s", s: styleCellCenterBold },
+  ];
+  merges.push({ s: { r: summaryRowIdx, c: 0 }, e: { r: summaryRowIdx, c: 3 } });
+
+  months.forEach((m) => {
+    const sums = monthSums[m.value];
+    summaryRow.push(
+      { v: sums.hadir, t: "n", s: styleCellCenterBold },
+      { v: sums.sakit, t: "n", s: styleCellCenterBold },
+      { v: sums.izin, t: "n", s: styleCellCenterBold },
+      { v: sums.alpa, t: "n", s: styleCellCenterBold },
+      { v: sums.dispen, t: "n", s: styleCellCenterBold }
+    );
+  });
+
+  summaryRow.push(
+    { v: sumHadirSem, t: "n", s: styleCellCenterBold },
+    { v: sumSakitSem, t: "n", s: styleCellCenterBold },
+    { v: sumIzinSem, t: "n", s: styleCellCenterBold },
+    { v: sumAlpaSem, t: "n", s: styleCellCenterBold },
+    { v: sumDispenSem, t: "n", s: styleCellCenterBold },
+    { v: sumTotalSem, t: "n", s: styleCellCenterBold },
+    { v: `${semesterRecap.averageAttendance}%`, t: "s", s: styleCellCenterBold },
+    { v: "-", t: "s", s: styleCellCenterBold }
+  );
+
+  rows.push(summaryRow);
+
+  // 6. BLOK TANDA TANGAN RESMI
+  rows.push([]);
+  rows.push([]);
+  const signRow1Idx = rows.length;
+  const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
+  const signColRight = Math.max(5, totalCols - 4);
+
+  merges.push({ s: { r: signRow1Idx, c: 1 }, e: { r: signRow1Idx, c: 3 } });
+  merges.push({ s: { r: signRow1Idx, c: signColRight }, e: { r: signRow1Idx, c: totalCols - 1 } });
+
+  const signRow1: any[] = [
+    { v: "", t: "s" },
+    { v: `Mengetahui,\nKepala ${mergedMeta.schoolName}`, t: "s", s: { alignment: { horizontal: "center", wrapText: true } } },
+    { v: "", t: "s" },
+    { v: "", t: "s" },
+  ];
+  while (signRow1.length < signColRight) signRow1.push({ v: "", t: "s" });
+  signRow1.push({
+    v: `${mergedMeta.location}, ${formattedToday}\nGuru Mata Pelajaran Informatika,`,
+    t: "s",
+    s: { alignment: { horizontal: "center", wrapText: true } },
+  });
+  rows.push(signRow1);
+
+  rows.push([]);
+  rows.push([]);
+
+  const signRow2Idx = rows.length;
+  merges.push({ s: { r: signRow2Idx, c: 1 }, e: { r: signRow2Idx, c: 3 } });
+  merges.push({ s: { r: signRow2Idx, c: signColRight }, e: { r: signRow2Idx, c: totalCols - 1 } });
+
+  const signRow2: any[] = [
+    { v: "", t: "s" },
+    { v: "( ............................................................ )\nNIP. ........................................................", t: "s", s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } } },
+    { v: "", t: "s" },
+    { v: "", t: "s" },
+  ];
+  while (signRow2.length < signColRight) signRow2.push({ v: "", t: "s" });
+  signRow2.push({
+    v: `( ${mergedMeta.teacherName} )\nNIP. ${mergedMeta.teacherNip}`,
+    t: "s",
+    s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } },
+  });
+  rows.push(signRow2);
+
+  // Buat sheet dan workbook
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!merges"] = merges;
+
+  // Lebar Kolom
+  const colWidths: any[] = [
+    { wch: 5 },  // No
+    { wch: 14 }, // NIS
+    { wch: 30 }, // Nama Siswa
+    { wch: 5 },  // L/P
+  ];
+  // 5 kolom per bulan
+  months.forEach(() => {
+    colWidths.push({ wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 });
+  });
+  // Total Semester
+  colWidths.push(
+    { wch: 8 },  // Hadir
+    { wch: 8 },  // Sakit
+    { wch: 8 },  // Izin
+    { wch: 8 },  // Alpa
+    { wch: 8 },  // Dispen
+    { wch: 8 },  // Total Hari
+    { wch: 10 }, // % Hadir
+    { wch: 14 }  // Predikat
+  );
+  ws["!cols"] = colWidths;
+
+  const wb = XLSX.utils.book_new();
+  const safeClassName = currentClass.name.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 20);
+  XLSX.utils.book_append_sheet(wb, ws, `Semester_${safeClassName}`);
+
+  const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  return new Uint8Array(arrayBuffer);
+}
+
+/**
+ * Menghasilkan konten CSV Rekapitulasi Kumulatif Semester dengan Kop Surat Resmi
+ */
+export function generateSemesterAttendanceCsvWithKop(
+  currentClass: Class,
+  semesterRecap: SemesterClassRecap,
+  meta: SchoolExportMetadata = {}
+): string {
+  const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
+  const months = semesterRecap.months;
+  const rows: string[] = [];
+
+  // --- KOP SURAT RESMI SEKOLAH ---
+  rows.push(`"DAFTAR HADIR SISWA KUMULATIF SEMESTER ${currentClass.semester ?? 1} (GANJIL) KELAS ${currentClass.name.toUpperCase()}"`);
+  rows.push(`"${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR"`);
+  rows.push(`"TAHUN PELAJARAN ${currentClass.academicYear}"`);
+  rows.push(`"Mata Pelajaran: ${currentClass.subject || mergedMeta.subject} | Semester: ${currentClass.semester ?? 1} (Ganjil) | Periode: Juli - Desember 2026"`);
+  rows.push("");
+
+  // --- HEADER KOLOM ---
+  const headerCols: string[] = ["No", "NIPD / NIS", "Nama Siswa", "L/P"];
+  months.forEach((m) => {
+    headerCols.push(
+      `"${m.label} (H)"`,
+      `"${m.label} (S)"`,
+      `"${m.label} (I)"`,
+      `"${m.label} (A)"`,
+      `"${m.label} (D)"`
+    );
+  });
+  headerCols.push(
+    "Semester Hadir",
+    "Semester Sakit",
+    "Semester Izin",
+    "Semester Alpa",
+    "Semester Dispen",
+    "Total Hari",
+    "% Kehadiran",
+    "Predikat"
+  );
+  rows.push(headerCols.join(","));
+
+  // --- BARIS DATA SISWA ---
+  let sumHadirSem = 0;
+  let sumSakitSem = 0;
+  let sumIzinSem = 0;
+  let sumAlpaSem = 0;
+  let sumDispenSem = 0;
+
+  semesterRecap.students.forEach((s, idx) => {
+    sumHadirSem += s.totalHadir;
+    sumSakitSem += s.totalSakit;
+    sumIzinSem += s.totalIzin;
+    sumAlpaSem += s.totalAlpa;
+    sumDispenSem += s.totalDispen;
+
+    const rowCols = [
+      String(idx + 1),
+      `"${s.nis ?? "-"}"`,
+      `"${s.fullName.replace(/"/g, '""')}"`,
+      `"${s.gender ?? "-"}"`,
+    ];
+
+    months.forEach((m) => {
+      const stats = s.monthlyStats[m.value] || {
+        hadir: 0,
+        sakit: 0,
+        izin: 0,
+        alpa: 0,
+        dispen: 0,
+      };
+      rowCols.push(
+        String(stats.hadir),
+        String(stats.sakit),
+        String(stats.izin),
+        String(stats.alpa),
+        String(stats.dispen)
+      );
+    });
+
+    rowCols.push(
+      String(s.totalHadir),
+      String(s.totalSakit),
+      String(s.totalIzin),
+      String(s.totalAlpa),
+      String(s.totalDispen),
+      String(s.totalHari),
+      `"${s.persentaseSemester}%"`,
+      `"${s.predikat}"`
+    );
+
+    rows.push(rowCols.join(","));
+  });
+
+  // --- REKAPITULASI BAWAH ---
+  rows.push("");
+  const totalStudents = semesterRecap.students.length;
+  const blankMonthlyPaddings = months.map(() => '""').join(",");
+  rows.push(
+    `"","","JUMLAH TOTAL",""${blankMonthlyPaddings ? `,${blankMonthlyPaddings}` : ""},${sumHadirSem},${sumSakitSem},${sumIzinSem},${sumAlpaSem},${sumDispenSem},"${totalStudents} Siswa","${semesterRecap.averageAttendance}%","-"`
+  );
+  rows.push("");
+
+  // --- TITIMANGSA & BLOK TANDA TANGAN ---
+  const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
+  rows.push(`"Mengetahui,","","",""`);
+  rows.push(`"Kepala Sekolah,","","","","${mergedMeta.location}, ${formattedToday}"`);
+  rows.push(`"","","","","Guru Mata Pelajaran,"`);
+  rows.push(`""`);
+  rows.push(`""`);
+  rows.push(`"( ............................................ )","","","","${mergedMeta.teacherName}"`);
+  rows.push(`"NIP. ........................................","","","","NIP. ${mergedMeta.teacherNip}"`);
+
+  return "\uFEFF" + rows.join("\r\n");
 }
 
 // ============================================================================
