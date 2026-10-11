@@ -1086,7 +1086,7 @@ function GradesPageContent() {
                             <td
                               key={asmt.id}
                               className={`py-2 px-3 text-center border-r border-[var(--border-hairline)] font-mono transition-colors ${
-                                isUnderKkm ? "bg-amber-50/50 dark:bg-amber-950/20" : ""
+                                isUnderKkm ? "bg-rose-50/25 dark:bg-rose-950/10" : ""
                               }`}
                             >
                               {isEditingThis ? (
@@ -1102,7 +1102,7 @@ function GradesPageContent() {
                                     if (e.key === "Enter") handleSaveCellEdit();
                                     if (e.key === "Escape") setEditingCell(null);
                                   }}
-                                  className="w-16 px-1.5 py-1 text-center font-mono text-xs bg-[var(--surface-card)] border-2 border-[var(--color-accent)] rounded outline-none shadow-xs"
+                                  className="w-16 px-1.5 py-1 text-center font-mono text-xs bg-[var(--surface-card)] text-[var(--text-primary)] font-bold border-2 border-[var(--color-accent)] rounded outline-none shadow-xs"
                                 />
                               ) : (
                                 <button
@@ -1110,18 +1110,25 @@ function GradesPageContent() {
                                   onClick={() =>
                                     handleStartCellEdit(summary.studentId, asmt.id, sc ?? null)
                                   }
-                                  title="Klik untuk mengedit nilai"
-                                  className={`w-full py-1 rounded text-xs transition-colors hover:bg-[var(--surface-recessed)] flex items-center justify-center gap-1 ${
+                                  title={
+                                    sc !== null && sc !== undefined
+                                      ? isUnderKkm
+                                        ? `Nilai: ${sc} (Di bawah KKM ${kkm} / Perlu Remedial) - Klik untuk mengedit`
+                                        : `Nilai: ${sc} (Tuntas) - Klik untuk mengedit`
+                                      : "Klik untuk mengisi nilai"
+                                  }
+                                  className={`w-full py-1.5 px-2 rounded-md text-xs font-mono transition-colors hover:bg-[var(--surface-recessed)] flex items-center justify-center gap-1.5 cursor-pointer ${
                                     sc === null || sc === undefined
-                                      ? "text-[var(--text-secondary)]/50"
-                                      : isUnderKkm
-                                      ? "text-amber-700 dark:text-amber-400 font-bold"
-                                      : "text-[var(--text-primary)] font-semibold"
+                                      ? "text-[var(--text-secondary)]/40"
+                                      : "text-[var(--text-primary)] font-bold"
                                   }`}
                                 >
                                   <span>{sc !== null && sc !== undefined ? sc : "-"}</span>
                                   {isUnderKkm && (
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                    <span
+                                      className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"
+                                      title={`Di bawah KKM (${kkm})`}
+                                    />
                                   )}
                                 </button>
                               )}
@@ -1131,16 +1138,18 @@ function GradesPageContent() {
                       )}
 
                       {/* Nilai Rata-rata Akhir */}
-                      <td className="py-2.5 px-3 text-center font-mono font-bold text-xs border-r border-[var(--border-hairline)] bg-[var(--surface-card)]">
-                        <span
-                          className={
-                            summary.finalScore !== null && summary.finalScore < kkm
-                              ? "text-amber-600 dark:text-amber-400"
-                              : "text-[var(--text-primary)]"
-                          }
-                        >
-                          {summary.finalScore !== null ? summary.finalScore : "-"}
-                        </span>
+                      <td className="py-2.5 px-3 text-center font-mono text-xs border-r border-[var(--border-hairline)] bg-[var(--surface-card)]">
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="text-[var(--text-primary)] font-bold">
+                            {summary.finalScore !== null ? summary.finalScore : "-"}
+                          </span>
+                          {summary.finalScore !== null && summary.finalScore < kkm && (
+                            <span
+                              className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"
+                              title={`Rata-rata di bawah KKM (${kkm})`}
+                            />
+                          )}
+                        </div>
                       </td>
 
                       {/* Predikat Nilai */}
@@ -1646,9 +1655,9 @@ function GradesPageContent() {
                               [student.id]: val,
                             }));
                           }}
-                          className={`w-20 px-2.5 py-1.5 text-center font-mono text-xs border rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] ${
+                          className={`w-20 px-2.5 py-1.5 text-center font-mono text-xs border rounded-[8px] font-bold focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] ${
                             isUnderKkm
-                              ? "border-amber-400 bg-amber-50/50 dark:bg-amber-950/20 text-[var(--text-primary)]"
+                              ? "border-rose-300 bg-rose-50/20 text-[var(--text-primary)]"
                               : "border-[var(--border-hairline)] bg-[var(--surface-card)] text-[var(--text-primary)]"
                           }`}
                         />
