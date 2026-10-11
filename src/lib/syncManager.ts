@@ -10,6 +10,10 @@ import type {
   StudentScoreRecord,
 } from "../contracts/grades.ts";
 import {
+  MOCK_CLASSES,
+  ALL_STUDENTS_BY_CLASS,
+} from "../contracts/mocks/attendanceMocks.ts";
+import {
   getSavedSessions,
   getSavedRecords,
   STORAGE_KEY_SESSIONS,
@@ -65,6 +69,8 @@ export interface SyncResult {
   message: string;
   syncedAt?: string;
   details?: {
+    classesCount?: number;
+    studentsCount?: number;
     sessionsCount?: number;
     recordsCount?: number;
     assessmentsCount?: number;
@@ -94,7 +100,8 @@ export async function syncLocalDataToCloud(): Promise<SyncResult> {
     const payload = createFullBackupPayload();
     const nowIso = new Date().toISOString();
 
-    // 1. Cadangkan snapshot komprehensif ke tabel app_snapshots
+    // 1. Cadangkan snapshot komprehensif ke tabel app_snapshots (Disaster Recovery Tier-1)
+    // Berisi seluruh state lokal termasuk kkmByGrade dan customStudents secara utuh
     const { error: snapshotError } = await supabase.from("app_snapshots").upsert({
       id: `cloud-snap-${Date.now()}`,
       timestamp: nowIso,
@@ -106,19 +113,80 @@ export async function syncLocalDataToCloud(): Promise<SyncResult> {
 
     if (snapshotError) {
       // Jika tabel belum dibuat, beritahu guru dengan jelas
-      if (snapshotError.code === "42P01" || snapshotError.message.includes("relation") || snapshotError.message.includes("does not exist")) {
+      if (
+        snapshotError.code === "42P01" ||
+        snapshotError.message.includes("relation") ||
+        snapshotError.message.includes("does not exist")
+      ) {
         return {
           success: false,
-          message: "Tabel belum dibuat di Supabase. Silakan jalankan script schema.sql di SQL Editor Supabase terlebih dahulu.",
+          message:
+            "Tabel belum dibuat di Supabase. Silakan jalankan script schema.sql di SQL Editor Supabase terlebih dahulu.",
           error: snapshotError.message,
         };
       }
       throw new Error(`Gagal menyimpan snapshot ke cloud: ${snapshotError.message}`);
     }
 
-    // 2. Sinkronkan Hari Libur / Agenda Kalender
-    const holidays = payload.data.holidays;
-    if (holidays && holidays.length > 0) {
+    // 2. Sinkronkan Tabel Induk: Rombel / Kelas (classes)
+    // Wajib di-upsert sebelum tabel anak (sessions, assessments, students) untuk memenuhi relasi Foreign Key
+    const classRows = MOCK_CLASSES.map((c) => ({
+      id: c.id,
+      teacher_id: c.teacherId,
+      name: c.name,
+      academic_year: c.academicYear,
+      semester: c.semester,
+      archived_at: c.archivedAt,
+      created_at: c.createdAt,
+      schedule_day: c.scheduleDay,
+      schedule_time: c.scheduleTime,
+      schedule_period: c.schedulePeriod,
+      subject: c.subject || "Informatika",
+    }));
+    const { error: clsErr } = await supabase
+      .from("classes")
+      .upsert(classRows, { onConflict: "id" });
+    if (clsErr) console.warn("Peringatan sinkronisasi classes:", clsErr.message);
+
+    const validClassIds = new Set(MOCK_CLASSES.map((c) => c.id));
+
+    // 3. Sinkronkan Tabel Induk: Siswa (students)
+    // Gabungkan siswa resmi SMPN 3 Cibungbulang dan siswa kustom lokal
+    const studentMap = new Map<string, Student>();
+    Object.values(ALL_STUDENTS_BY_CLASS).forEach((list) => {
+      list.forEach((s) => studentMap.set(s.id, s));
+    });
+    if (payload.data.customStudents) {
+      Object.values(payload.data.customStudents).forEach((list) => {
+        list.forEach((s) => studentMap.set(s.id, s));
+      });
+    }
+
+    const studentList = Array.from(studentMap.values()).filter(
+      (s) => s.classId && validClassIds.has(s.classId)
+    );
+    const BATCH_SIZE = 200;
+    for (let i = 0; i < studentList.length; i += BATCH_SIZE) {
+      const batch = studentList.slice(i, i + BATCH_SIZE).map((s) => ({
+        id: s.id,
+        class_id: s.classId,
+        nis: s.nis || null,
+        full_name: s.fullName,
+        gender: s.gender === "P" ? "P" : "L",
+        is_active: s.isActive ?? true,
+        created_at: s.createdAt || nowIso,
+      }));
+      const { error: stdErr } = await supabase
+        .from("students")
+        .upsert(batch, { onConflict: "id" });
+      if (stdErr) console.warn("Peringatan sinkronisasi students batch:", stdErr.message);
+    }
+
+    const validStudentIds = new Set(studentList.map((s) => s.id));
+
+    // 4. Sinkronkan Hari Libur / Agenda Kalender (holidays)
+    const holidays = payload.data.holidays || [];
+    if (holidays.length > 0) {
       const holidayRows = holidays.map((h) => ({
         id: h.id,
         date: h.date,
@@ -126,14 +194,21 @@ export async function syncLocalDataToCloud(): Promise<SyncResult> {
         category: h.category,
         description: h.description || null,
       }));
-      const { error: hErr } = await supabase.from("holidays").upsert(holidayRows, { onConflict: "id" });
+      const { error: hErr } = await supabase
+        .from("holidays")
+        .upsert(holidayRows, { onConflict: "id" });
       if (hErr) console.warn("Peringatan sinkronisasi holidays:", hErr.message);
     }
 
-    // 3. Sinkronkan Sesi Presensi
-    const sessions = payload.data.sessions;
-    if (sessions && sessions.length > 0) {
-      const sessionRows = sessions.map((s) => ({
+    // 5. Sinkronkan Sesi Presensi (attendance_sessions)
+    const rawSessions = payload.data.sessions || [];
+    const validSessions = rawSessions.filter(
+      (s) => s.classId && validClassIds.has(s.classId)
+    );
+
+    const syncedSessionIds = new Set<string>();
+    if (validSessions.length > 0) {
+      const sessionRows = validSessions.map((s) => ({
         id: s.id,
         class_id: s.classId,
         session_date: s.sessionDate,
@@ -146,17 +221,33 @@ export async function syncLocalDataToCloud(): Promise<SyncResult> {
         created_at: s.createdAt,
         updated_at: s.updatedAt,
       }));
-      const { error: sErr } = await supabase.from("attendance_sessions").upsert(sessionRows, { onConflict: "id" });
-      if (sErr) console.warn("Peringatan sinkronisasi attendance_sessions:", sErr.message);
+      const { error: sErr } = await supabase
+        .from("attendance_sessions")
+        .upsert(sessionRows, { onConflict: "id" });
+
+      if (sErr) {
+        console.warn("Peringatan sinkronisasi attendance_sessions:", sErr.message);
+      } else {
+        validSessions.forEach((s) => syncedSessionIds.add(s.id));
+      }
     }
 
-    // 4. Sinkronkan Rekaman Kehadiran Siswa
-    const records = payload.data.records;
-    if (records && records.length > 0) {
-      // Upsert bertahap (batch per 200 baris) agar aman
-      const BATCH_SIZE = 200;
-      for (let i = 0; i < records.length; i += BATCH_SIZE) {
-        const batch = records.slice(i, i + BATCH_SIZE).map((r) => ({
+    // 6. Sinkronkan Rekaman Kehadiran Siswa (attendance_records)
+    // Proteksi Integritas FK: Hanya dorong rekaman yang sesi dan siswanya valid di Supabase
+    const rawRecords = payload.data.records || [];
+    const validRecords = rawRecords.filter(
+      (r) => syncedSessionIds.has(r.sessionId) && validStudentIds.has(r.studentId)
+    );
+
+    if (rawRecords.length > validRecords.length) {
+      console.info(
+        `Menyaring ${rawRecords.length - validRecords.length} rekaman presensi yatim/usang agar integritas foreign key di Supabase tetap terjaga.`
+      );
+    }
+
+    if (validRecords.length > 0) {
+      for (let i = 0; i < validRecords.length; i += BATCH_SIZE) {
+        const batch = validRecords.slice(i, i + BATCH_SIZE).map((r) => ({
           id: r.id,
           session_id: r.sessionId,
           student_id: r.studentId,
@@ -164,15 +255,22 @@ export async function syncLocalDataToCloud(): Promise<SyncResult> {
           late_minutes: r.lateMinutes ?? null,
           note: r.note || null,
         }));
-        const { error: rErr } = await supabase.from("attendance_records").upsert(batch, { onConflict: "id" });
+        const { error: rErr } = await supabase
+          .from("attendance_records")
+          .upsert(batch, { onConflict: "id" });
         if (rErr) console.warn("Peringatan sinkronisasi attendance_records batch:", rErr.message);
       }
     }
 
-    // 5. Sinkronkan Asesmen / Tugas Nilai
-    const assessments = payload.data.assessments;
-    if (assessments && assessments.length > 0) {
-      const assessmentRows = assessments.map((a) => ({
+    // 7. Sinkronkan Asesmen / Tugas Nilai (assessments)
+    const rawAssessments = payload.data.assessments || [];
+    const validAssessments = rawAssessments.filter(
+      (a) => a.classId && validClassIds.has(a.classId)
+    );
+
+    const syncedAssessmentIds = new Set<string>();
+    if (validAssessments.length > 0) {
+      const assessmentRows = validAssessments.map((a) => ({
         id: a.id,
         class_id: a.classId,
         subject: a.subject,
@@ -184,16 +282,33 @@ export async function syncLocalDataToCloud(): Promise<SyncResult> {
         weight: a.weight,
         created_at: a.createdAt,
       }));
-      const { error: aErr } = await supabase.from("assessments").upsert(assessmentRows, { onConflict: "id" });
-      if (aErr) console.warn("Peringatan sinkronisasi assessments:", aErr.message);
+      const { error: aErr } = await supabase
+        .from("assessments")
+        .upsert(assessmentRows, { onConflict: "id" });
+
+      if (aErr) {
+        console.warn("Peringatan sinkronisasi assessments:", aErr.message);
+      } else {
+        validAssessments.forEach((a) => syncedAssessmentIds.add(a.id));
+      }
     }
 
-    // 6. Sinkronkan Nilai Siswa
-    const scores = payload.data.scores;
-    if (scores && scores.length > 0) {
-      const BATCH_SIZE = 200;
-      for (let i = 0; i < scores.length; i += BATCH_SIZE) {
-        const batch = scores.slice(i, i + BATCH_SIZE).map((sc) => ({
+    // 8. Sinkronkan Nilai Siswa (student_scores)
+    // Proteksi Integritas FK: Hanya dorong nilai yang asesmen dan siswanya valid di Supabase
+    const rawScores = payload.data.scores || [];
+    const validScores = rawScores.filter(
+      (sc) => syncedAssessmentIds.has(sc.assessmentId) && validStudentIds.has(sc.studentId)
+    );
+
+    if (rawScores.length > validScores.length) {
+      console.info(
+        `Menyaring ${rawScores.length - validScores.length} data nilai siswa yatim agar integritas foreign key di Supabase tetap terjaga.`
+      );
+    }
+
+    if (validScores.length > 0) {
+      for (let i = 0; i < validScores.length; i += BATCH_SIZE) {
+        const batch = validScores.slice(i, i + BATCH_SIZE).map((sc) => ({
           id: sc.id,
           assessment_id: sc.assessmentId,
           student_id: sc.studentId,
@@ -201,7 +316,9 @@ export async function syncLocalDataToCloud(): Promise<SyncResult> {
           feedback: sc.feedback || null,
           updated_at: sc.updatedAt,
         }));
-        const { error: scErr } = await supabase.from("student_scores").upsert(batch, { onConflict: "id" });
+        const { error: scErr } = await supabase
+          .from("student_scores")
+          .upsert(batch, { onConflict: "id" });
         if (scErr) console.warn("Peringatan sinkronisasi student_scores batch:", scErr.message);
       }
     }
@@ -214,10 +331,12 @@ export async function syncLocalDataToCloud(): Promise<SyncResult> {
       message: "Seluruh data dan cadangan berhasil disinkronkan ke Supabase Cloud (PostgreSQL)!",
       syncedAt: nowIso,
       details: {
-        sessionsCount: sessions.length,
-        recordsCount: records.length,
-        assessmentsCount: assessments.length,
-        scoresCount: scores.length,
+        classesCount: classRows.length,
+        studentsCount: studentList.length,
+        sessionsCount: validSessions.length,
+        recordsCount: validRecords.length,
+        assessmentsCount: validAssessments.length,
+        scoresCount: validScores.length,
         holidaysCount: holidays.length,
       },
     };

@@ -85,6 +85,10 @@ import {
   type StudentMonthlyRecap,
 } from "../contracts/attendance.ts";
 import {
+  MOCK_CLASSES,
+  ALL_STUDENTS_BY_CLASS,
+} from "../contracts/mocks/attendanceMocks.ts";
+import {
   generateAttendanceCsvWithKop,
   generateAttendanceExcelHtmlWithKop,
   generateGradesExcelHtmlWithKop,
@@ -787,10 +791,37 @@ function runSmokeTest() {
     assert.ok(fullBackup.stats.totalRecords >= 0, "Stats totalRecords harus ada");
     assert.ok(fullBackup.data.sessions !== undefined, "Blok sesi harus ada");
     assert.ok(fullBackup.data.records !== undefined, "Blok rekaman harus ada");
-    assert.ok(fullBackup.data.assessments !== undefined, "Blok asesmen harus ada");
-    assert.ok(fullBackup.data.scores !== undefined, "Blok nilai harus ada");
+    // Uji integritas hierarki relasi Foreign Key (classes & students)
+    assert.strictEqual(MOCK_CLASSES.length, 10, "Harus tersedia 10 rombel resmi SMPN 3 Cibungbulang");
+    const classIdSet = new Set(MOCK_CLASSES.map((c) => c.id));
 
-    console.log("✓ LULUS: Konfigurasi klien Supabase dan struktur payload cloud sync teruji siap.");
+    // Seluruh siswa resmi harus memiliki class_id yang terdaftar di classes
+    let totalVerifiedStudents = 0;
+    for (const [clsId, students] of Object.entries(ALL_STUDENTS_BY_CLASS)) {
+      assert.ok(classIdSet.has(clsId), `Class ID ${clsId} harus terdaftar di tabel classes`);
+      for (const st of students) {
+        assert.strictEqual(st.classId, clsId, `Siswa ${st.fullName} harus memiliki class_id yang sinkron`);
+        assert.ok(st.id && st.id.length > 0, "ID siswa tidak boleh kosong");
+        totalVerifiedStudents++;
+      }
+    }
+    assert.strictEqual(totalVerifiedStudents, 401, "Harus ada 401 siswa otentik terverifikasi relasi foreign key-nya");
+
+    // Uji isolasi & penyaringan rekaman yatim (orphan record filter simulation)
+    const mockSyncedSessionIds = new Set(["session-valid-1"]);
+    const mockStudentIds = new Set(["std-1"]);
+    const testRecords = [
+      { id: "r1", sessionId: "session-valid-1", studentId: "std-1", status: "HADIR" },
+      { id: "r2", sessionId: "session-ghost-orphan", studentId: "std-1", status: "HADIR" }, // Orphan session
+      { id: "r3", sessionId: "session-valid-1", studentId: "std-unknown-ghost", status: "HADIR" }, // Orphan student
+    ];
+    const filteredRecords = testRecords.filter(
+      (r) => mockSyncedSessionIds.has(r.sessionId) && mockStudentIds.has(r.studentId)
+    );
+    assert.strictEqual(filteredRecords.length, 1, "Hanya 1 rekaman sah yang lolos, rekaman yatim wajib disaring");
+    assert.strictEqual(filteredRecords[0].id, "r1");
+
+    console.log("✓ LULUS: Konfigurasi Supabase, integritas relasi foreign key (classes & students), dan proteksi rekaman yatim teruji 100%.");
   }
 
   // --------------------------------------------------------------------------

@@ -102,13 +102,21 @@ export function saveSessionAndRecords(
     const sessions = getSavedSessions();
     const existingRecords = getSavedRecords();
 
+    // Temukan apakah ada sesi sebelumnya untuk rombel dan tanggal ini
+    const oldSession = sessions.find(
+      (s) => s.classId === session.classId && s.sessionDate === session.sessionDate
+    );
+    const oldSessionId = oldSession ? oldSession.id : null;
+
     // Perbarui atau tambahkan sesi
     const otherSessions = sessions.filter(
       (s) => !(s.classId === session.classId && s.sessionDate === session.sessionDate)
     );
     const updatedSessions = [...otherSessions, session];
-    // Perbarui catatan siswa untuk sesi ini
-    const otherRecords = existingRecords.filter((r) => r.sessionId !== session.id);
+    // Perbarui catatan siswa untuk sesi ini (hapus catatan dengan id sesi baru maupun id sesi lama jika berbeda)
+    const otherRecords = existingRecords.filter(
+      (r) => r.sessionId !== session.id && (!oldSessionId || r.sessionId !== oldSessionId)
+    );
     const updatedRecords = [...otherRecords, ...records];
 
     try {
