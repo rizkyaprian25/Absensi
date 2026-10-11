@@ -58,6 +58,10 @@ import {
   exportGradesToCSV,
   STORAGE_KEY_ASSESSMENTS,
   STORAGE_KEY_SCORES,
+  STORAGE_KEY_ASSESSMENT_ORDER,
+  getAssessmentOrderForClass,
+  saveAssessmentOrderForClass,
+  getAssessmentsByClass,
 } from "./gradeStorage.ts";
 import {
   DEFAULT_KKM,
@@ -839,9 +843,106 @@ function runSmokeTest() {
     console.log("✓ LULUS: Rekapitulasi kumulatif semester (Buku Raport & 6 bulan) dan ekspor ber-kop resmi terverifikasi 100%.");
   }
 
+  // 14. Pengujian Fleksibilitas Pengurutan Kolom Penilaian (Reordering / Drag & Drop)
+  {
+    console.log("[TEST 14] Pengujian fleksibilitas kustomisasi urutan kolom penilaian...");
+    const testClassId = "class-test-reorder";
+
+    // Simulasikan 3 asesmen tersimpan dengan tanggal UTS lebih awal daripada Tugas 1
+    const mockAssessments: AssessmentItem[] = [
+      {
+        id: "asmt-uts",
+        classId: testClassId,
+        subject: "Informatika",
+        title: "Penilaian Tengah Semester (UTS)",
+        type: "UTS",
+        date: "2026-09-10",
+        maxScore: 100,
+        weight: 2,
+        createdAt: "2026-09-10T08:00:00.000Z",
+      },
+      {
+        id: "asmt-tugas-1",
+        classId: testClassId,
+        subject: "Informatika",
+        title: "Tugas 1 - Algoritma Pemrograman",
+        type: "TUGAS",
+        date: "2026-09-15",
+        maxScore: 100,
+        weight: 1,
+        createdAt: "2026-09-15T08:00:00.000Z",
+      },
+      {
+        id: "asmt-uas",
+        classId: testClassId,
+        subject: "Informatika",
+        title: "Penilaian Akhir Semester (UAS)",
+        type: "UAS",
+        date: "2026-11-25",
+        maxScore: 100,
+        weight: 3,
+        createdAt: "2026-11-25T08:00:00.000Z",
+      },
+    ];
+
+    // Simpan ke storage
+    localStorage.setItem(STORAGE_KEY_ASSESSMENTS, JSON.stringify(mockAssessments));
+    localStorage.removeItem(STORAGE_KEY_ASSESSMENT_ORDER);
+
+    // Default urutan adalah berdasarkan tanggal kronologis (UTS, Tugas 1, UAS)
+    const initialList = getAssessmentsByClass(testClassId);
+    assert.strictEqual(initialList[0].id, "asmt-uts");
+    assert.strictEqual(initialList[1].id, "asmt-tugas-1");
+    assert.strictEqual(initialList[2].id, "asmt-uas");
+
+    // Guru mengubah urutan agar Tugas 1 berada sebelum UTS: [Tugas 1, UTS, UAS]
+    const customDesiredOrder = ["asmt-tugas-1", "asmt-uts", "asmt-uas"];
+    saveAssessmentOrderForClass(testClassId, customDesiredOrder);
+
+    // Verifikasi urutan kustom tersimpan di storage
+    const savedOrder = getAssessmentOrderForClass(testClassId);
+    assert.deepStrictEqual(savedOrder, customDesiredOrder, "Urutan kustom harus tersimpan persisten");
+
+    // Verifikasi getAssessmentsByClass mengembalikan urutan sesuai kustomisasi guru
+    const reorderedList = getAssessmentsByClass(testClassId);
+    assert.strictEqual(reorderedList[0].id, "asmt-tugas-1", "Tugas 1 harus di posisi pertama");
+    assert.strictEqual(reorderedList[1].id, "asmt-uts", "UTS harus di posisi kedua");
+    assert.strictEqual(reorderedList[2].id, "asmt-uas", "UAS harus di posisi ketiga");
+
+    // Verifikasi ekspor nilai ke Excel & CSV otomatis memakai urutan kustom ini
+    const dummyStudent: Student = {
+      id: "std-test-1",
+      fullName: "Budi Santoso",
+      nis: "1001",
+      gender: "L",
+      classId: testClassId,
+      isActive: true,
+      createdAt: "2026-07-01T00:00:00.000Z",
+    };
+    const summary = calculateStudentGradeSummary(dummyStudent, reorderedList, [], 75);
+    const dummyClassObj: Class = {
+      id: testClassId,
+      teacherId: "teacher-1",
+      name: "Kelas Uji Urutan",
+      academicYear: "2026/2027",
+      semester: 1,
+      createdAt: "2026-07-01T00:00:00.000Z",
+      scheduleDay: "Senin",
+      schedulePeriod: "Jam ke 1-2 (07:30 - 08:50)",
+      subject: "Informatika",
+    };
+
+    const gradesXlsx = generateGradesXlsxWithKop(dummyClassObj.name, reorderedList, [summary], 75);
+    assert.ok(gradesXlsx instanceof Uint8Array, "Ekspor nilai XLSX dengan urutan kustom harus valid");
+
+    const gradesCsv = generateGradesCsvWithKop(dummyClassObj.name, reorderedList, [summary], 75);
+    assert.ok(gradesCsv.indexOf("Tugas 1 - Algoritma Pemrograman") < gradesCsv.indexOf("Penilaian Tengah Semester (UTS)"), 
+      "Header CSV harus menempatkan Tugas 1 sebelum UTS sesuai urutan yang digeser");
+
+    console.log("✓ LULUS: Kustomisasi urutan kolom penilaian (Reordering / Drag & Drop) dan persistensi ke ekspor terverifikasi 100%.");
+  }
+
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");
 }
-
-
 
 runSmokeTest();

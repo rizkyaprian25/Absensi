@@ -15,6 +15,7 @@ import { triggerAutoSnapshot } from "./backupManager.ts";
 export const STORAGE_KEY_ASSESSMENTS = "absensi_grade_assessments_v2";
 export const STORAGE_KEY_SCORES = "absensi_student_scores_v2";
 export const STORAGE_KEY_KKM = "absensi_grade_kkm_v1";
+export const STORAGE_KEY_ASSESSMENT_ORDER = "absensi_grade_assessment_order_v1";
 
 // ============================================================================
 // AKSES PENYIMPANAN LOKAL (LOCALSTORAGE OFFLINE-FIRST)
@@ -214,13 +215,70 @@ export function saveStoredKKM(kkm: number): void {
 // ============================================================================
 
 /**
- * Mengambil asesmen berdasarkan ID kelas tertentu
+ * Mengambil daftar ID urutan asesmen kustom untuk kelas tertentu
+ */
+export function getAssessmentOrderForClass(classId: string): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_ASSESSMENT_ORDER);
+    if (!raw) return [];
+    const map = JSON.parse(raw);
+    return Array.isArray(map?.[classId]) ? map[classId] : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Menyimpan daftar ID urutan asesmen kustom untuk kelas tertentu
+ * dan menyinkronkan urutan item pada penyimpanan global
+ */
+export function saveAssessmentOrderForClass(classId: string, orderedIds: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_ASSESSMENT_ORDER);
+    const map = raw ? JSON.parse(raw) : {};
+    map[classId] = orderedIds;
+    localStorage.setItem(STORAGE_KEY_ASSESSMENT_ORDER, JSON.stringify(map));
+
+    // Sinkronkan urutan daftar asesmen kelas pada penyimpanan utama
+    const all = getStoredAssessments();
+    const classItems = all.filter((a) => a.classId === classId);
+    const otherItems = all.filter((a) => a.classId !== classId);
+
+    const orderMap = new Map(orderedIds.map((id, idx) => [id, idx]));
+    classItems.sort((a, b) => {
+      const idxA = orderMap.has(a.id) ? (orderMap.get(a.id) as number) : 9999;
+      const idxB = orderMap.has(b.id) ? (orderMap.get(b.id) as number) : 9999;
+      return idxA - idxB;
+    });
+
+    saveStoredAssessments([...otherItems, ...classItems]);
+    triggerAutoSnapshot("Pembaruan Urutan Penilaian");
+  } catch (err) {
+    console.error("Gagal menyimpan urutan asesmen:", err);
+  }
+}
+
+/**
+ * Mengambil asesmen berdasarkan ID kelas tertentu (mempertimbangkan urutan kustom yang telah diatur)
  */
 export function getAssessmentsByClass(classId: string): AssessmentItem[] {
   const all = getStoredAssessments();
-  return all
-    .filter((a) => a.classId === classId)
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const classItems = all.filter((a) => a.classId === classId);
+  const customOrder = getAssessmentOrderForClass(classId);
+
+  if (customOrder.length > 0) {
+    const orderMap = new Map(customOrder.map((id, idx) => [id, idx]));
+    return classItems.sort((a, b) => {
+      const idxA = orderMap.has(a.id) ? (orderMap.get(a.id) as number) : 9999;
+      const idxB = orderMap.has(b.id) ? (orderMap.get(b.id) as number) : 9999;
+      if (idxA !== idxB) return idxA - idxB;
+      return a.date.localeCompare(b.date);
+    });
+  }
+
+  return classItems.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /**
@@ -236,6 +294,12 @@ export function createAssessment(data: Omit<AssessmentItem, "id" | "createdAt">)
   const existing = getStoredAssessments();
   const updated = [...existing, newItem];
   saveStoredAssessments(updated);
+
+  // Jika kelas memiliki urutan kustom, tambahkan item baru di urutan paling akhir
+  const customOrder = getAssessmentOrderForClass(data.classId);
+  if (customOrder.length > 0 && !customOrder.includes(newItem.id)) {
+    saveAssessmentOrderForClass(data.classId, [...customOrder, newItem.id]);
+  }
 
   return newItem;
 }
@@ -263,8 +327,19 @@ export function updateAssessment(id: string, updates: Partial<AssessmentItem>): 
  */
 export function deleteAssessment(id: string): void {
   const existingAssessments = getStoredAssessments();
+  const target = existingAssessments.find((a) => a.id === id);
   const filteredAssessments = existingAssessments.filter((a) => a.id !== id);
   saveStoredAssessments(filteredAssessments);
+
+  if (target) {
+    const customOrder = getAssessmentOrderForClass(target.classId);
+    if (customOrder.includes(id)) {
+      saveAssessmentOrderForClass(
+        target.classId,
+        customOrder.filter((item) => item !== id)
+      );
+    }
+  }
 
   // Bersihkan nilai siswa yang terasosiasi
   const existingScores = getStoredScores();

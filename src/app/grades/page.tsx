@@ -18,12 +18,17 @@ import {
   BookOpen,
   Calendar,
   SlidersHorizontal,
+  ChevronLeft,
   ChevronRight,
   TrendingUp,
   AlertTriangle,
   Sparkles,
   Users,
   Download,
+  GripVertical,
+  ArrowLeftRight,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 
 import {
@@ -55,6 +60,9 @@ import {
   calculateClassGradeStats,
   exportGradesToCSV,
   clearAssessmentsForClass,
+  getAssessmentsByClass,
+  getAssessmentOrderForClass,
+  saveAssessmentOrderForClass,
 } from "@/lib/gradeStorage";
 import {
   generateGradesExcelHtmlWithKop,
@@ -105,6 +113,11 @@ function GradesPageContent() {
   const [editingCell, setEditingCell] = useState<{ studentId: string; assessmentId: string } | null>(null);
   const [cellInputValue, setCellInputValue] = useState<string>("");
 
+  // 6. State Geser / Drag & Drop Urutan Penilaian (Reordering)
+  const [draggedAssessmentId, setDraggedAssessmentId] = useState<string | null>(null);
+  const [dragOverAssessmentId, setDragOverAssessmentId] = useState<string | null>(null);
+  const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
+
   // Muat data awal dari localStorage
   const refreshData = () => {
     setAssessments(getStoredAssessments());
@@ -129,10 +142,63 @@ function GradesPageContent() {
     return getStudentsForClass(selectedClassId);
   }, [selectedClassId]);
 
-  // Asesmen untuk kelas yang dipilih
+  // Asesmen untuk kelas yang dipilih (mempertimbangkan urutan kustom yang telah diatur)
   const classAssessments = useMemo(() => {
-    return assessments.filter((a) => a.classId === selectedClassId);
+    return getAssessmentsByClass(selectedClassId);
   }, [assessments, selectedClassId]);
+
+  // Handler memindahkan urutan asesmen (Drag & Drop atau tombol geser)
+  const handleReorderAssessments = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+
+    const currentIds = classAssessments.map((a) => a.id);
+    const sourceIdx = currentIds.indexOf(sourceId);
+    const targetIdx = currentIds.indexOf(targetId);
+
+    if (sourceIdx === -1 || targetIdx === -1) return;
+
+    const newIds = [...currentIds];
+    const [moved] = newIds.splice(sourceIdx, 1);
+    newIds.splice(targetIdx, 0, moved);
+
+    saveAssessmentOrderForClass(selectedClassId, newIds);
+    refreshData();
+
+    const movedItem = classAssessments.find((a) => a.id === sourceId);
+    showToast(`Urutan penilaian diperbarui: "${movedItem?.title || "Penilaian"}" berhasil digeser.`);
+  };
+
+  // Geser asesmen 1 langkah ke kiri (lebih awal)
+  const handleMoveAssessmentLeft = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const currentIds = classAssessments.map((a) => a.id);
+    const idx = currentIds.indexOf(id);
+    if (idx <= 0) return;
+    const targetId = currentIds[idx - 1];
+    handleReorderAssessments(id, targetId);
+  };
+
+  // Geser asesmen 1 langkah ke kanan (lebih akhir)
+  const handleMoveAssessmentRight = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const currentIds = classAssessments.map((a) => a.id);
+    const idx = currentIds.indexOf(id);
+    if (idx === -1 || idx >= currentIds.length - 1) return;
+    const targetId = currentIds[idx + 1];
+    handleReorderAssessments(id, targetId);
+  };
+
+  // Kembalikan urutan asesmen sesuai urutan tanggal
+  const handleResetAssessmentOrder = () => {
+    const isConfirm = window.confirm(
+      "Kembalikan urutan seluruh penilaian kelas ini ke urutan kronologis berdasarkan tanggal pelaksanaan?"
+    );
+    if (!isConfirm) return;
+    const sortedByDate = [...classAssessments].sort((a, b) => a.date.localeCompare(b.date));
+    saveAssessmentOrderForClass(selectedClassId, sortedByDate.map((a) => a.id));
+    refreshData();
+    showToast("Urutan kolom penilaian dikembalikan berdasarkan tanggal.");
+  };
 
   // Asesmen setelah difilter kategori
   const filteredAssessments = useMemo(() => {
@@ -708,11 +774,24 @@ function GradesPageContent() {
             <option value="nilai_asc">Urut: Nilai Terendah</option>
           </select>
 
+          {classAssessments.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setIsReorderModalOpen(true)}
+              className="px-3 py-1.5 bg-[var(--surface-recessed)] hover:bg-[var(--surface-recessed)]/80 text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[8px] text-xs font-semibold shrink-0 flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+              title="Atur urutan kolom penilaian (Geser Tugas, Ulangan, UTS, UAS)"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+              <span className="hidden md:inline">Atur Urutan Kolom</span>
+              <span className="md:hidden">Atur Urutan</span>
+            </button>
+          )}
+
           {filteredAssessments.length > 0 && (
             <button
               type="button"
               onClick={() => handleOpenQuickEntry()}
-              className="px-3 py-1.5 bg-[var(--color-accent)]/15 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/25 rounded-[8px] text-xs font-semibold shrink-0 flex items-center gap-1 transition-colors"
+              className="px-3 py-1.5 bg-[var(--color-accent)]/15 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/25 rounded-[8px] text-xs font-semibold shrink-0 flex items-center gap-1 transition-colors cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Input Nilai Cepat</span>
@@ -720,6 +799,28 @@ function GradesPageContent() {
           )}
         </div>
       </div>
+
+      {/* Petunjuk Interaktif Geser Urutan Kolom Penilaian */}
+      {classAssessments.length > 1 && (
+        <div className="px-3.5 py-2.5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[12px] text-xs text-[var(--text-secondary)] flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="px-2 py-0.5 rounded-[5px] bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-bold text-[10px] uppercase font-mono shrink-0">
+              💡 Cara Geser Urutan
+            </span>
+            <span className="truncate">
+              <strong>Tahan &amp; geser (drag &amp; drop)</strong> kepala kolom nilai di bawah untuk menukar urutannya (misal: Tugas sebelum UTS), atau klik tombol panah <strong>◀ ▶</strong> pada judul kolom.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleResetAssessmentOrder}
+            className="text-[11px] text-[var(--color-accent)] hover:underline shrink-0 font-medium cursor-pointer"
+            title="Kembalikan urutan sesuai kronologi tanggal pelaksanaan"
+          >
+            Reset ke Tanggal
+          </button>
+        </div>
+      )}
 
       {/* Tabel Matriks Rekap Nilai Siswa (Apple HIG Ledger Style) */}
       <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] overflow-hidden shadow-xs">
@@ -735,70 +836,144 @@ function GradesPageContent() {
                   Nama Siswa / NIS
                 </th>
 
-                {/* Kolom Tiap Asesmen */}
+                {/* Kolom Tiap Asesmen (Dapat Di-drag & Di-hold untuk Mengubah Urutan) */}
                 {filteredAssessments.length === 0 ? (
                   <th className="py-2.5 px-4 font-normal text-[var(--text-secondary)] italic border-r border-[var(--border-hairline)] min-w-[220px]">
                     Belum ada penilaian dibuat
                   </th>
                 ) : (
-                  filteredAssessments.map((asmt) => {
-                  const meta = ASSESSMENT_TYPE_METAS[asmt.type];
-                  return (
-                    <th
-                      key={asmt.id}
-                      className="py-2.5 px-3 min-w-[140px] max-w-[160px] border-r border-[var(--border-hairline)] align-top group"
-                    >
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${meta.badgeClass}`}>
-                            {meta.shortLabel}
-                          </span>
-                          <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingAssessment(asmt);
-                                setIsAssessmentModalOpen(true);
-                              }}
-                              title="Ubah Penilaian"
-                              className="p-0.5 hover:text-[var(--color-accent)]"
-                            >
-                              <Edit2 className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteAssessment(asmt.id, asmt.title)}
-                              title="Hapus Penilaian"
-                              className="p-0.5 hover:text-rose-600"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
+                  filteredAssessments.map((asmt, asmtIdx) => {
+                    const meta = ASSESSMENT_TYPE_METAS[asmt.type];
+                    const isDragging = draggedAssessmentId === asmt.id;
+                    const isDragOver = dragOverAssessmentId === asmt.id;
+
+                    return (
+                      <th
+                        key={asmt.id}
+                        draggable={true}
+                        onDragStart={(e) => {
+                          setDraggedAssessmentId(asmt.id);
+                          e.dataTransfer.setData("text/plain", asmt.id);
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                        }}
+                        onDragEnter={(e) => {
+                          e.preventDefault();
+                          if (draggedAssessmentId && draggedAssessmentId !== asmt.id) {
+                            setDragOverAssessmentId(asmt.id);
+                          }
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverAssessmentId === asmt.id) {
+                            setDragOverAssessmentId(null);
+                          }
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (draggedAssessmentId && draggedAssessmentId !== asmt.id) {
+                            handleReorderAssessments(draggedAssessmentId, asmt.id);
+                          }
+                          setDraggedAssessmentId(null);
+                          setDragOverAssessmentId(null);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedAssessmentId(null);
+                          setDragOverAssessmentId(null);
+                        }}
+                        className={`py-2.5 px-3 min-w-[155px] max-w-[185px] border-r border-[var(--border-hairline)] align-top select-none transition-all group ${
+                          isDragging
+                            ? "opacity-30 border-dashed border-2 border-[var(--color-accent)] bg-[var(--surface-recessed)] scale-[0.98]"
+                            : isDragOver
+                            ? "border-l-4 border-l-[var(--color-accent)] bg-[var(--color-accent)]/15 scale-[1.01]"
+                            : "hover:bg-[var(--surface-recessed)]/80 cursor-grab active:cursor-grabbing"
+                        }`}
+                        title="Tahan & geser untuk mengubah urutan kolom nilai, atau klik panah ◀ ▶"
+                      >
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <span
+                                className="p-0.5 text-[var(--text-secondary)]/50 group-hover:text-[var(--color-accent)] cursor-grab active:cursor-grabbing transition-colors"
+                                title="Tahan & geser untuk memindahkan urutan kolom"
+                              >
+                                <GripVertical className="w-3.5 h-3.5 shrink-0" />
+                              </span>
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border truncate ${meta.badgeClass}`}>
+                                {meta.shortLabel}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity shrink-0">
+                              {/* Tombol Geser Kiri */}
+                              <button
+                                type="button"
+                                disabled={asmtIdx === 0}
+                                onClick={(e) => handleMoveAssessmentLeft(asmt.id, e)}
+                                title="Geser ke kiri (sebelumnya)"
+                                className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed text-[var(--text-secondary)] hover:text-[var(--color-accent)] transition-colors cursor-pointer"
+                              >
+                                <ChevronLeft className="w-3 h-3" />
+                              </button>
+
+                              {/* Tombol Geser Kanan */}
+                              <button
+                                type="button"
+                                disabled={asmtIdx === filteredAssessments.length - 1}
+                                onClick={(e) => handleMoveAssessmentRight(asmt.id, e)}
+                                title="Geser ke kanan (berikutnya)"
+                                className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed text-[var(--text-secondary)] hover:text-[var(--color-accent)] transition-colors cursor-pointer"
+                              >
+                                <ChevronRight className="w-3 h-3" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingAssessment(asmt);
+                                  setIsAssessmentModalOpen(true);
+                                }}
+                                title="Ubah Penilaian"
+                                className="p-1 hover:text-[var(--color-accent)] rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteAssessment(asmt.id, asmt.title)}
+                                title="Hapus Penilaian"
+                                className="p-1 hover:text-rose-600 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
                           </div>
+
+                          <p className="font-semibold text-xs text-[var(--text-primary)] leading-tight line-clamp-2" title={asmt.title}>
+                            {asmt.title}
+                          </p>
+
+                          <div className="flex items-center justify-between text-[10px] text-[var(--text-secondary)] font-mono pt-0.5">
+                            <span>{asmt.date.slice(5)}</span>
+                            <span>Max {asmt.maxScore}</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenQuickEntry(asmt.id)}
+                            className="mt-1 w-full py-1 px-1.5 rounded-[6px] bg-[var(--surface-card)] hover:bg-[var(--color-accent)] hover:text-[var(--color-on-accent)] text-[var(--text-primary)] font-semibold text-[10px] flex items-center justify-center gap-1 transition-all border border-[var(--border-hairline)] shadow-2xs cursor-pointer"
+                            title={`Buka form input nilai untuk ${asmt.title}`}
+                          >
+                            <Sparkles className="w-2.5 h-2.5" />
+                            <span>Beri Nilai</span>
+                          </button>
                         </div>
-
-                        <p className="font-semibold text-xs text-[var(--text-primary)] leading-tight line-clamp-2" title={asmt.title}>
-                          {asmt.title}
-                        </p>
-
-                        <div className="flex items-center justify-between text-[10px] text-[var(--text-secondary)] font-mono pt-0.5">
-                          <span>{asmt.date.slice(5)}</span>
-                          <span>Max {asmt.maxScore}</span>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleOpenQuickEntry(asmt.id)}
-                          className="mt-1 w-full py-1 px-1.5 rounded-[6px] bg-[var(--surface-card)] hover:bg-[var(--color-accent)] hover:text-[var(--color-on-accent)] text-[var(--text-primary)] font-semibold text-[10px] flex items-center justify-center gap-1 transition-all border border-[var(--border-hairline)] shadow-2xs"
-                          title={`Buka form input nilai untuk ${asmt.title}`}
-                        >
-                          <Sparkles className="w-2.5 h-2.5" />
-                          <span>Beri Nilai</span>
-                        </button>
-                      </div>
-                    </th>
-                  );
-                })
-              )}
+                      </th>
+                    );
+                  })
+                )}
 
                 {/* Kolom Hasil & KKM */}
                 <th className="py-3 px-3 text-center font-bold text-[var(--text-secondary)] min-w-[90px] bg-[var(--surface-recessed)] border-r border-[var(--border-hairline)]">
@@ -1519,6 +1694,113 @@ function GradesPageContent() {
                 className="px-4 py-2 bg-[var(--color-accent)] text-[var(--color-on-accent)] rounded-[8px] text-xs font-semibold hover:bg-[var(--color-accent)]/90 shadow-xs"
               >
                 Terapkan KKM
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Atur Urutan Kolom Penilaian */}
+      {isReorderModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[16px] shadow-xl p-5 animate-in fade-in zoom-in-95 flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between border-b border-[var(--border-hairline)] pb-3 mb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <ArrowLeftRight className="w-4 h-4 text-[var(--color-accent)]" />
+                <div>
+                  <h3 className="font-bold text-sm text-[var(--text-primary)] leading-tight">
+                    Atur Urutan Kolom Penilaian
+                  </h3>
+                  <p className="text-[11px] text-[var(--text-secondary)]">
+                    Kelas {currentClass.name} &bull; {classAssessments.length} Kolom
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsReorderModalOpen(false)}
+                className="p-1 rounded-full text-[var(--text-secondary)] hover:bg-[var(--surface-recessed)] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[var(--text-secondary)] mb-3 shrink-0">
+              Gunakan tombol panah <strong>Naik</strong> / <strong>Turun</strong> untuk mengatur urutan kolom rekap nilai (misalnya mendahulukan Tugas sebelum Ulangan/UTS), atau Anda juga bisa langsung menahan dan menggeser <em>header</em> tabel rekap.
+            </p>
+
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 my-1">
+              {classAssessments.map((asmt, idx) => {
+                const meta = ASSESSMENT_TYPE_METAS[asmt.type] || {
+                  label: asmt.type,
+                  shortLabel: asmt.type,
+                  badgeClass: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700",
+                };
+
+                return (
+                  <div
+                    key={asmt.id}
+                    className="flex items-center justify-between gap-2 p-2.5 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] hover:border-[var(--color-accent)]/40 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-6 h-6 rounded-full bg-[var(--surface-card)] border border-[var(--border-hairline)] text-[11px] font-bold text-[var(--text-secondary)] flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${meta.badgeClass}`}>
+                            {meta.shortLabel}
+                          </span>
+                          <span className="text-[10px] text-[var(--text-secondary)] font-mono">
+                            {asmt.date}
+                          </span>
+                        </div>
+                        <p className="font-semibold text-xs text-[var(--text-primary)] truncate max-w-[210px]" title={asmt.title}>
+                          {asmt.title}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => handleMoveAssessmentLeft(asmt.id)}
+                        title="Geser Lebih Awal (Naik)"
+                        className="p-1.5 rounded-[6px] bg-[var(--surface-card)] border border-[var(--border-hairline)] text-[var(--text-secondary)] hover:text-[var(--color-accent)] disabled:opacity-25 disabled:cursor-not-allowed hover:bg-[var(--surface-card)]/80 transition-colors cursor-pointer"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === classAssessments.length - 1}
+                        onClick={() => handleMoveAssessmentRight(asmt.id)}
+                        title="Geser Lebih Akhir (Turun)"
+                        className="p-1.5 rounded-[6px] bg-[var(--surface-card)] border border-[var(--border-hairline)] text-[var(--text-secondary)] hover:text-[var(--color-accent)] disabled:opacity-25 disabled:cursor-not-allowed hover:bg-[var(--surface-card)]/80 transition-colors cursor-pointer"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 border-t border-[var(--border-hairline)] pt-3 mt-3 shrink-0">
+              <button
+                type="button"
+                onClick={handleResetAssessmentOrder}
+                className="text-xs text-[var(--text-secondary)] hover:text-rose-600 font-medium transition-colors cursor-pointer"
+              >
+                Reset ke Tanggal
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsReorderModalOpen(false)}
+                className="px-4 py-2 bg-[var(--color-accent)] text-[var(--color-on-accent)] rounded-[8px] text-xs font-semibold hover:bg-[var(--color-accent)]/90 shadow-xs cursor-pointer"
+              >
+                Selesai
               </button>
             </div>
           </div>
