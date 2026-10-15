@@ -1712,3 +1712,491 @@ export function generateGradesCsvWithKop(
   return "\uFEFF" + rows.join("\r\n");
 }
 
+// ============================================================================
+// 6. EKSPOR REKAP PENGUMUMAN NILAI DISENSOR (STATUS KELENGKAPAN TUGAS / UH)
+// Sesuai UU PDP: Nilai angka disamarkan, hanya menampilkan status Sudah / Belum
+// ============================================================================
+
+/**
+ * Menghasilkan berkas Excel murni (.xlsx) mode Sensor untuk Pengumuman Publik
+ * Nilai angka diganti dengan balok warna hijau (✓ SUDAH) dan merah (BELUM).
+ */
+export function generateCensoredGradesXlsxWithKop(
+  className: string,
+  assessments: AssessmentItem[],
+  summaries: StudentGradeSummary[],
+  meta: SchoolExportMetadata = {}
+): Uint8Array {
+  const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
+  const totalCols = 4 + assessments.length + 2;
+
+  const rows: any[][] = [];
+  const merges: any[] = [];
+
+  // 1. KOP SURAT RESMI PENGUMUMAN
+  rows.push([{ v: `REKAPITULASI KELENGKAPAN TUGAS & ASESMEN SISWA (PENGUMUMAN PUBLIK)`, t: "s", s: styleKop1 }]);
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } });
+
+  rows.push([{ v: `KELAS ${className.toUpperCase()} - ${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR`, t: "s", s: styleKop2 }]);
+  merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } });
+
+  rows.push([{ v: "TAHUN PELAJARAN 2026/2027 · SEMESTER GANJIL", t: "s", s: styleKop3 }]);
+  merges.push({ s: { r: 2, c: 0 }, e: { r: 2, c: totalCols - 1 } });
+
+  rows.push([{
+    v: `Mata Pelajaran: ${mergedMeta.subject} | Status: Nilai Angka Disensor (Privasi UU PDP) | Keterangan: [✓ SUDAH] = Tuntas Mengumpulkan, [BELUM] = Belum Mengerjakan`,
+    t: "s",
+    s: styleKopInfo,
+  }]);
+  merges.push({ s: { r: 3, c: 0 }, e: { r: 3, c: totalCols - 1 } });
+
+  rows.push([]);
+
+  // 2. HEADER TABEL
+  const headerRow: any[] = [
+    { v: "NO", t: "s", s: styleThDefault },
+    { v: "NIS", t: "s", s: styleThDefault },
+    { v: "NAMA SISWA", t: "s", s: styleThDefault },
+    { v: "L/P", t: "s", s: styleThDefault },
+  ];
+
+  assessments.forEach((a) => {
+    headerRow.push({
+      v: `${a.title}\n[${a.type}]`,
+      t: "s",
+      s: styleThDefault,
+    });
+  });
+
+  headerRow.push(
+    { v: "TOTAL TUNTAS", t: "s", s: { ...styleThDefault, fill: { fgColor: { rgb: "E0F2FE" } } } },
+    { v: "STATUS KELENGKAPAN", t: "s", s: styleThDefault }
+  );
+
+  rows.push(headerRow);
+
+  // 3. BARIS DATA SISWA DISENSOR
+  let fullyCompletedCount = 0;
+  let pendingStudentsCount = 0;
+  const pendingPerAssessment: Record<string, number> = {};
+  assessments.forEach((a) => { pendingPerAssessment[a.id] = 0; });
+
+  summaries.forEach((s, idx) => {
+    let completedCount = 0;
+
+    const row: any[] = [
+      { v: idx + 1, t: "n", s: styleCellCenter },
+      { v: s.nis ?? "-", t: "s", s: styleCellCenter },
+      { v: s.studentName, t: "s", s: styleCellText },
+      { v: s.gender ?? "-", t: "s", s: styleCellCenter },
+    ];
+
+    assessments.forEach((a) => {
+      const val = s.scores[a.id];
+      if (val !== null && val !== undefined) {
+        completedCount++;
+        row.push({
+          v: "✓ SUDAH",
+          t: "s",
+          s: styleStatusH, // Blok hijau tua dengan latar hijau muda
+        });
+      } else {
+        pendingPerAssessment[a.id] = (pendingPerAssessment[a.id] || 0) + 1;
+        row.push({
+          v: "BELUM",
+          t: "s",
+          s: styleStatusA, // Blok merah dengan latar merah muda
+        });
+      }
+    });
+
+    const isAllDone = assessments.length > 0 && completedCount === assessments.length;
+    if (isAllDone) fullyCompletedCount++;
+    else pendingStudentsCount++;
+
+    const pendingCount = assessments.length - completedCount;
+    const statusText = isAllDone ? "LENGKAP" : `BELUM LENGKAP (${pendingCount} Tagihan)`;
+
+    row.push(
+      {
+        v: `${completedCount} / ${assessments.length}`,
+        t: "s",
+        s: styleCellCenterBold,
+      },
+      {
+        v: statusText,
+        t: "s",
+        s: isAllDone ? styleStatusH : styleStatusA,
+      }
+    );
+
+    rows.push(row);
+  });
+
+  // 4. STATISTIK RINGKASAN DI BAWAH TABEL
+  rows.push([]);
+  const statsStartRow = rows.length;
+
+  rows.push([
+    { v: "RINGKASAN STATUS KELENGKAPAN KELAS:", t: "s", s: { font: { bold: true, sz: 10 } } },
+  ]);
+  merges.push({ s: { r: statsStartRow, c: 0 }, e: { r: statsStartRow, c: 3 } });
+
+  rows.push([
+    { v: `• Total Siswa Terdaftar: ${summaries.length} siswa`, t: "s", s: styleCellText },
+  ]);
+  merges.push({ s: { r: statsStartRow + 1, c: 0 }, e: { r: statsStartRow + 1, c: 3 } });
+
+  rows.push([
+    {
+      v: `• Siswa Sudah Tuntas Seluruh Tugas: ${fullyCompletedCount} siswa (${summaries.length > 0 ? ((fullyCompletedCount / summaries.length) * 100).toFixed(0) : 0}%)`,
+      t: "s",
+      s: { ...styleCellText, font: { color: { rgb: "166534" }, bold: true } },
+    },
+  ]);
+  merges.push({ s: { r: statsStartRow + 2, c: 0 }, e: { r: statsStartRow + 2, c: 4 } });
+
+  rows.push([
+    {
+      v: `• Siswa Masih Ada Tagihan Tugas: ${pendingStudentsCount} siswa (${summaries.length > 0 ? ((pendingStudentsCount / summaries.length) * 100).toFixed(0) : 0}%)`,
+      t: "s",
+      s: { ...styleCellText, font: { color: { rgb: "991B1B" }, bold: true } },
+    },
+  ]);
+  merges.push({ s: { r: statsStartRow + 3, c: 0 }, e: { r: statsStartRow + 3, c: 4 } });
+
+  // 5. TITIMANGSA & BLOK TANDA TANGAN RESMI
+  rows.push([]);
+  rows.push([]);
+
+  const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
+  const signRow1Idx = rows.length;
+  const signColRight = Math.max(3, totalCols - 3);
+
+  merges.push({ s: { r: signRow1Idx, c: 1 }, e: { r: signRow1Idx, c: 2 } });
+  merges.push({ s: { r: signRow1Idx, c: signColRight }, e: { r: signRow1Idx, c: totalCols - 1 } });
+
+  const signRow1: any[] = [
+    { v: "", t: "s" },
+    { v: `Mengetahui,\nKepala ${mergedMeta.schoolName}`, t: "s", s: { alignment: { horizontal: "center", wrapText: true } } },
+    { v: "", t: "s" },
+  ];
+  while (signRow1.length < signColRight) signRow1.push({ v: "", t: "s" });
+  signRow1.push({
+    v: `${mergedMeta.location}, ${formattedToday}\nGuru Mata Pelajaran Informatika,`,
+    t: "s",
+    s: { alignment: { horizontal: "center", wrapText: true } },
+  });
+  rows.push(signRow1);
+
+  rows.push([]);
+  rows.push([]);
+
+  const signRow2Idx = rows.length;
+  merges.push({ s: { r: signRow2Idx, c: 1 }, e: { r: signRow2Idx, c: 2 } });
+  merges.push({ s: { r: signRow2Idx, c: signColRight }, e: { r: signRow2Idx, c: totalCols - 1 } });
+
+  const signRow2: any[] = [
+    { v: "", t: "s" },
+    { v: "( ............................................................ )\nNIP. ........................................................", t: "s", s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } } },
+    { v: "", t: "s" },
+  ];
+  while (signRow2.length < signColRight) signRow2.push({ v: "", t: "s" });
+  signRow2.push({
+    v: `( ${mergedMeta.teacherName} )\nNIP. ${mergedMeta.teacherNip}`,
+    t: "s",
+    s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } },
+  });
+  rows.push(signRow2);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!merges"] = merges;
+
+  const colWidths = [
+    { wch: 5 },  // No
+    { wch: 14 }, // NIS
+    { wch: 32 }, // Nama Siswa
+    { wch: 5 },  // L/P
+    ...assessments.map(() => ({ wch: 16 })), // Asesmen disensor
+    { wch: 14 }, // Total Tuntas
+    { wch: 28 }, // Status Kelengkapan
+  ];
+  ws["!cols"] = colWidths;
+
+  const wb = XLSX.utils.book_new();
+  const safeClassName = className.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 25);
+  XLSX.utils.book_append_sheet(wb, ws, `Pengumuman_${safeClassName}`);
+
+  const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  return new Uint8Array(arrayBuffer);
+}
+
+/**
+ * Menghasilkan berkas CSV terformat untuk Rekap Pengumuman Nilai Disensor
+ */
+export function generateCensoredGradesCsvWithKop(
+  className: string,
+  assessments: AssessmentItem[],
+  summaries: StudentGradeSummary[],
+  meta: SchoolExportMetadata = {}
+): string {
+  const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
+  const rows: string[] = [];
+
+  // Kop Surat Resmi
+  rows.push(`"REKAPITULASI KELENGKAPAN TUGAS & ASESMEN SISWA (PENGUMUMAN PUBLIK)"`);
+  rows.push(`"KELAS ${className.toUpperCase()} - ${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR"`);
+  rows.push(`"TAHUN PELAJARAN 2026/2027 · SEMESTER GANJIL"`);
+  rows.push(`"Mata Pelajaran: ${mergedMeta.subject} | Status: Nilai Angka Disensor (UU PDP) | [SUDAH] = Tuntas, [BELUM] = Belum Mengerjakan"`);
+  rows.push("");
+
+  // Header Kolom
+  const headerCols = ["No", "NIS", "Nama Siswa", "L/P"];
+  assessments.forEach((a) => {
+    headerCols.push(`"${a.title.replace(/"/g, '""')} (${a.type})"`);
+  });
+  headerCols.push("Total Tuntas", "Status Kelengkapan");
+  rows.push(headerCols.join(","));
+
+  // Baris Siswa
+  summaries.forEach((s, idx) => {
+    let completedCount = 0;
+    const rowCols: string[] = [
+      String(idx + 1),
+      `"${s.nis ?? "-"}"`,
+      `"${s.studentName.replace(/"/g, '""')}"`,
+      `"${s.gender ?? "-"}"`,
+    ];
+
+    assessments.forEach((a) => {
+      const val = s.scores[a.id];
+      if (val !== null && val !== undefined) {
+        completedCount++;
+        rowCols.push('"SUDAH"');
+      } else {
+        rowCols.push('"BELUM"');
+      }
+    });
+
+    const isAllDone = assessments.length > 0 && completedCount === assessments.length;
+    const pendingCount = assessments.length - completedCount;
+    rowCols.push(`"${completedCount} / ${assessments.length}"`);
+    rowCols.push(isAllDone ? '"LENGKAP"' : `"BELUM LENGKAP (${pendingCount} Tagihan)"`);
+
+    rows.push(rowCols.join(","));
+  });
+
+  // Titimangsa & Blok Tanda Tangan
+  const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
+  rows.push("");
+  rows.push(`"Mengetahui,","","","","${assessments.map(() => '""').join(",")}"`);
+  rows.push(`"Kepala Sekolah,","","","","${assessments.map(() => '""').join(",")}","${mergedMeta.location}, ${formattedToday}"`);
+  rows.push(`"","","","","${assessments.map(() => '""').join(",")}","Guru Mata Pelajaran,"`);
+  rows.push(`""`);
+  rows.push(`""`);
+  rows.push(`"( ............................................ )","","","","${assessments.map(() => '""').join(",")}","${mergedMeta.teacherName}"`);
+  rows.push(`"NIP. ........................................","","","","${assessments.map(() => '""').join(",")}","NIP. ${mergedMeta.teacherNip}"`);
+
+  return "\uFEFF" + rows.join("\r\n");
+}
+
+/**
+ * Menghasilkan teks ringkasan rapi siap salin (Copy-Paste) untuk diumumkan ke Grup WhatsApp Kelas
+ * Otomatis mendata nama anak dan tugas apa saja yang belum dikumpulkan.
+ */
+export function generateCensoredGradesWhatsAppText(
+  className: string,
+  assessments: AssessmentItem[],
+  summaries: StudentGradeSummary[],
+  meta: SchoolExportMetadata = {}
+): string {
+  const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
+  const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
+
+  const studentsWithPending: { name: string; pendingTitles: string[] }[] = [];
+  let completeCount = 0;
+
+  summaries.forEach((s) => {
+    const pendingTitles: string[] = [];
+    assessments.forEach((a) => {
+      const val = s.scores[a.id];
+      if (val === null || val === undefined) {
+        pendingTitles.push(`${a.title} [${a.type}]`);
+      }
+    });
+
+    if (pendingTitles.length > 0) {
+      studentsWithPending.push({ name: s.studentName, pendingTitles });
+    } else {
+      completeCount++;
+    }
+  });
+
+  const lines: string[] = [
+    `📢 *PENGUMUMAN KELENGKAPAN TUGAS & ASESMEN*`,
+    `*${mergedMeta.schoolName.toUpperCase()}*`,
+    `*Kelas:* ${className} · *Mata Pelajaran:* ${mergedMeta.subject}`,
+    `*Per Tanggal:* ${formattedToday}`,
+    ``,
+    `🔒 *Catatan Privasi:* Nilai angka dirahasiakan (disensor). Pengumuman ini hanya menampilkan status kelengkapan pengumpulan tugas/ulangan.`,
+    ``,
+    `📊 *Ringkasan Kelas:*`,
+    `• Total Siswa: ${summaries.length} siswa`,
+    `• Siswa Tugas Lengkap: ${completeCount} siswa ✅`,
+    `• Siswa Memiliki Tagihan: ${studentsWithPending.length} siswa ⚠️`,
+    ``,
+  ];
+
+  if (studentsWithPending.length === 0) {
+    lines.push(`🎉 *Alhamdulillah! Seluruh siswa Kelas ${className} sudah menuntaskan seluruh tugas & asesmen.*`);
+  } else {
+    lines.push(`⚠️ *Daftar Siswa yang Masih Memiliki Tagihan Tugas / UH:*`);
+    studentsWithPending.forEach((item, idx) => {
+      lines.push(`${idx + 1}. *${item.name}*`);
+      item.pendingTitles.forEach((t) => {
+        lines.push(`   └ ❌ Belum: ${t}`);
+      });
+    });
+    lines.push(``);
+    lines.push(`_Bagi siswa yang namanya tercantum di atas, mohon segera menyelesaikan dan mengumpulkan tugas kepada guru pengampu._`);
+  }
+
+  lines.push(``);
+  lines.push(`Guru Pengampu:`);
+  lines.push(`*${mergedMeta.teacherName}*`);
+  lines.push(`NIP. ${mergedMeta.teacherNip}`);
+
+  return lines.join("\n");
+}
+
+/**
+ * Menghasilkan dokumen HTML ber-KOP resmi untuk Pratinjau Cetak / Simpan PDF Pengumuman Disensor
+ */
+export function generateCensoredGradesHtmlPrint(
+  className: string,
+  assessments: AssessmentItem[],
+  summaries: StudentGradeSummary[],
+  meta: SchoolExportMetadata = {}
+): string {
+  const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
+  const totalCols = 4 + assessments.length + 2;
+
+  let completeCount = 0;
+  let pendingCount = 0;
+
+  const rowsHtml = summaries
+    .map((s, idx) => {
+      let done = 0;
+      const cells = assessments
+        .map((a) => {
+          const sc = s.scores[a.id];
+          if (sc !== null && sc !== undefined) {
+            done++;
+            return `<td style="text-align: center; font-weight: bold; background-color: #DCFCE7; color: #166534;">✓ SUDAH</td>`;
+          }
+          return `<td style="text-align: center; font-weight: bold; background-color: #FEE2E2; color: #991B1B;">BELUM</td>`;
+        })
+        .join("");
+
+      const isAll = assessments.length > 0 && done === assessments.length;
+      if (isAll) completeCount++;
+      else pendingCount++;
+
+      const pendingTagihan = assessments.length - done;
+
+      return `<tr>
+        <td style="text-align: center; font-family: monospace;">${idx + 1}</td>
+        <td style="text-align: center; font-family: monospace;">${s.nis ?? "-"}</td>
+        <td style="text-align: left; font-weight: 500;">${s.studentName}</td>
+        <td style="text-align: center;">${s.gender ?? "-"}</td>
+        ${cells}
+        <td style="text-align: center; font-weight: bold; font-family: monospace;">${done} / ${assessments.length}</td>
+        <td style="text-align: center; font-weight: bold; ${
+          isAll ? "background-color: #DCFCE7; color: #166534;" : "background-color: #FEE2E2; color: #991B1B;"
+        }">${isAll ? "LENGKAP" : `BELUM LENGKAP (${pendingTagihan})`}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
+
+  return `
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>Pengumuman Kelengkapan Tugas Kelas ${className}</title>
+  <style>
+    body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 10pt; color: #111827; margin: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+    .kop-1 { font-size: 13pt; font-weight: bold; text-align: center; }
+    .kop-2 { font-size: 11pt; font-weight: bold; text-align: center; }
+    .kop-info { font-size: 9pt; text-align: center; color: #4B5563; margin-top: 4px; }
+    th { border: 1px solid #374151; background-color: #E2EFDA; padding: 6px 4px; font-size: 8.5pt; font-weight: bold; text-align: center; }
+    td { border: 1px solid #6B7280; padding: 4px 6px; font-size: 8.5pt; vertical-align: middle; }
+    .no-border { border: none !important; }
+    @media print {
+      body { margin: 10mm; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div style="text-align: center; border-bottom: 2px solid #111827; padding-bottom: 8px; margin-bottom: 12px;">
+    <div class="kop-1">REKAPITULASI KELENGKAPAN TUGAS &amp; ASESMEN SISWA</div>
+    <div class="kop-2">KELAS ${className.toUpperCase()} · ${mergedMeta.schoolName.toUpperCase()}</div>
+    <div class="kop-info">Tahun Ajaran 2026/2027 · Mata Pelajaran: ${mergedMeta.subject} · Status: Nilai Angka Disensor (UU PDP)</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 30px;">NO</th>
+        <th style="width: 85px;">NIS</th>
+        <th style="width: 220px; text-align: left; padding-left: 8px;">NAMA SISWA</th>
+        <th style="width: 35px;">L/P</th>
+        ${assessments
+          .map(
+            (a) =>
+              `<th style="width: 80px;">${a.title}<br/><span style="font-size: 7.5pt; color: #4B5563;">[${a.type}]</span></th>`
+          )
+          .join("")}
+        <th style="width: 70px; background-color: #E0F2FE;">TOTAL</th>
+        <th style="width: 110px;">STATUS</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+
+  <div style="margin-top: 16px; font-size: 9pt; background: #F9FAFB; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 6px;">
+    <strong>Ringkasan Kelas:</strong> Total Siswa: ${summaries.length} | Siswa Lengkap: <span style="color: #166534; font-weight: bold;">${completeCount}</span> | Masih Ada Tagihan: <span style="color: #991B1B; font-weight: bold;">${pendingCount}</span>
+  </div>
+
+  <table style="width: 100%; border: none; margin-top: 30px;">
+    <tr>
+      <td colspan="4" class="no-border" style="width: 50%; text-align: left; padding-left: 20px;">
+        Mengetahui,<br/>
+        Kepala ${mergedMeta.schoolName}<br/><br/><br/><br/>
+        <strong>( ............................................................ )</strong><br/>
+        NIP. ........................................................
+      </td>
+      <td colspan="${Math.max(1, totalCols - 4)}" class="no-border" style="width: 50%; text-align: right; padding-right: 30px;">
+        ${mergedMeta.location}, ${formattedToday}<br/>
+        Guru Mata Pelajaran Informatika,<br/><br/><br/><br/>
+        <strong><u>${mergedMeta.teacherName}</u></strong><br/>
+        NIP. ${mergedMeta.teacherNip}
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+}
+
+/** Alias untuk pratinjau HTML berkas pengumuman nilai */
+export const generateCensoredGradesExcelHtmlWithKop = generateCensoredGradesHtmlPrint;
+
+
+

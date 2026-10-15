@@ -75,6 +75,7 @@ import {
   getGradePredicate,
   type AssessmentItem,
   type StudentScoreRecord,
+  type StudentGradeSummary,
 } from "../contracts/grades.ts";
 import {
   AttendanceStatusSchema,
@@ -97,6 +98,10 @@ import {
   generateGradesXlsxWithKop,
   generateSemesterAttendanceCsvWithKop,
   generateSemesterAttendanceXlsxWithKop,
+  generateCensoredGradesXlsxWithKop,
+  generateCensoredGradesCsvWithKop,
+  generateCensoredGradesWhatsAppText,
+  generateCensoredGradesHtmlPrint,
 } from "./exportUtils.ts";
 import { computeSemesterRecapForClass } from "../app/reports/page.tsx";
 import type { SemesterClassRecap, StudentSemesterRecap } from "../contracts/attendance.ts";
@@ -1030,6 +1035,129 @@ function runSmokeTest() {
     assert.strictEqual(backup.data.kkmByGrade?.["8"], 83);
 
     console.log("✓ LULUS: Kustomisasi KKM per angkatan (Kls 7: 82, Kls 8: 83), skala predikat ketuntasan, dan disaster recovery teruji 100%.");
+  }
+
+  // 16. Pengujian Ekspor & Pengumuman Nilai Disensor (Mode Perlindungan Privasi Siswa UU PDP)
+  {
+    console.log("[TEST 16] Menguji pembuatan berkas ekspor nilai disensor (Excel, CSV, WhatsApp, dan Cetak HTML)...");
+
+    const dummyAssessments: AssessmentItem[] = [
+      {
+        id: "asmt-tugas-1",
+        classId: "7A",
+        subject: "Informatika",
+        title: "Tugas 1 - Algoritma",
+        type: "TUGAS",
+        weight: 20,
+        maxScore: 100,
+        date: "2026-08-10",
+        createdAt: "2026-08-10T07:00:00.000Z",
+      },
+      {
+        id: "asmt-uh-1",
+        classId: "7A",
+        subject: "Informatika",
+        title: "UH 1 - Flowchart",
+        type: "UH",
+        weight: 30,
+        maxScore: 100,
+        date: "2026-08-25",
+        createdAt: "2026-08-25T07:00:00.000Z",
+      },
+    ];
+
+    const dummySummaries: StudentGradeSummary[] = [
+      {
+        studentId: "std-1",
+        studentName: "Ahmad Fauzi",
+        nis: "26001",
+        gender: "L",
+        scores: { "asmt-tugas-1": 95, "asmt-uh-1": 88 },
+        categoryAverages: { TUGAS: 95, UH: 88, UTS: null, UAS: null, PRAKTIK: null, QUIZ: null, LAINNYA: null },
+        finalScore: 91,
+        predicate: "A",
+        isPassed: true,
+        gradedCount: 2,
+        totalCount: 2,
+      },
+      {
+        studentId: "std-2",
+        studentName: "Budi Santoso",
+        nis: "26002",
+        gender: "L",
+        scores: { "asmt-tugas-1": 80, "asmt-uh-1": null }, // belum mengerjakan UH 1
+        categoryAverages: { TUGAS: 80, UH: null, UTS: null, UAS: null, PRAKTIK: null, QUIZ: null, LAINNYA: null },
+        finalScore: 80,
+        predicate: "B",
+        isPassed: true,
+        gradedCount: 1,
+        totalCount: 2,
+      },
+      {
+        studentId: "std-3",
+        studentName: "Citra Lestari",
+        nis: "26003",
+        gender: "P",
+        scores: { "asmt-tugas-1": null, "asmt-uh-1": null }, // belum mengerjakan dua-duanya
+        categoryAverages: { TUGAS: null, UH: null, UTS: null, UAS: null, PRAKTIK: null, QUIZ: null, LAINNYA: null },
+        finalScore: null,
+        predicate: "D",
+        isPassed: false,
+        gradedCount: 0,
+        totalCount: 2,
+      },
+    ];
+
+    // 16.1 Uji Ekspor Excel (.xlsx) Disensor
+    const xlsxBuffer = generateCensoredGradesXlsxWithKop("7A", dummyAssessments, dummySummaries);
+    assert.ok(xlsxBuffer instanceof Uint8Array, "Ekspor Excel harus menghasilkan Uint8Array valid");
+    assert.ok(xlsxBuffer.length > 500, "Ukuran berkas Excel harus realistis (> 500 byte)");
+
+    // Baca kembali berkas Excel via XLSX parser untuk validasi isi sel disensor
+    const wb = XLSX.read(xlsxBuffer, { type: "buffer" });
+    assert.ok(wb.SheetNames.length > 0, "Workbook harus memiliki setidaknya 1 worksheet");
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const sheetText = XLSX.utils.sheet_to_csv(ws);
+    // Verifikasi bahwa sel berisi status SUDAH dan BELUM, bukan angka mentah
+    assert.ok(sheetText.includes("SUDAH"), "Excel disensor harus memuat teks status 'SUDAH'");
+    assert.ok(sheetText.includes("BELUM"), "Excel disensor harus memuat teks status 'BELUM'");
+    assert.ok(sheetText.includes("Ahmad Fauzi"), "Excel disensor harus memuat nama siswa");
+    assert.ok(sheetText.includes("LENGKAP"), "Excel disensor harus memuat status kelengkapan kelas");
+    // Pastikan angka nilai asli (misalnya nilai 95 dan 88) TIDAK bocor pada kolom asesmen
+    assert.strictEqual(sheetText.includes(",95,"), false, "Nilai aktual 95 dilarang bocor di Excel disensor");
+    assert.strictEqual(sheetText.includes(",88,"), false, "Nilai aktual 88 dilarang bocor di Excel disensor");
+
+    // 16.2 Uji Ekspor CSV Disensor
+    const csvContent = generateCensoredGradesCsvWithKop("7A", dummyAssessments, dummySummaries);
+    assert.ok(csvContent.includes("REKAPITULASI KELENGKAPAN TUGAS"), "CSV harus memuat judul pengumuman");
+    assert.ok(csvContent.includes("Disensor"), "CSV harus memuat penanda status disensor");
+    assert.ok(csvContent.includes("SUDAH"), "CSV harus memuat label 'SUDAH'");
+    assert.ok(csvContent.includes("BELUM"), "CSV harus memuat label 'BELUM'");
+    assert.ok(csvContent.includes("Budi Santoso"), "CSV harus memuat nama Budi Santoso");
+    assert.strictEqual(csvContent.includes(",95,"), false, "Nilai aktual 95 dilarang bocor di CSV disensor");
+
+    // 16.3 Uji Generator Teks Pengumuman WhatsApp
+    const waText = generateCensoredGradesWhatsAppText("7A", dummyAssessments, dummySummaries);
+    assert.ok(waText.includes("*PENGUMUMAN KELENGKAPAN TUGAS & ASESMEN*"), "Format WA harus memiliki judul pengumuman");
+    assert.ok(waText.includes("*Kelas:* 7A"), "Format WA harus mencantumkan kelas 7A");
+    assert.ok(waText.includes("Budi Santoso"), "Format WA harus mencantumkan Budi yang belum tuntas");
+    assert.ok(waText.includes("UH 1 - Flowchart"), "Format WA harus mencantumkan judul tugas yang belum tuntas");
+    assert.ok(waText.includes("Citra Lestari"), "Format WA harus mencantumkan Citra yang belum tuntas");
+    assert.ok(waText.includes("Tugas 1 - Algoritma"), "Format WA harus mencantumkan tugas 1 untuk Citra");
+    // Pastikan Ahmad Fauzi yang sudah tuntas TIDAK masuk dalam daftar tagihan WA
+    assert.strictEqual(waText.includes("*Ahmad Fauzi*"), false, "Siswa yang sudah tuntas tidak boleh masuk daftar tagihan WA");
+    assert.ok(waText.includes("Guru Pengampu:"), "Format WA harus mencantumkan penutup guru pengampu");
+
+    // 16.4 Uji Format HTML Siap Cetak / PDF Mading
+    const htmlPrint = generateCensoredGradesHtmlPrint("7A", dummyAssessments, dummySummaries);
+    assert.ok(htmlPrint.includes("<!DOCTYPE html>"), "HTML print harus dokumen HTML valid");
+    assert.ok(htmlPrint.includes("REKAPITULASI KELENGKAPAN TUGAS"), "HTML print harus memuat judul rekapitulasi");
+    assert.ok(htmlPrint.includes("background-color: #DCFCE7"), "HTML print harus memiliki style sel hijau untuk SUDAH");
+    assert.ok(htmlPrint.includes("background-color: #FEE2E2"), "HTML print harus memiliki style sel merah untuk BELUM");
+    assert.ok(htmlPrint.includes("Ahmad Fauzi"), "HTML print harus memuat nama siswa");
+    assert.strictEqual(htmlPrint.includes(">95<"), false, "Nilai aktual 95 dilarang bocor di HTML cetak disensor");
+
+    console.log("✓ LULUS: Ekspor & Pengumuman Nilai Disensor (Excel .xlsx, CSV, WhatsApp 1-Klik, & Cetak HTML Mading) terverifikasi 100% aman privasi.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");

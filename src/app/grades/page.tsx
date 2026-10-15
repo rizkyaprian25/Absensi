@@ -29,6 +29,12 @@ import {
   ArrowLeftRight,
   ArrowUp,
   ArrowDown,
+  EyeOff,
+  Eye,
+  Share2,
+  Copy,
+  Printer,
+  Check,
 } from "lucide-react";
 
 import {
@@ -72,6 +78,11 @@ import {
   generateGradesExcelHtmlWithKop,
   generateGradesCsvWithKop,
   generateGradesXlsxWithKop,
+  generateCensoredGradesXlsxWithKop,
+  generateCensoredGradesCsvWithKop,
+  generateCensoredGradesExcelHtmlWithKop,
+  generateCensoredGradesHtmlPrint,
+  generateCensoredGradesWhatsAppText,
   downloadXlsxFile,
 } from "@/lib/exportUtils";
 
@@ -122,7 +133,12 @@ function GradesPageContent() {
   const [dragOverAssessmentId, setDragOverAssessmentId] = useState<string | null>(null);
   const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
 
-  // 7. State Mounted untuk perlindungan hidrasi SSR (Hydration Mismatch Shield)
+  // 7. State Ekspor Pengumuman Sensor Nilai & Mode Sensor Layar
+  const [isCensoredExportModalOpen, setIsCensoredExportModalOpen] = useState(false);
+  const [isCensoredViewActive, setIsCensoredViewActive] = useState(false);
+  const [hasCopiedWa, setHasCopiedWa] = useState(false);
+
+  // 8. State Mounted untuk perlindungan hidrasi SSR (Hydration Mismatch Shield)
   const [isMounted, setIsMounted] = useState(false);
 
   // Muat data awal dari localStorage
@@ -517,6 +533,116 @@ function GradesPageContent() {
     URL.revokeObjectURL(url);
   };
 
+  // Unduh Berkas Excel (.xlsx) Mode Pengumuman Disensor (Status Kelengkapan)
+  const handleDownloadCensoredExcel = () => {
+    const xlsxBuffer = generateCensoredGradesXlsxWithKop(
+      currentClass.name,
+      classAssessments,
+      studentSummaries
+    );
+
+    const filename = `Pengumuman_Kelengkapan_Tugas_Kelas_${currentClass.name}_Informatika_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    downloadXlsxFile(xlsxBuffer, filename);
+
+    showToast(`Berkas Excel (.xlsx) Pengumuman Nilai Disensor Kelas ${currentClass.name} berhasil diunduh`);
+  };
+
+  // Unduh Berkas CSV Mode Pengumuman Disensor
+  const handleDownloadCensoredCSV = () => {
+    const csvContent = generateCensoredGradesCsvWithKop(
+      currentClass.name,
+      classAssessments,
+      studentSummaries
+    );
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `Pengumuman_Kelengkapan_Tugas_Kelas_${currentClass.name}_Informatika_${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`Berkas CSV Pengumuman Nilai Disensor Kelas ${currentClass.name} berhasil diunduh`);
+  };
+
+  // Salin Teks Ringkasan Pengumuman WhatsApp
+  const handleCopyWhatsAppText = () => {
+    const text = generateCensoredGradesWhatsAppText(
+      currentClass.name,
+      classAssessments,
+      studentSummaries
+    );
+
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        setHasCopiedWa(true);
+        showToast("Teks Pengumuman WhatsApp berhasil disalin ke clipboard!");
+        setTimeout(() => setHasCopiedWa(false), 2500);
+      }).catch(() => {
+        alert("Gagal menyalin teks ke clipboard. Silakan gunakan tombol unduh berkas Excel/CSV.");
+      });
+    }
+  };
+
+  // Cetak / Simpan PDF Pengumuman Disensor
+  const handlePrintCensoredHtml = () => {
+    const htmlContent = generateCensoredGradesHtmlPrint(
+      currentClass.name,
+      classAssessments,
+      studentSummaries
+    );
+
+    const printWin = window.open("", "_blank");
+    if (printWin) {
+      printWin.document.open();
+      printWin.document.write(htmlContent);
+      printWin.document.close();
+      setTimeout(() => {
+        printWin.focus();
+        printWin.print();
+      }, 400);
+    } else {
+      alert("Popup terblokir oleh peramban. Izinkan popup untuk mencetak pengumuman.");
+    }
+  };
+
+  // Hitung ringkasan kelengkapan tugas kelas untuk modal pengumuman
+  const censoredStats = useMemo(() => {
+    let completedStudents = 0;
+    let pendingStudents = 0;
+    const taskPendingCounts: Record<string, number> = {};
+    classAssessments.forEach((a) => { taskPendingCounts[a.id] = 0; });
+
+    studentSummaries.forEach((s) => {
+      let done = 0;
+      classAssessments.forEach((a) => {
+        const val = s.scores[a.id];
+        if (val !== null && val !== undefined) {
+          done++;
+        } else {
+          taskPendingCounts[a.id] = (taskPendingCounts[a.id] || 0) + 1;
+        }
+      });
+      if (classAssessments.length > 0 && done === classAssessments.length) {
+        completedStudents++;
+      } else {
+        pendingStudents++;
+      }
+    });
+
+    return {
+      completedStudents,
+      pendingStudents,
+      totalStudents: studentSummaries.length,
+      taskPendingCounts,
+    };
+  }, [studentSummaries, classAssessments]);
+
   // Konfirmasi & Kosongkan Penilaian Kelas Terpilih
   const handleClearAssessments = () => {
     const isConfirm = window.confirm(
@@ -594,6 +720,17 @@ function GradesPageContent() {
           >
             <Download className="w-3.5 h-3.5 text-[var(--color-accent)]" />
             <span>Ekspor CSV</span>
+          </button>
+
+          {/* Tombol Ekspor Nilai Disensor (Pengumuman / Kelengkapan Tugas) */}
+          <button
+            type="button"
+            onClick={() => setIsCensoredExportModalOpen(true)}
+            className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs active:scale-[0.98] cursor-pointer"
+            title="Buka menu ekspor nilai disensor untuk pengumuman grup kelas / mading (Melindungi privasi siswa sesuai UU PDP)"
+          >
+            <EyeOff className="w-3.5 h-3.5 text-amber-100" />
+            <span>Ekspor Sensor (Pengumuman)</span>
           </button>
 
           {/* Tombol Kosongkan Nilai (Hanya muncul jika kelas memiliki asesmen) */}
@@ -840,6 +977,30 @@ function GradesPageContent() {
               <span className="hidden sm:inline">Input Nilai Cepat</span>
             </button>
           )}
+
+          {/* Tombol Toggle Sensor Layar (Mode Aman Proyektor Kelas / Mading) */}
+          <button
+            type="button"
+            onClick={() => setIsCensoredViewActive((prev) => !prev)}
+            className={`px-3 py-1.5 rounded-[8px] text-xs font-semibold shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer border ${
+              isCensoredViewActive
+                ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-400 font-bold"
+                : "bg-[var(--surface-recessed)] hover:bg-[var(--surface-recessed)]/80 text-[var(--text-secondary)] border-[var(--border-hairline)]"
+            }`}
+            title="Sembunyikan angka nilai aktual di layar agar aman ditampilkan di proyektor kelas atau ruang publik (Hanya tampil ✓ SUDAH / BELUM)"
+          >
+            {isCensoredViewActive ? (
+              <>
+                <Eye className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span>Buka Sensor</span>
+              </>
+            ) : (
+              <>
+                <EyeOff className="w-3.5 h-3.5 text-amber-600" />
+                <span>Sensor Layar</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -861,6 +1022,25 @@ function GradesPageContent() {
             title="Kembalikan urutan sesuai kronologi tanggal pelaksanaan"
           >
             Reset ke Tanggal
+          </button>
+        </div>
+      )}
+
+      {/* Banner Peringatan Mode Sensor Layar Aktif */}
+      {isCensoredViewActive && (
+        <div className="px-3.5 py-2.5 bg-amber-500/10 border border-amber-500/30 rounded-[12px] text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between gap-3 shadow-2xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <EyeOff className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>Mode Sensor Layar Aktif:</strong> Angka nilai aktual disembunyikan dan digantikan status kelengkapan (<strong>✓ SUDAH</strong> / <strong>BELUM</strong>). Aman ditayangkan di proyektor kelas atau grup publik.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCensoredViewActive(false)}
+            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-[6px] font-semibold text-[11px] shrink-0 cursor-pointer"
+          >
+            Matikan Sensor
           </button>
         </div>
       )}
@@ -1086,10 +1266,28 @@ function GradesPageContent() {
                             <td
                               key={asmt.id}
                               className={`py-2 px-3 text-center border-r border-[var(--border-hairline)] font-mono transition-colors ${
-                                isUnderKkm ? "bg-rose-50/25 dark:bg-rose-950/10" : ""
+                                !isCensoredViewActive && isUnderKkm ? "bg-rose-50/25 dark:bg-rose-950/10" : ""
                               }`}
                             >
-                              {isEditingThis ? (
+                              {isCensoredViewActive ? (
+                                <div className="flex items-center justify-center py-0.5">
+                                  {sc !== null && sc !== undefined ? (
+                                    <span
+                                      className="inline-flex items-center justify-center px-2 py-0.5 rounded-[5px] text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-800/80 select-none shadow-2xs"
+                                      title={`Tugas/Asesmen '${asmt.title}' SUDAH dikerjakan`}
+                                    >
+                                      ✓ SUDAH
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className="inline-flex items-center justify-center px-2 py-0.5 rounded-[5px] text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300/80 dark:border-rose-800/80 select-none shadow-2xs"
+                                      title={`Tugas/Asesmen '${asmt.title}' BELUM dikerjakan`}
+                                    >
+                                      BELUM
+                                    </span>
+                                  )}
+                                </div>
+                              ) : isEditingThis ? (
                                 <input
                                   autoFocus
                                   type="number"
@@ -1139,41 +1337,81 @@ function GradesPageContent() {
 
                       {/* Nilai Rata-rata Akhir */}
                       <td className="py-2.5 px-3 text-center font-mono text-xs border-r border-[var(--border-hairline)] bg-[var(--surface-card)]">
-                        <div className="flex items-center justify-center gap-1">
-                          <span className="text-[var(--text-primary)] font-bold">
-                            {summary.finalScore !== null ? summary.finalScore : "-"}
+                        {isCensoredViewActive ? (
+                          <span
+                            className="text-[var(--text-secondary)] font-mono font-bold select-none text-[11px] tracking-widest opacity-60"
+                            title="Nilai rata-rata disensor demi privasi siswa"
+                          >
+                            ***
                           </span>
-                          {summary.finalScore !== null && summary.finalScore < kkm && (
-                            <span
-                              className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"
-                              title={`Rata-rata di bawah KKM (${kkm})`}
-                            />
-                          )}
-                        </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="text-[var(--text-primary)] font-bold">
+                              {summary.finalScore !== null ? summary.finalScore : "-"}
+                            </span>
+                            {summary.finalScore !== null && summary.finalScore < kkm && (
+                              <span
+                                className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"
+                                title={`Rata-rata di bawah KKM (${kkm})`}
+                              />
+                            )}
+                          </div>
+                        )}
                       </td>
 
                       {/* Predikat Nilai */}
                       <td className="py-2.5 px-2.5 text-center font-bold text-xs border-r border-[var(--border-hairline)] font-mono">
-                        <span
-                          className={`inline-block w-5 h-5 rounded leading-5 text-[11px] ${
-                            summary.predicate === "A"
-                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                              : summary.predicate === "B"
-                              ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
-                              : summary.predicate === "C"
-                              ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300"
-                              : summary.predicate === "D"
-                              ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                              : "text-[var(--text-secondary)]"
-                          }`}
-                        >
-                          {summary.predicate}
-                        </span>
+                        {isCensoredViewActive ? (
+                          <span
+                            className="text-[var(--text-secondary)] font-mono font-bold select-none text-xs opacity-60"
+                            title="Predikat disensor demi privasi siswa"
+                          >
+                            -
+                          </span>
+                        ) : (
+                          <span
+                            className={`inline-block w-5 h-5 rounded leading-5 text-[11px] ${
+                              summary.predicate === "A"
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                : summary.predicate === "B"
+                                ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                                : summary.predicate === "C"
+                                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300"
+                                : summary.predicate === "D"
+                                ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                                : "text-[var(--text-secondary)]"
+                            }`}
+                          >
+                            {summary.predicate}
+                          </span>
+                        )}
                       </td>
 
-                      {/* Keterangan KKM */}
+                      {/* Keterangan KKM / Kelengkapan Tugas */}
                       <td className="py-2.5 px-3 text-center">
-                        {summary.finalScore === null ? (
+                        {isCensoredViewActive ? (
+                          (() => {
+                            let doneCount = 0;
+                            filteredAssessments.forEach((a) => {
+                              const v = summary.scores[a.id];
+                              if (v !== null && v !== undefined) doneCount++;
+                            });
+                            const isAllDone = filteredAssessments.length > 0 && doneCount === filteredAssessments.length;
+                            const missingCount = filteredAssessments.length - doneCount;
+
+                            return isAllDone ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Lengkap</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                                <AlertCircle className="w-3 h-3" />
+                                <span>Tagihan ({missingCount})</span>
+                              </span>
+                            );
+                          })()
+                        ) : summary.finalScore === null ? (
                           <span className="text-[11px] text-[var(--text-secondary)] font-medium">
                             Belum Ada Nilai
                           </span>
@@ -1195,7 +1433,7 @@ function GradesPageContent() {
               )}
             </tbody>
 
-            {/* Footer Rata-rata Kelas */}
+            {/* Footer Rata-rata Kelas / Ringkasan Sensor */}
             {sortedAndFilteredSummaries.length > 0 && (
               <tfoot className="bg-[var(--surface-recessed)] border-t-2 border-[var(--border-hairline)] font-bold text-xs sticky bottom-0 z-20">
                 <tr>
@@ -1203,13 +1441,27 @@ function GradesPageContent() {
                     Σ
                   </td>
                   <td className="py-2.5 px-3 sticky left-10 bg-[var(--surface-recessed)] z-20 border-r border-[var(--border-hairline)] shadow-[2px_0_4px_rgba(0,0,0,0.02)] uppercase tracking-wider text-[11px] text-[var(--text-secondary)]">
-                    Rata-rata Kelas
+                    {isCensoredViewActive ? "Total Selesai" : "Rata-rata Kelas"}
                   </td>
 
                   {filteredAssessments.map((asmt) => {
                     const valid = sortedAndFilteredSummaries
                       .map((s) => s.scores[asmt.id])
                       .filter((sc): sc is number => typeof sc === "number" && !isNaN(sc));
+
+                    if (isCensoredViewActive) {
+                      return (
+                        <td
+                          key={asmt.id}
+                          className="py-2.5 px-3 text-center font-mono border-r border-[var(--border-hairline)] text-[var(--text-primary)]"
+                        >
+                          <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                            {valid.length} / {sortedAndFilteredSummaries.length}
+                          </span>
+                        </td>
+                      );
+                    }
+
                     const avg =
                       valid.length > 0
                         ? Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 10) / 10
@@ -1226,13 +1478,19 @@ function GradesPageContent() {
                   })}
 
                   <td className="py-2.5 px-3 text-center font-mono text-emerald-700 dark:text-emerald-400 border-r border-[var(--border-hairline)]">
-                    {stats.classAverage > 0 ? stats.classAverage : "-"}
+                    {isCensoredViewActive
+                      ? `${censoredStats.completedStudents} Siswa`
+                      : stats.classAverage > 0
+                      ? stats.classAverage
+                      : "-"}
                   </td>
                   <td className="py-2.5 px-2.5 text-center border-r border-[var(--border-hairline)]">
                     -
                   </td>
                   <td className="py-2.5 px-3 text-center font-mono text-[11px] text-[var(--text-secondary)]">
-                    {stats.passingRate}% Tuntas
+                    {isCensoredViewActive
+                      ? `${Math.round(((censoredStats.completedStudents || 0) / (censoredStats.totalStudents || 1)) * 100)}% Lengkap`
+                      : `${stats.passingRate}% Tuntas`}
                   </td>
                 </tr>
               </tfoot>
@@ -1930,6 +2188,257 @@ function GradesPageContent() {
                 className="px-4 py-2 bg-[var(--color-accent)] text-[var(--color-on-accent)] rounded-[8px] text-xs font-semibold hover:bg-[var(--color-accent)]/90 shadow-xs cursor-pointer"
               >
                 Selesai
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Ekspor & Pengumuman Nilai Disensor (Mode Privasi Siswa) */}
+      {isCensoredExportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs overflow-y-auto">
+          <div className="w-full max-w-2xl bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[18px] shadow-2xl p-6 animate-in fade-in zoom-in-95 my-8 max-h-[90vh] flex flex-col">
+            {/* Header Modal */}
+            <div className="flex items-start justify-between border-b border-[var(--border-hairline)] pb-4 mb-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-[12px] bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                  <EyeOff className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-[var(--text-primary)] leading-tight">
+                    Ekspor &amp; Pengumuman Nilai Disensor
+                  </h3>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                    Kelas {currentClass.name} · Nilai angka disensor &amp; hanya menampilkan status kelengkapan (✓ SUDAH / BELUM) aman sesuai UU Perlindungan Data Pribadi (PDP).
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCensoredExportModalOpen(false)}
+                className="p-1.5 rounded-full text-[var(--text-secondary)] hover:bg-[var(--surface-recessed)] transition-colors cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Konten Scrollable */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+              {/* Ringkasan Status Kelengkapan Kelas */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="p-3 rounded-[12px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)]">
+                  <span className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase block">
+                    Total Siswa
+                  </span>
+                  <span className="text-lg font-bold font-mono text-[var(--text-primary)]">
+                    {censoredStats.totalStudents}
+                  </span>
+                </div>
+                <div className="p-3 rounded-[12px] bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                  <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-300 uppercase block">
+                    Tuntas Semua
+                  </span>
+                  <span className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300">
+                    {censoredStats.completedStudents} Siswa
+                  </span>
+                </div>
+                <div className="p-3 rounded-[12px] bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800">
+                  <span className="text-[10px] font-semibold text-rose-800 dark:text-rose-300 uppercase block">
+                    Ada Tagihan
+                  </span>
+                  <span className="text-lg font-bold font-mono text-rose-700 dark:text-rose-300">
+                    {censoredStats.pendingStudents} Siswa
+                  </span>
+                </div>
+                <div className="p-3 rounded-[12px] bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800">
+                  <span className="text-[10px] font-semibold text-sky-800 dark:text-sky-300 uppercase block">
+                    Tingkat Lengkap
+                  </span>
+                  <span className="text-lg font-bold font-mono text-sky-700 dark:text-sky-300">
+                    {censoredStats.totalStudents > 0
+                      ? Math.round((censoredStats.completedStudents / censoredStats.totalStudents) * 100)
+                      : 0}
+                    %
+                  </span>
+                </div>
+              </div>
+
+              {/* Opsi Ekspor & Distribusi Pengumuman */}
+              <div>
+                <h4 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider mb-2">
+                  Pilih Format Pengumuman
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Kartu 1: Unduh Excel Disensor */}
+                  <div className="p-3.5 rounded-[14px] bg-[var(--surface-recessed)]/70 border border-[var(--border-hairline)] hover:border-emerald-500/50 transition-all flex flex-col justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className="p-1.5 rounded-[8px] bg-emerald-600 text-white">
+                          <FileSpreadsheet className="w-4 h-4" />
+                        </div>
+                        <strong className="text-xs font-bold text-[var(--text-primary)]">
+                          Excel (.xlsx) Ber-Kop Disensor
+                        </strong>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                        Tabel ber-kop resmi SMPN 3 Cibungbulang dengan blok sel hijau (<strong>✓ SUDAH</strong>) dan merah (<strong>BELUM</strong>). Siap dibagikan ke wali murid.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDownloadCensoredExcel}
+                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[10px] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs active:scale-[0.98] cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Unduh Excel Disensor</span>
+                    </button>
+                  </div>
+
+                  {/* Kartu 2: Salin Format WhatsApp */}
+                  <div className="p-3.5 rounded-[14px] bg-[var(--surface-recessed)]/70 border border-[var(--border-hairline)] hover:border-emerald-500/50 transition-all flex flex-col justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className="p-1.5 rounded-[8px] bg-emerald-700 text-white">
+                          <Share2 className="w-4 h-4" />
+                        </div>
+                        <strong className="text-xs font-bold text-[var(--text-primary)]">
+                          Salin Format WhatsApp
+                        </strong>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                        Rangkuman teks ramah WhatsApp yang otomatis mendata nama siswa dan rincian tugas yang belum diserahkan.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyWhatsAppText}
+                      className={`w-full py-2 rounded-[10px] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs active:scale-[0.98] cursor-pointer ${
+                        hasCopiedWa
+                          ? "bg-emerald-800 text-white"
+                          : "bg-emerald-700 hover:bg-emerald-800 text-white"
+                      }`}
+                    >
+                      {hasCopiedWa ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Tersalin ke Clipboard!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Salin Teks WhatsApp</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Kartu 3: Cetak / PDF Fisik */}
+                  <div className="p-3.5 rounded-[14px] bg-[var(--surface-recessed)]/70 border border-[var(--border-hairline)] hover:border-[var(--color-accent)]/50 transition-all flex flex-col justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className="p-1.5 rounded-[8px] bg-[var(--color-accent)] text-white">
+                          <Printer className="w-4 h-4" />
+                        </div>
+                        <strong className="text-xs font-bold text-[var(--text-primary)]">
+                          Cetak / Simpan PDF Pengumuman
+                        </strong>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                        Dokumen cetak ber-kop resmi sekolah dan tanda tangan guru. Cocok dicetak untuk ditempel di papan mading kelas.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handlePrintCensoredHtml}
+                      className="w-full py-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent)]/90 text-white rounded-[10px] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs active:scale-[0.98] cursor-pointer"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Cetak / Simpan PDF</span>
+                    </button>
+                  </div>
+
+                  {/* Kartu 4: Unduh CSV Disensor */}
+                  <div className="p-3.5 rounded-[14px] bg-[var(--surface-recessed)]/70 border border-[var(--border-hairline)] hover:border-[var(--color-accent)]/50 transition-all flex flex-col justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className="p-1.5 rounded-[8px] bg-slate-700 text-white">
+                          <Download className="w-4 h-4" />
+                        </div>
+                        <strong className="text-xs font-bold text-[var(--text-primary)]">
+                          Unduh CSV Disensor
+                        </strong>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                        Format CSV ber-kop resmi yang kompatibel dengan berbagai aplikasi spreadsheet atau arsip tata usaha sekolah.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDownloadCensoredCSV}
+                      className="w-full py-2 bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[10px] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs active:scale-[0.98] cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Unduh CSV Disensor</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Fitur Tambahan: Mode Sensor Layar Proyektor */}
+              <div className="p-3.5 rounded-[14px] bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <EyeOff className="w-5 h-5 text-amber-600 shrink-0" />
+                  <div>
+                    <h5 className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                      Tampilkan Sensor pada Tabel Layar / Proyektor Kelas
+                    </h5>
+                    <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80">
+                      Aktifkan fitur ini jika Anda ingin menyambungkan layar laptop ke proyektor LCD di depan siswa.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCensoredViewActive((prev) => !prev)}
+                  className={`px-3 py-1.5 rounded-[8px] text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                    isCensoredViewActive
+                      ? "bg-amber-600 text-white shadow-xs"
+                      : "bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--border-hairline)]"
+                  }`}
+                >
+                  {isCensoredViewActive ? "Sensor Aktif ✓" : "Aktifkan Sensor"}
+                </button>
+              </div>
+
+              {/* Pratinjau Teks WhatsApp */}
+              <div className="border border-[var(--border-hairline)] rounded-[14px] p-3.5 bg-[var(--surface-recessed)]">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1.5">
+                    <span>Pratinjau Pesan WhatsApp:</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopyWhatsAppText}
+                    className="text-[11px] font-semibold text-[var(--color-accent)] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>Salin Pesan</span>
+                  </button>
+                </div>
+                <pre className="text-[11px] font-mono whitespace-pre-wrap bg-[var(--surface-card)] p-3 rounded-[8px] border border-[var(--border-hairline)] max-h-40 overflow-y-auto text-[var(--text-primary)]">
+                  {generateCensoredGradesWhatsAppText(currentClass.name, classAssessments, studentSummaries)}
+                </pre>
+              </div>
+            </div>
+
+            {/* Footer Modal */}
+            <div className="border-t border-[var(--border-hairline)] pt-3 mt-4 flex items-center justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsCensoredExportModalOpen(false)}
+                className="px-5 py-2 bg-[var(--surface-recessed)] hover:bg-[var(--surface-recessed)]/80 text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[10px] text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Tutup
               </button>
             </div>
           </div>
