@@ -17,6 +17,7 @@ import {
   FileCheck,
   BookOpen,
 } from "lucide-react";
+import { Toast } from "@/components/ui/Toast";
 import {
   MOCK_CLASSES,
   MOCK_SCHOOL_NAME,
@@ -177,12 +178,7 @@ export default function TodayDashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       {/* Toast Notifikasi Aksi */}
-      {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[var(--text-primary)] text-[var(--color-bg)] px-4 py-2.5 rounded-[12px] shadow-xl flex items-center gap-2 text-xs md:text-sm font-semibold animate-in fade-in slide-in-from-top-4 border border-[var(--border-hairline)] max-w-[90vw]">
-          <CheckCircle2 className="w-4 h-4 text-[var(--status-hadir-fg)] shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
 
       {/* Header Guru & Status Sistem */}
       <header className="flex flex-col gap-1.5">

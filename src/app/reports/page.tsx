@@ -21,6 +21,7 @@ import {
   Sparkles,
   TrendingUp,
 } from "lucide-react";
+import { Toast } from "@/components/ui/Toast";
 import {
   MOCK_CLASSES,
   getStudentsForClass,
@@ -593,12 +594,7 @@ export default function ReportsPage() {
   return (
     <div className="flex flex-col gap-5 print:p-0">
       {/* Toast Notifikasi */}
-      {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[var(--status-hadir-fg)] text-white px-4 py-2.5 rounded-[12px] shadow-lg flex items-center gap-2 text-sm font-semibold animate-in fade-in slide-in-from-top-4 print:hidden">
-          <CheckCircle2 className="w-5 h-5" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
 
       {/* Header Halaman & Aksi Cepat */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:hidden">
