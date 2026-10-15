@@ -85,6 +85,7 @@ import {
   generateCensoredGradesWhatsAppText,
   downloadXlsxFile,
 } from "@/lib/exportUtils";
+import { SmoothHorizontalScroll } from "@/components/ui/SmoothHorizontalScroll";
 
 function GradesPageContent() {
   const searchParams = useSearchParams();
@@ -771,13 +772,20 @@ function GradesPageContent() {
             {students.length} Siswa Terdaftar
           </span>
         </div>
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        <SmoothHorizontalScroll
+          containerClassName="w-full"
+          className="py-1 px-0.5"
+          activeKey={selectedClassId}
+          activeSelector="[data-active='true']"
+          gradientFromClass="from-[var(--surface-recessed)]"
+        >
           {MOCK_CLASSES.map((cls) => {
             const isSelected = cls.id === selectedClassId;
             return (
               <button
                 key={cls.id}
                 type="button"
+                data-active={isSelected}
                 onClick={() => handleSelectClass(cls.id)}
                 className={`min-h-[38px] px-3.5 py-1.5 rounded-[10px] text-xs font-bold shrink-0 transition-all ${
                   isSelected
@@ -789,7 +797,7 @@ function GradesPageContent() {
               </button>
             );
           })}
-        </div>
+        </SmoothHorizontalScroll>
       </div>
 
       {/* Kartu Ringkasan Metrik Kelas */}
@@ -889,14 +897,21 @@ function GradesPageContent() {
 
       {/* Filter Kategori Asesmen & Pencarian */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[var(--surface-card)] p-3 rounded-[12px] border border-[var(--border-hairline)]">
-        {/* Filter Kategori Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+        {/* Filter Kategori Pills dengan Smooth Horizontal Scroll */}
+        <SmoothHorizontalScroll
+          containerClassName="flex-1 min-w-0"
+          className="py-1 px-0.5"
+          activeKey={categoryFilter}
+          activeSelector="[data-active='true']"
+          gradientFromClass="from-[var(--surface-card)]"
+        >
           <button
             type="button"
+            data-active={categoryFilter === "ALL"}
             onClick={() => setCategoryFilter("ALL")}
-            className={`px-3 py-1.5 rounded-[8px] text-xs font-semibold shrink-0 transition-colors ${
+            className={`px-3 py-1.5 rounded-[8px] text-xs font-semibold shrink-0 transition-all ${
               categoryFilter === "ALL"
-                ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                ? "bg-[var(--color-accent)] text-[var(--color-on-accent)] shadow-xs"
                 : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             }`}
           >
@@ -910,28 +925,33 @@ function GradesPageContent() {
               <button
                 key={cat}
                 type="button"
+                data-active={isSelected}
                 onClick={() => setCategoryFilter(cat)}
-                className={`px-2.5 py-1.5 rounded-[8px] text-xs font-medium shrink-0 transition-colors flex items-center gap-1 ${
+                className={`px-2.5 py-1.5 rounded-[8px] text-xs font-medium shrink-0 transition-all flex items-center gap-1.5 ${
                   isSelected
-                    ? "bg-[var(--text-primary)] text-[var(--surface-card)] font-bold"
+                    ? "bg-[var(--text-primary)] text-[var(--surface-card)] font-bold shadow-xs"
                     : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 }`}
               >
                 <span>{meta.shortLabel}</span>
                 {count > 0 && (
-                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                    isSelected ? "bg-white/20 text-white" : "bg-black/10 dark:bg-white/10"
-                  }`}>
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                      isSelected
+                        ? "bg-white/20 text-white dark:bg-black/20 dark:text-black"
+                        : "bg-black/10 dark:bg-white/10"
+                    }`}
+                  >
                     {count}
                   </span>
                 )}
               </button>
             );
           })}
-        </div>
+        </SmoothHorizontalScroll>
 
         {/* Input Pencarian & Sort */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="relative flex-1 md:w-56">
             <Search className="w-3.5 h-3.5 text-[var(--text-secondary)] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -1754,37 +1774,46 @@ function GradesPageContent() {
                 )}
               </div>
 
-              {/* Status Filter Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-[11px] shrink-0">
+              {/* Status Filter Pills dengan Smooth Horizontal Scroll */}
+              <SmoothHorizontalScroll
+                containerClassName="w-full text-[11px]"
+                className="py-0.5 px-0.5"
+                activeKey={quickStatusFilter}
+                activeSelector="[data-active='true']"
+                gradientFromClass="from-[var(--surface-recessed)]"
+              >
                 <button
                   type="button"
+                  data-active={quickStatusFilter === "ALL"}
                   onClick={() => setQuickStatusFilter("ALL")}
-                  className={`px-2.5 py-1 rounded-[6px] font-medium transition-colors shrink-0 ${
+                  className={`px-2.5 py-1 rounded-[6px] font-medium transition-all shrink-0 ${
                     quickStatusFilter === "ALL"
-                      ? "bg-[var(--text-primary)] text-[var(--surface-card)] font-bold"
-                      : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      ? "bg-[var(--text-primary)] text-[var(--surface-card)] font-bold shadow-xs"
+                      : "bg-[var(--surface-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   }`}
                 >
                   Semua ({students.length})
                 </button>
                 <button
                   type="button"
+                  data-active={quickStatusFilter === "UNGRADED"}
                   onClick={() => setQuickStatusFilter("UNGRADED")}
-                  className={`px-2.5 py-1 rounded-[6px] font-medium transition-colors shrink-0 ${
+                  className={`px-2.5 py-1 rounded-[6px] font-medium transition-all shrink-0 ${
                     quickStatusFilter === "UNGRADED"
-                      ? "bg-amber-500 text-white font-bold"
-                      : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      ? "bg-amber-500 text-white font-bold shadow-xs"
+                      : "bg-[var(--surface-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   }`}
                 >
                   Belum Dinilai ({quickCounts.ungraded})
                 </button>
                 <button
                   type="button"
+                  data-active={quickStatusFilter === "GRADED"}
                   onClick={() => setQuickStatusFilter("GRADED")}
-                  className={`px-2.5 py-1 rounded-[6px] font-medium transition-colors shrink-0 ${
+                  className={`px-2.5 py-1 rounded-[6px] font-medium transition-all shrink-0 ${
                     quickStatusFilter === "GRADED"
-                      ? "bg-emerald-600 text-white font-bold"
-                      : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      ? "bg-emerald-600 text-white font-bold shadow-xs"
+                      : "bg-[var(--surface-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   }`}
                 >
                   Sudah Dinilai ({quickCounts.graded})
@@ -1792,17 +1821,18 @@ function GradesPageContent() {
                 {quickCounts.remedial > 0 && (
                   <button
                     type="button"
+                    data-active={quickStatusFilter === "REMEDIAL"}
                     onClick={() => setQuickStatusFilter("REMEDIAL")}
-                    className={`px-2.5 py-1 rounded-[6px] font-medium transition-colors shrink-0 ${
+                    className={`px-2.5 py-1 rounded-[6px] font-medium transition-all shrink-0 ${
                       quickStatusFilter === "REMEDIAL"
-                        ? "bg-rose-600 text-white font-bold"
-                        : "bg-[var(--surface-recessed)] text-[var(--status-alpa-fg)] hover:text-[var(--status-alpa-fg)]"
+                        ? "bg-rose-600 text-white font-bold shadow-xs"
+                        : "bg-[var(--surface-card)] text-[var(--status-alpa-fg)] hover:text-[var(--status-alpa-fg)]"
                     }`}
                   >
                     Remedial ({quickCounts.remedial})
                   </button>
                 )}
-              </div>
+              </SmoothHorizontalScroll>
             </div>
 
             {/* Indikator Hasil Pencarian jika ada query atau filter */}
