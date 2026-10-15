@@ -98,6 +98,7 @@ import {
   generateGradesXlsxWithKop,
   generateSemesterAttendanceCsvWithKop,
   generateSemesterAttendanceXlsxWithKop,
+  generateSemesterAttendanceHtmlPrint,
   generateCensoredGradesXlsxWithKop,
   generateCensoredGradesCsvWithKop,
   generateCensoredGradesWhatsAppText,
@@ -896,13 +897,27 @@ function runSmokeTest() {
     assert.ok(wb.SheetNames.length > 0, "Worksheet semester harus terbuat");
     assert.ok(wb.SheetNames[0].startsWith("Semester_"), "Nama worksheet harus diawali Semester_");
 
-    // Uji pembuatan berkas CSV Semester dengan UTF-8 BOM
+    // Uji pembuatan berkas CSV Semester dengan UTF-8 BOM (13 kolom langsung)
     const csvContent = generateSemesterAttendanceCsvWithKop(dummyClass, semesterRecap);
     assert.ok(csvContent.startsWith("\uFEFF"), "CSV semester wajib memiliki awalan UTF-8 BOM");
     assert.ok(csvContent.includes("DAFTAR HADIR SISWA KUMULATIF SEMESTER 1 (GANJIL)"), "Kop CSV semester harus ada");
-    assert.ok(csvContent.includes("TOTAL KUMULATIF SEMESTER") || csvContent.includes("Semester Hadir"), "Kolom total semester harus ada");
+    assert.ok(csvContent.includes("JUMLAH TOTAL KEHADIRAN KELAS") || csvContent.includes("Total"), "Kolom total semester harus ada");
+    assert.ok(csvContent.includes("Telat (T)"), "Kolom Telat (T) harus ada di CSV semester");
+    assert.ok(csvContent.includes("Predikat Raport"), "Kolom Predikat Raport harus ada di CSV semester");
 
-    console.log("✓ LULUS: Rekapitulasi kumulatif semester (Buku Raport & 6 bulan) dan ekspor ber-kop resmi terverifikasi 100%.");
+    // Uji pembuatan dokumen cetak / PDF HTML Rekap Semester Folio (21.59cm x 33.02cm 1 Lembar)
+    const htmlPrint = generateSemesterAttendanceHtmlPrint(dummyClass, semesterRecap, {
+      schoolName: "SMP NEGERI 3 CIBUNGBULANG",
+      teacherName: "Muhamad Rizky Aprian, S.Kom",
+    });
+    assert.ok(typeof htmlPrint === "string", "Output cetak PDF harus berupa string HTML");
+    assert.ok(htmlPrint.includes("21.59cm 33.02cm"), "Ukuran kertas harus Folio resmi 21.59cm x 33.02cm");
+    assert.ok(htmlPrint.includes("REKAPITULASI AKUMULASI PRESENSI SISWA KELAS VII / A"), "Kop judul rekap semester harus ada");
+    assert.ok(htmlPrint.includes("HADIR (H)") && htmlPrint.includes("TELAT (T)"), "Header 13 kolom harus lengkap");
+    assert.ok(htmlPrint.includes("JUMLAH TOTAL KEHADIRAN KELAS"), "Baris total akumulasi kelas harus ada");
+    assert.ok(htmlPrint.includes("Guru Mata Pelajaran Informatika"), "Tanda tangan guru harus ada");
+
+    console.log("✓ LULUS: Rekapitulasi kumulatif semester 13 kolom langsung (Excel, CSV, dan PDF Folio ber-kop) terverifikasi 100%.");
   }
 
   // 14. Pengujian Fleksibilitas Pengurutan Kolom Penilaian (Reordering / Drag & Drop)

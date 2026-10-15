@@ -978,9 +978,66 @@ const stylePredikatKurang = {
   alignment: { horizontal: "center", vertical: "center" },
 };
 
+const styleStatusT = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "C2410C" } },
+  fill: { fgColor: { rgb: "FFEDD5" } },
+  border: borderThin,
+  alignment: { horizontal: "center", vertical: "center" },
+};
+
+const styleThHadir = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "166534" } },
+  fill: { fgColor: { rgb: "DCFCE7" } },
+  border: borderHeader,
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+};
+
+const styleThSakit = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "1E40AF" } },
+  fill: { fgColor: { rgb: "DBEAFE" } },
+  border: borderHeader,
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+};
+
+const styleThIzin = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "854D0E" } },
+  fill: { fgColor: { rgb: "FEF9C3" } },
+  border: borderHeader,
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+};
+
+const styleThAlpa = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "991B1B" } },
+  fill: { fgColor: { rgb: "FEE2E2" } },
+  border: borderHeader,
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+};
+
+const styleThTelat = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "C2410C" } },
+  fill: { fgColor: { rgb: "FFEDD5" } },
+  border: borderHeader,
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+};
+
+const styleThDispen = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "4338CA" } },
+  fill: { fgColor: { rgb: "EEF2FF" } },
+  border: borderHeader,
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+};
+
+const styleThTotal = {
+  font: { name: "Calibri", sz: 9, bold: true, color: { rgb: "0369A1" } },
+  fill: { fgColor: { rgb: "E0F2FE" } },
+  border: borderHeader,
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+};
+
 /**
- * Menghasilkan berkas Excel murni (.xlsx) berstandar OpenXML untuk Rekapitulasi Kumulatif Semester
- * Memuat rincian tiap bulan (H/S/I/A/D), total semester, persentase kehadiran, dan predikat buku raport
+ * Menghasilkan berkas Excel murni (.xlsx) berstandar OpenXML untuk Rekapitulasi Kumulatif Semester (Format Buku Raport SMP)
+ * Memuat 13 kolom langsung: No, NIS / NIPD, Nama Lengkap Siswa, L/P, Hadir, Sakit, Izin, Alpa, Telat, Dispen, Total, % Hadir, Predikat Raport
+ * dengan Kop Surat Resmi, format Folio (21.59cm x 33.02cm) portrait, dan tanda tangan resmi.
  */
 export function generateSemesterAttendanceXlsxWithKop(
   currentClass: Class,
@@ -988,8 +1045,7 @@ export function generateSemesterAttendanceXlsxWithKop(
   meta: SchoolExportMetadata = {}
 ): Uint8Array {
   const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
-  const months = semesterRecap.months;
-  const totalCols = 4 + months.length * 5 + 8;
+  const totalCols = 13;
 
   const rows: any[][] = [];
   const merges: any[] = [];
@@ -1017,7 +1073,7 @@ export function generateSemesterAttendanceXlsxWithKop(
   merges.push({ s: { r: 2, c: 0 }, e: { r: 2, c: totalCols - 1 } });
 
   rows.push([{
-    v: `Mata Pelajaran: ${currentClass.subject || mergedMeta.subject} | Semester: ${currentClass.semester ?? 1} (Ganjil) | Periode: Juli - Desember 2026`,
+    v: `Mata Pelajaran: ${currentClass.subject || mergedMeta.subject} | Semester: ${currentClass.semester ?? 1} (Ganjil) | Format: Buku Raport SMP`,
     t: "s",
     s: styleKopInfo,
   }]);
@@ -1025,83 +1081,30 @@ export function generateSemesterAttendanceXlsxWithKop(
 
   rows.push([]); // Baris kosong pemisah
 
-  // 2. HEADER TINGKAT 1 (KOLOM IDENTITAS, BULAN, TOTAL SEMESTER)
-  const header1RowIdx = rows.length;
-  const headerRow1: any[] = [
+  // 2. HEADER TABEL (13 KOLOM LANGSUNG)
+  const headerRow: any[] = [
     { v: "NO", t: "s", s: styleThDefault },
-    { v: "NIPD / NIS", t: "s", s: styleThDefault },
-    { v: "NAMA SISWA", t: "s", s: styleThDefault },
+    { v: "NIS / NIPD", t: "s", s: styleThDefault },
+    { v: "NAMA LENGKAP SISWA", t: "s", s: styleThDefault },
     { v: "L/P", t: "s", s: styleThDefault },
+    { v: "HADIR (H)", t: "s", s: styleThHadir },
+    { v: "SAKIT (S)", t: "s", s: styleThSakit },
+    { v: "IZIN (I)", t: "s", s: styleThIzin },
+    { v: "ALPA (A)", t: "s", s: styleThAlpa },
+    { v: "TELAT (T)", t: "s", s: styleThTelat },
+    { v: "DISPEN (D)", t: "s", s: styleThDispen },
+    { v: "TOTAL", t: "s", s: styleThTotal },
+    { v: "% HADIR", t: "s", s: styleThTotal },
+    { v: "PREDIKAT RAPORT", t: "s", s: styleThTotal },
   ];
+  rows.push(headerRow);
 
-  // Merge No, NIS, Nama, L/P secara vertikal (row 5 ke row 6)
-  merges.push({ s: { r: header1RowIdx, c: 0 }, e: { r: header1RowIdx + 1, c: 0 } });
-  merges.push({ s: { r: header1RowIdx, c: 1 }, e: { r: header1RowIdx + 1, c: 1 } });
-  merges.push({ s: { r: header1RowIdx, c: 2 }, e: { r: header1RowIdx + 1, c: 2 } });
-  merges.push({ s: { r: header1RowIdx, c: 3 }, e: { r: header1RowIdx + 1, c: 3 } });
-
-  // Tiap Bulan: Colspan 5 (H, S, I, A, D)
-  months.forEach((m, mIdx) => {
-    const colStart = 4 + mIdx * 5;
-    headerRow1.push({ v: m.label.toUpperCase(), t: "s", s: styleThDefault });
-    headerRow1.push({ v: "", t: "s", s: styleThDefault });
-    headerRow1.push({ v: "", t: "s", s: styleThDefault });
-    headerRow1.push({ v: "", t: "s", s: styleThDefault });
-    headerRow1.push({ v: "", t: "s", s: styleThDefault });
-    merges.push({ s: { r: header1RowIdx, c: colStart }, e: { r: header1RowIdx, c: colStart + 4 } });
-  });
-
-  // Total Semester: Colspan 8 (Hadir, Sakit, Izin, Alpa, Dispen, Total, % Hadir, Predikat)
-  const totalSemColStart = 4 + months.length * 5;
-  headerRow1.push({ v: "TOTAL KUMULATIF SEMESTER", t: "s", s: styleThDefault });
-  for (let k = 1; k < 8; k++) {
-    headerRow1.push({ v: "", t: "s", s: styleThDefault });
-  }
-  merges.push({ s: { r: header1RowIdx, c: totalSemColStart }, e: { r: header1RowIdx, c: totalCols - 1 } });
-
-  rows.push(headerRow1);
-
-  // 3. HEADER TINGKAT 2 (SUB-HEADER H, S, I, A, D & TOTAL)
-  const headerRow2: any[] = [
-    { v: "", t: "s", s: styleThDefault },
-    { v: "", t: "s", s: styleThDefault },
-    { v: "", t: "s", s: styleThDefault },
-    { v: "", t: "s", s: styleThDefault },
-  ];
-
-  months.forEach(() => {
-    headerRow2.push(
-      { v: "H", t: "s", s: styleStatusH },
-      { v: "S", t: "s", s: styleStatusS },
-      { v: "I", t: "s", s: styleStatusI },
-      { v: "A", t: "s", s: styleStatusA },
-      { v: "D", t: "s", s: styleStatusD }
-    );
-  });
-
-  headerRow2.push(
-    { v: "Hadir", t: "s", s: styleStatusH },
-    { v: "Sakit", t: "s", s: styleStatusS },
-    { v: "Izin", t: "s", s: styleStatusI },
-    { v: "Alpa", t: "s", s: styleStatusA },
-    { v: "Dispen", t: "s", s: styleStatusD },
-    { v: "Total", t: "s", s: styleThDefault },
-    { v: "% Hadir", t: "s", s: styleThDefault },
-    { v: "Predikat", t: "s", s: styleThDefault }
-  );
-
-  rows.push(headerRow2);
-
-  // 4. BARIS DATA SISWA
-  const monthSums: Record<string, { hadir: number; sakit: number; izin: number; alpa: number; dispen: number }> = {};
-  months.forEach((m) => {
-    monthSums[m.value] = { hadir: 0, sakit: 0, izin: 0, alpa: 0, dispen: 0 };
-  });
-
+  // 3. BARIS DATA SISWA
   let sumHadirSem = 0;
   let sumSakitSem = 0;
   let sumIzinSem = 0;
   let sumAlpaSem = 0;
+  let sumTelatSem = 0;
   let sumDispenSem = 0;
   let sumTotalSem = 0;
 
@@ -1110,52 +1113,25 @@ export function generateSemesterAttendanceXlsxWithKop(
     sumSakitSem += s.totalSakit;
     sumIzinSem += s.totalIzin;
     sumAlpaSem += s.totalAlpa;
+    sumTelatSem += s.totalTerlambat;
     sumDispenSem += s.totalDispen;
     sumTotalSem += s.totalHari;
+
+    let predStyle = stylePredikatBaik;
+    if (s.predikat === "Sangat Baik") predStyle = stylePredikatSangatBaik;
+    else if (s.predikat === "Cukup") predStyle = stylePredikatCukup;
+    else if (s.predikat === "Kurang") predStyle = stylePredikatKurang;
 
     const row: any[] = [
       { v: idx + 1, t: "n", s: styleCellCenter },
       { v: s.nis ?? "-", t: "s", s: styleCellCenter },
       { v: s.fullName, t: "s", s: styleCellText },
       { v: s.gender ?? "-", t: "s", s: styleCellCenter },
-    ];
-
-    // Rincian per bulan
-    months.forEach((m) => {
-      const stats = s.monthlyStats[m.value] || {
-        hadir: 0,
-        sakit: 0,
-        izin: 0,
-        alpa: 0,
-        dispen: 0,
-      };
-
-      monthSums[m.value].hadir += stats.hadir;
-      monthSums[m.value].sakit += stats.sakit;
-      monthSums[m.value].izin += stats.izin;
-      monthSums[m.value].alpa += stats.alpa;
-      monthSums[m.value].dispen += stats.dispen;
-
-      row.push(
-        { v: stats.hadir, t: "n", s: styleStatusH },
-        { v: stats.sakit, t: "n", s: styleStatusS },
-        { v: stats.izin, t: "n", s: styleStatusI },
-        { v: stats.alpa, t: "n", s: styleStatusA },
-        { v: stats.dispen, t: "n", s: styleStatusD }
-      );
-    });
-
-    // Gaya predikat
-    let predStyle = stylePredikatBaik;
-    if (s.predikat === "Sangat Baik") predStyle = stylePredikatSangatBaik;
-    else if (s.predikat === "Cukup") predStyle = stylePredikatCukup;
-    else if (s.predikat === "Kurang") predStyle = stylePredikatKurang;
-
-    row.push(
       { v: s.totalHadir, t: "n", s: styleStatusH },
       { v: s.totalSakit, t: "n", s: styleStatusS },
       { v: s.totalIzin, t: "n", s: styleStatusI },
       { v: s.totalAlpa, t: "n", s: styleStatusA },
+      { v: s.totalTerlambat, t: "n", s: styleStatusT },
       { v: s.totalDispen, t: "n", s: styleStatusD },
       { v: s.totalHari, t: "n", s: styleCellCenterBold },
       {
@@ -1165,68 +1141,56 @@ export function generateSemesterAttendanceXlsxWithKop(
           ? { ...styleStatusA, font: { ...styleStatusA.font, bold: true } }
           : styleStatusH,
       },
-      { v: s.predikat, t: "s", s: predStyle }
-    );
+      { v: s.predikat, t: "s", s: predStyle },
+    ];
 
     rows.push(row);
   });
 
-  // 5. BARIS TOTAL KEHADIRAN KELAS
+  // 4. BARIS TOTAL KEHADIRAN KELAS
   const summaryRowIdx = rows.length;
   const summaryRow: any[] = [
-    { v: "TOTAL KEHADIRAN KELAS", t: "s", s: styleCellCenterBold },
+    { v: "JUMLAH TOTAL KEHADIRAN KELAS", t: "s", s: styleCellCenterBold },
     { v: "", t: "s", s: styleCellCenterBold },
     { v: "", t: "s", s: styleCellCenterBold },
     { v: "", t: "s", s: styleCellCenterBold },
-  ];
-  merges.push({ s: { r: summaryRowIdx, c: 0 }, e: { r: summaryRowIdx, c: 3 } });
-
-  months.forEach((m) => {
-    const sums = monthSums[m.value];
-    summaryRow.push(
-      { v: sums.hadir, t: "n", s: styleCellCenterBold },
-      { v: sums.sakit, t: "n", s: styleCellCenterBold },
-      { v: sums.izin, t: "n", s: styleCellCenterBold },
-      { v: sums.alpa, t: "n", s: styleCellCenterBold },
-      { v: sums.dispen, t: "n", s: styleCellCenterBold }
-    );
-  });
-
-  summaryRow.push(
     { v: sumHadirSem, t: "n", s: styleCellCenterBold },
     { v: sumSakitSem, t: "n", s: styleCellCenterBold },
     { v: sumIzinSem, t: "n", s: styleCellCenterBold },
     { v: sumAlpaSem, t: "n", s: styleCellCenterBold },
+    { v: sumTelatSem, t: "n", s: styleCellCenterBold },
     { v: sumDispenSem, t: "n", s: styleCellCenterBold },
     { v: sumTotalSem, t: "n", s: styleCellCenterBold },
     { v: `${semesterRecap.averageAttendance}%`, t: "s", s: styleCellCenterBold },
-    { v: "-", t: "s", s: styleCellCenterBold }
-  );
-
+    { v: "-", t: "s", s: styleCellCenterBold },
+  ];
+  merges.push({ s: { r: summaryRowIdx, c: 0 }, e: { r: summaryRowIdx, c: 3 } });
   rows.push(summaryRow);
 
-  // 6. BLOK TANDA TANGAN RESMI
+  // 5. BLOK TANDA TANGAN RESMI
   rows.push([]);
   rows.push([]);
   const signRow1Idx = rows.length;
   const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
-  const signColRight = Math.max(5, totalCols - 4);
 
   merges.push({ s: { r: signRow1Idx, c: 1 }, e: { r: signRow1Idx, c: 3 } });
-  merges.push({ s: { r: signRow1Idx, c: signColRight }, e: { r: signRow1Idx, c: totalCols - 1 } });
+  merges.push({ s: { r: signRow1Idx, c: 8 }, e: { r: signRow1Idx, c: 12 } });
 
   const signRow1: any[] = [
     { v: "", t: "s" },
     { v: `Mengetahui,\nKepala ${mergedMeta.schoolName}`, t: "s", s: { alignment: { horizontal: "center", wrapText: true } } },
     { v: "", t: "s" },
     { v: "", t: "s" },
+    { v: "", t: "s" },
+    { v: "", t: "s" },
+    { v: "", t: "s" },
+    { v: "", t: "s" },
+    {
+      v: `${mergedMeta.location}, ${formattedToday}\nGuru Mata Pelajaran Informatika,`,
+      t: "s",
+      s: { alignment: { horizontal: "center", wrapText: true } },
+    },
   ];
-  while (signRow1.length < signColRight) signRow1.push({ v: "", t: "s" });
-  signRow1.push({
-    v: `${mergedMeta.location}, ${formattedToday}\nGuru Mata Pelajaran Informatika,`,
-    t: "s",
-    s: { alignment: { horizontal: "center", wrapText: true } },
-  });
   rows.push(signRow1);
 
   rows.push([]);
@@ -1234,20 +1198,23 @@ export function generateSemesterAttendanceXlsxWithKop(
 
   const signRow2Idx = rows.length;
   merges.push({ s: { r: signRow2Idx, c: 1 }, e: { r: signRow2Idx, c: 3 } });
-  merges.push({ s: { r: signRow2Idx, c: signColRight }, e: { r: signRow2Idx, c: totalCols - 1 } });
+  merges.push({ s: { r: signRow2Idx, c: 8 }, e: { r: signRow2Idx, c: 12 } });
 
   const signRow2: any[] = [
     { v: "", t: "s" },
     { v: "( ............................................................ )\nNIP. ........................................................", t: "s", s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } } },
     { v: "", t: "s" },
     { v: "", t: "s" },
+    { v: "", t: "s" },
+    { v: "", t: "s" },
+    { v: "", t: "s" },
+    { v: "", t: "s" },
+    {
+      v: `( ${mergedMeta.teacherName} )\nNIP. ${mergedMeta.teacherNip}`,
+      t: "s",
+      s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } },
+    },
   ];
-  while (signRow2.length < signColRight) signRow2.push({ v: "", t: "s" });
-  signRow2.push({
-    v: `( ${mergedMeta.teacherName} )\nNIP. ${mergedMeta.teacherNip}`,
-    t: "s",
-    s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } },
-  });
   rows.push(signRow2);
 
   // Buat sheet dan workbook
@@ -1255,32 +1222,30 @@ export function generateSemesterAttendanceXlsxWithKop(
   ws["!merges"] = merges;
 
   // Lebar Kolom
-  const colWidths: any[] = [
+  ws["!cols"] = [
     { wch: 5 },  // No
-    { wch: 14 }, // NIS
-    { wch: 30 }, // Nama Siswa
-    { wch: 5 },  // L/P
+    { wch: 14 }, // NIS / NIPD
+    { wch: 32 }, // Nama Lengkap Siswa
+    { wch: 6 },  // L/P
+    { wch: 10 }, // Hadir (H)
+    { wch: 9 },  // Sakit (S)
+    { wch: 9 },  // Izin (I)
+    { wch: 9 },  // Alpa (A)
+    { wch: 9 },  // Telat (T)
+    { wch: 10 }, // Dispen (D)
+    { wch: 9 },  // Total
+    { wch: 11 }, // % Hadir
+    { wch: 16 }, // Predikat Raport
   ];
-  // 5 kolom per bulan
-  months.forEach(() => {
-    colWidths.push({ wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 });
-  });
-  // Total Semester
-  colWidths.push(
-    { wch: 8 },  // Hadir
-    { wch: 8 },  // Sakit
-    { wch: 8 },  // Izin
-    { wch: 8 },  // Alpa
-    { wch: 8 },  // Dispen
-    { wch: 8 },  // Total Hari
-    { wch: 10 }, // % Hadir
-    { wch: 14 }  // Predikat
-  );
-  ws["!cols"] = colWidths;
 
-  // Atur margin dan ukuran kertas folio resmi (21.59 cm x 33.02 cm)
+  // Atur margin dan ukuran kertas folio resmi (21.59 cm x 33.02 cm) portrait
   ws["!margins"] = OFFICIAL_PAGE_MARGINS;
-  ws["!pageSetup"] = { ...OFFICIAL_PAPER_SETUP, orientation: "landscape" };
+  ws["!pageSetup"] = {
+    ...OFFICIAL_PAPER_SETUP,
+    orientation: "portrait",
+    fitToWidth: 1,
+    fitToHeight: 1,
+  };
 
   const wb = XLSX.utils.book_new();
   const safeClassName = currentClass.name.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 20);
@@ -1291,7 +1256,7 @@ export function generateSemesterAttendanceXlsxWithKop(
 }
 
 /**
- * Menghasilkan konten CSV Rekapitulasi Kumulatif Semester dengan Kop Surat Resmi
+ * Menghasilkan konten CSV Rekapitulasi Kumulatif Semester dengan Kop Surat Resmi (13 kolom langsung)
  */
 export function generateSemesterAttendanceCsvWithKop(
   currentClass: Class,
@@ -1299,111 +1264,432 @@ export function generateSemesterAttendanceCsvWithKop(
   meta: SchoolExportMetadata = {}
 ): string {
   const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
-  const months = semesterRecap.months;
   const rows: string[] = [];
 
   // --- KOP SURAT RESMI SEKOLAH ---
   rows.push(`"DAFTAR HADIR SISWA KUMULATIF SEMESTER ${currentClass.semester ?? 1} (GANJIL) KELAS ${formatClassRoman(currentClass.name)}"`);
   rows.push(`"${getSchoolNameWithKabupaten(mergedMeta.schoolName)}"`);
   rows.push(`"TAHUN PELAJARAN ${currentClass.academicYear || "2026/2027"}"`);
-  rows.push(`"Mata Pelajaran: ${currentClass.subject || mergedMeta.subject} | Semester: ${currentClass.semester ?? 1} (Ganjil) | Periode: Juli - Desember 2026"`);
+  rows.push(`"Mata Pelajaran: ${currentClass.subject || mergedMeta.subject} | Semester: ${currentClass.semester ?? 1} (Ganjil) | Format: Buku Raport SMP"`);
   rows.push("");
 
   // --- HEADER KOLOM ---
-  const headerCols: string[] = ["No", "NIPD / NIS", "Nama Siswa", "L/P"];
-  months.forEach((m) => {
-    headerCols.push(
-      `"${m.label} (H)"`,
-      `"${m.label} (S)"`,
-      `"${m.label} (I)"`,
-      `"${m.label} (A)"`,
-      `"${m.label} (D)"`
-    );
-  });
-  headerCols.push(
-    "Semester Hadir",
-    "Semester Sakit",
-    "Semester Izin",
-    "Semester Alpa",
-    "Semester Dispen",
-    "Total Hari",
-    "% Kehadiran",
-    "Predikat"
-  );
-  rows.push(headerCols.join(","));
+  const headerCols: string[] = [
+    "No",
+    "NIS / NIPD",
+    "Nama Lengkap Siswa",
+    "L/P",
+    "Hadir (H)",
+    "Sakit (S)",
+    "Izin (I)",
+    "Alpa (A)",
+    "Telat (T)",
+    "Dispen (D)",
+    "Total",
+    "% Hadir",
+    "Predikat Raport",
+  ];
+  rows.push(headerCols.map((c) => `"${c}"`).join(","));
 
   // --- BARIS DATA SISWA ---
-  let sumHadirSem = 0;
-  let sumSakitSem = 0;
-  let sumIzinSem = 0;
-  let sumAlpaSem = 0;
-  let sumDispenSem = 0;
+  let sumHadir = 0;
+  let sumSakit = 0;
+  let sumIzin = 0;
+  let sumAlpa = 0;
+  let sumTelat = 0;
+  let sumDispen = 0;
+  let sumTotal = 0;
 
   semesterRecap.students.forEach((s, idx) => {
-    sumHadirSem += s.totalHadir;
-    sumSakitSem += s.totalSakit;
-    sumIzinSem += s.totalIzin;
-    sumAlpaSem += s.totalAlpa;
-    sumDispenSem += s.totalDispen;
+    sumHadir += s.totalHadir;
+    sumSakit += s.totalSakit;
+    sumIzin += s.totalIzin;
+    sumAlpa += s.totalAlpa;
+    sumTelat += s.totalTerlambat;
+    sumDispen += s.totalDispen;
+    sumTotal += s.totalHari;
 
     const rowCols = [
       String(idx + 1),
       `"${s.nis ?? "-"}"`,
       `"${s.fullName.replace(/"/g, '""')}"`,
       `"${s.gender ?? "-"}"`,
-    ];
-
-    months.forEach((m) => {
-      const stats = s.monthlyStats[m.value] || {
-        hadir: 0,
-        sakit: 0,
-        izin: 0,
-        alpa: 0,
-        dispen: 0,
-      };
-      rowCols.push(
-        String(stats.hadir),
-        String(stats.sakit),
-        String(stats.izin),
-        String(stats.alpa),
-        String(stats.dispen)
-      );
-    });
-
-    rowCols.push(
       String(s.totalHadir),
       String(s.totalSakit),
       String(s.totalIzin),
       String(s.totalAlpa),
+      String(s.totalTerlambat),
       String(s.totalDispen),
       String(s.totalHari),
       `"${s.persentaseSemester}%"`,
-      `"${s.predikat}"`
-    );
+      `"${s.predikat}"`,
+    ];
 
     rows.push(rowCols.join(","));
   });
 
   // --- REKAPITULASI BAWAH ---
   rows.push("");
-  const totalStudents = semesterRecap.students.length;
-  const blankMonthlyPaddings = months.map(() => '""').join(",");
   rows.push(
-    `"","","JUMLAH TOTAL",""${blankMonthlyPaddings ? `,${blankMonthlyPaddings}` : ""},${sumHadirSem},${sumSakitSem},${sumIzinSem},${sumAlpaSem},${sumDispenSem},"${totalStudents} Siswa","${semesterRecap.averageAttendance}%","-"`
+    `"","","JUMLAH TOTAL KEHADIRAN KELAS","",${sumHadir},${sumSakit},${sumIzin},${sumAlpa},${sumTelat},${sumDispen},${sumTotal},"${semesterRecap.averageAttendance}%","-"`
   );
   rows.push("");
 
   // --- TITIMANGSA & BLOK TANDA TANGAN ---
   const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
-  rows.push(`"Mengetahui,","","",""`);
-  rows.push(`"Kepala Sekolah,","","","","${mergedMeta.location}, ${formattedToday}"`);
-  rows.push(`"","","","","Guru Mata Pelajaran,"`);
+  rows.push(`"Mengetahui,","","","","","","","${mergedMeta.location}, ${formattedToday}"`);
+  rows.push(`"Kepala Sekolah,","","","","","","","Guru Mata Pelajaran,"`);
   rows.push(`""`);
   rows.push(`""`);
-  rows.push(`"( ............................................ )","","","","${mergedMeta.teacherName}"`);
-  rows.push(`"NIP. ........................................","","","","NIP. ${mergedMeta.teacherNip}"`);
+  rows.push(`"( ............................................ )","","","","","","","${mergedMeta.teacherName}"`);
+  rows.push(`"NIP. ........................................","","","","","","","NIP. ${mergedMeta.teacherNip}"`);
 
   return "\uFEFF" + rows.join("\r\n");
+}
+
+/**
+ * Menghasilkan dokumen HTML cetak / PDF Rekapitulasi Kumulatif Semester (Format Buku Raport SMP)
+ * Memuat Kop Resmi SMPN 3 Cibungbulang, logo base64, ukuran kertas Folio (21.59cm x 33.02cm),
+ * layout adaptif vertikal untuk s.d 40 siswa dan tanda tangan kepala sekolah & guru dalam 1 lembar.
+ */
+export function generateSemesterAttendanceHtmlPrint(
+  currentClass: Class,
+  semesterRecap: SemesterClassRecap,
+  meta: SchoolExportMetadata = {}
+): string {
+  const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
+  const studentCount = semesterRecap.students.length;
+
+  let sumHadir = 0;
+  let sumSakit = 0;
+  let sumIzin = 0;
+  let sumAlpa = 0;
+  let sumTelat = 0;
+  let sumDispen = 0;
+  let sumTotal = 0;
+  let fullAttendanceCount = 0;
+  let attentionCount = 0;
+
+  semesterRecap.students.forEach((s) => {
+    sumHadir += s.totalHadir;
+    sumSakit += s.totalSakit;
+    sumIzin += s.totalIzin;
+    sumAlpa += s.totalAlpa;
+    sumTelat += s.totalTerlambat;
+    sumDispen += s.totalDispen;
+    sumTotal += s.totalHari;
+    if (s.totalHari > 0 && s.persentaseSemester === 100) fullAttendanceCount++;
+    if (s.needsAttention) attentionCount++;
+  });
+
+  // 1. PARAMETER VERTIKAL ADAPTIF (Proporsional mengisi 1 lembar Folio 33.02cm untuk s.d 40+ siswa)
+  let rowPaddingY = "3.9px";
+  let tableFontSize = "8.5pt";
+  let badgeFontSize = "8pt";
+  let kopPaddingBottom = "6px";
+  let kopMarginBottom = "8px";
+  let tableMarginTop = "6px";
+  let summaryMarginTop = "8px";
+  let summaryPadding = "5px 8px";
+  let summaryFontSize = "8pt";
+  let signatureMarginTop = "20px";
+  let signatureSpacer = "52px";
+  let signatureFontSize = "8.5pt";
+
+  if (studentCount <= 28) {
+    rowPaddingY = "5.5px";
+    tableFontSize = "9pt";
+    badgeFontSize = "8.5pt";
+    kopPaddingBottom = "8px";
+    kopMarginBottom = "12px";
+    tableMarginTop = "8px";
+    summaryMarginTop = "12px";
+    summaryPadding = "6px 10px";
+    summaryFontSize = "8.5pt";
+    signatureMarginTop = "32px";
+    signatureSpacer = "68px";
+    signatureFontSize = "9pt";
+  } else if (studentCount <= 34) {
+    rowPaddingY = "4.6px";
+    tableFontSize = "8.5pt";
+    badgeFontSize = "8pt";
+    kopPaddingBottom = "7px";
+    kopMarginBottom = "10px";
+    tableMarginTop = "7px";
+    summaryMarginTop = "10px";
+    summaryPadding = "5px 9px";
+    summaryFontSize = "8pt";
+    signatureMarginTop = "26px";
+    signatureSpacer = "60px";
+    signatureFontSize = "8.5pt";
+  } else if (studentCount <= 40) {
+    // Standar 35 - 40 siswa (kasus utama): isi lembar proporsional & ruang paraf lapang
+    rowPaddingY = "3.9px";
+    tableFontSize = "8.5pt";
+    badgeFontSize = "8pt";
+    kopPaddingBottom = "6px";
+    kopMarginBottom = "8px";
+    tableMarginTop = "6px";
+    summaryMarginTop = "8px";
+    summaryPadding = "5px 8px";
+    summaryFontSize = "8pt";
+    signatureMarginTop = "20px";
+    signatureSpacer = "52px";
+    signatureFontSize = "8.5pt";
+  } else if (studentCount <= 44) {
+    rowPaddingY = "2.8px";
+    tableFontSize = "8pt";
+    badgeFontSize = "7.5pt";
+    kopPaddingBottom = "5px";
+    kopMarginBottom = "6px";
+    tableMarginTop = "4px";
+    summaryMarginTop = "6px";
+    summaryPadding = "4px 8px";
+    summaryFontSize = "7.5pt";
+    signatureMarginTop = "14px";
+    signatureSpacer = "40px";
+    signatureFontSize = "8pt";
+  } else {
+    rowPaddingY = "1.8px";
+    tableFontSize = "7pt";
+    badgeFontSize = "6.5pt";
+    kopPaddingBottom = "4px";
+    kopMarginBottom = "5px";
+    tableMarginTop = "3px";
+    summaryMarginTop = "4px";
+    summaryPadding = "3px 6px";
+    summaryFontSize = "7pt";
+    signatureMarginTop = "10px";
+    signatureSpacer = "30px";
+    signatureFontSize = "7.5pt";
+  }
+
+  // Margin horizontal adaptif yang nyaman untuk 13 kolom
+  const marginX = "0.8cm";
+
+  const rowsHtml = semesterRecap.students
+    .map((s, idx) => {
+      let predBg = "#DBEAFE";
+      let predColor = "#1E40AF";
+      if (s.predikat === "Sangat Baik") {
+        predBg = "#DCFCE7";
+        predColor = "#166534";
+      } else if (s.predikat === "Cukup") {
+        predBg = "#FEF9C3";
+        predColor = "#854D0E";
+      } else if (s.predikat === "Kurang") {
+        predBg = "#FEE2E2";
+        predColor = "#991B1B";
+      }
+
+      const percentBg = s.needsAttention ? "#FEE2E2" : "#DCFCE7";
+      const percentColor = s.needsAttention ? "#991B1B" : "#166534";
+
+      return `<tr>
+        <td style="text-align: center; font-family: monospace;">${idx + 1}</td>
+        <td style="text-align: center; font-family: monospace;">${s.nis ?? "-"}</td>
+        <td style="text-align: left; padding-left: 6px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 210px;">${s.fullName}</td>
+        <td style="text-align: center;">${s.gender ?? "-"}</td>
+        <td style="text-align: center; font-family: monospace; font-weight: bold; color: #166534; ${s.totalHadir > 0 ? "background-color: #DCFCE7;" : ""}">${s.totalHadir}</td>
+        <td style="text-align: center; font-family: monospace; font-weight: bold; color: #1E40AF; ${s.totalSakit > 0 ? "background-color: #DBEAFE;" : ""}">${s.totalSakit}</td>
+        <td style="text-align: center; font-family: monospace; font-weight: bold; color: #854D0E; ${s.totalIzin > 0 ? "background-color: #FEF9C3;" : ""}">${s.totalIzin}</td>
+        <td style="text-align: center; font-family: monospace; font-weight: bold; color: #991B1B; ${s.totalAlpa > 0 ? "background-color: #FEE2E2;" : ""}">${s.totalAlpa}</td>
+        <td style="text-align: center; font-family: monospace; font-weight: bold; color: #C2410C; ${s.totalTerlambat > 0 ? "background-color: #FFEDD5;" : ""}">${s.totalTerlambat}</td>
+        <td style="text-align: center; font-family: monospace; font-weight: bold; color: #4338CA; ${s.totalDispen > 0 ? "background-color: #EEF2FF;" : ""}">${s.totalDispen}</td>
+        <td style="text-align: center; font-family: monospace; font-weight: bold;">${s.totalHari}</td>
+        <td style="text-align: center; font-family: monospace; font-weight: bold; background-color: ${percentBg}; color: ${percentColor}; font-size: ${badgeFontSize};">${s.persentaseSemester}%</td>
+        <td style="text-align: center; font-weight: bold; background-color: ${predBg}; color: ${predColor}; font-size: ${badgeFontSize};">${s.predikat}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
+
+  return `
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>Rekapitulasi Akumulasi Presensi Kelas ${currentClass.name}</title>
+  <style>
+    @page {
+      size: 21.59cm 33.02cm;
+      margin: 0.8cm ${marginX} 0.8cm ${marginX};
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #111827;
+      font-family: 'Calibri', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      font-size: ${tableFontSize};
+      line-height: 1.15;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .sheet-wrapper {
+      width: 100%;
+      margin: 0 auto;
+      padding: 0.4cm ${marginX};
+    }
+    .kop-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1.5px solid #111827;
+      padding-bottom: ${kopPaddingBottom};
+      margin-bottom: ${kopMarginBottom};
+    }
+    .kop-title-1 { font-size: 10.5pt; font-weight: 800; letter-spacing: 0.2px; text-transform: uppercase; line-height: 1.15; }
+    .kop-title-2 { font-size: 9.5pt; font-weight: 800; letter-spacing: 0.2px; text-transform: uppercase; line-height: 1.15; margin-top: 1px; }
+    .kop-title-3 { font-size: 9pt; font-weight: 700; line-height: 1.15; margin-top: 1px; }
+    .kop-info { font-size: 7.5pt; color: #4B5563; line-height: 1.15; margin-top: 2px; }
+    table.data-table {
+      border-collapse: collapse;
+      width: 100%;
+      table-layout: auto;
+      margin-top: ${tableMarginTop};
+    }
+    table.data-table th {
+      border: 1px solid #374151;
+      padding: ${rowPaddingY} 2px;
+      font-size: ${tableFontSize};
+      font-weight: bold;
+      text-align: center;
+      line-height: 1.15;
+    }
+    table.data-table td {
+      border: 1px solid #6B7280;
+      padding: ${rowPaddingY} 3px;
+      font-size: ${tableFontSize};
+      vertical-align: middle;
+      line-height: 1.15;
+    }
+    table.data-table tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .summary-box {
+      margin-top: ${summaryMarginTop};
+      font-size: ${summaryFontSize};
+      line-height: 1.15;
+      background: #F9FAFB;
+      padding: ${summaryPadding};
+      border: 1px solid #E5E7EB;
+      border-radius: 3px;
+    }
+    .signature-table {
+      width: 100%;
+      border: none;
+      margin-top: ${signatureMarginTop};
+      font-size: ${signatureFontSize};
+      line-height: 1.2;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .signature-table td {
+      border: none !important;
+      padding: 0;
+    }
+    .signature-spacer {
+      height: ${signatureSpacer};
+    }
+    @media print {
+      @page {
+        size: 21.59cm 33.02cm;
+        margin: 0.7cm ${marginX} 0.7cm ${marginX};
+      }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .sheet-wrapper {
+        padding: 0 !important;
+        width: 100% !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet-wrapper">
+    <div class="kop-container">
+      <img src="${LOGO_SMPN3_BASE64}" alt="Logo SMPN 3 Cibungbulang" style="width: 44px; height: auto; max-height: 54px; object-fit: contain; display: block;" />
+      <div style="flex: 1; text-align: center; padding: 0 8px;">
+        <div class="kop-title-1">REKAPITULASI AKUMULASI PRESENSI SISWA KELAS ${formatClassRoman(currentClass.name)}</div>
+        <div class="kop-title-2">${getSchoolNameWithKabupaten(mergedMeta.schoolName)}</div>
+        <div class="kop-title-3">SEMESTER ${currentClass.semester ?? 1} (GANJIL) TAHUN PELAJARAN ${currentClass.academicYear || "2026/2027"}</div>
+        <div class="kop-info">Mata Pelajaran: <strong>${currentClass.subject || mergedMeta.subject}</strong> · Format: Buku Raport SMP · Periode: Juli - Desember 2026</div>
+      </div>
+      <div style="width: 44px;" aria-hidden="true"></div>
+    </div>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 28px; background-color: #E2EFDA;">NO</th>
+          <th style="width: 72px; background-color: #E2EFDA;">NIS / NIPD</th>
+          <th style="text-align: left; padding-left: 6px; background-color: #E2EFDA;">NAMA LENGKAP SISWA</th>
+          <th style="width: 28px; background-color: #E2EFDA;">L/P</th>
+          <th style="width: 36px; background-color: #DCFCE7; color: #166534;">HADIR (H)</th>
+          <th style="width: 34px; background-color: #DBEAFE; color: #1E40AF;">SAKIT (S)</th>
+          <th style="width: 34px; background-color: #FEF9C3; color: #854D0E;">IZIN (I)</th>
+          <th style="width: 34px; background-color: #FEE2E2; color: #991B1B;">ALPA (A)</th>
+          <th style="width: 34px; background-color: #FFEDD5; color: #C2410C;">TELAT (T)</th>
+          <th style="width: 36px; background-color: #EEF2FF; color: #4338CA;">DISPEN (D)</th>
+          <th style="width: 38px; background-color: #E0F2FE; color: #0369A1;">TOTAL</th>
+          <th style="width: 50px; background-color: #E0F2FE; color: #0369A1;">% HADIR</th>
+          <th style="width: 80px; background-color: #E0F2FE; color: #0369A1;">PREDIKAT RAPORT</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+        <tr style="font-weight: bold; background-color: #F3F4F6;">
+          <td colspan="4" style="text-align: center; font-weight: bold;">JUMLAH TOTAL KEHADIRAN KELAS</td>
+          <td style="text-align: center; font-family: monospace; color: #166534;">${sumHadir}</td>
+          <td style="text-align: center; font-family: monospace; color: #1E40AF;">${sumSakit}</td>
+          <td style="text-align: center; font-family: monospace; color: #854D0E;">${sumIzin}</td>
+          <td style="text-align: center; font-family: monospace; color: #991B1B;">${sumAlpa}</td>
+          <td style="text-align: center; font-family: monospace; color: #C2410C;">${sumTelat}</td>
+          <td style="text-align: center; font-family: monospace; color: #4338CA;">${sumDispen}</td>
+          <td style="text-align: center; font-family: monospace;">${sumTotal}</td>
+          <td style="text-align: center; font-family: monospace; color: #0369A1;">${semesterRecap.averageAttendance}%</td>
+          <td style="text-align: center;">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="summary-box">
+      <strong>Ringkasan Semester:</strong> Total Siswa: ${studentCount} | Rata-rata Kehadiran: <strong>${semesterRecap.averageAttendance}%</strong> | Siswa 100% Hadir: <span style="color: #166534; font-weight: bold;">${fullAttendanceCount}</span> | Perlu Perhatian (&lt; 85%): <span style="color: #991B1B; font-weight: bold;">${attentionCount}</span>
+    </div>
+
+    <table class="signature-table">
+      <tr>
+        <td style="width: 50%; text-align: left; padding-left: 8px; vertical-align: top;">
+          Mengetahui,<br/>
+          Kepala ${mergedMeta.schoolName}<br/>
+          <div class="signature-spacer"></div>
+          <strong>( ............................................................ )</strong><br/>
+          NIP. ........................................................
+        </td>
+        <td style="width: 50%; text-align: right; padding-right: 12px; vertical-align: top;">
+          ${mergedMeta.location}, ${formattedToday}<br/>
+          Guru Mata Pelajaran Informatika,<br/>
+          <div class="signature-spacer"></div>
+          <strong><u>${mergedMeta.teacherName}</u></strong><br/>
+          NIP. ${mergedMeta.teacherNip}
+        </td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>
+  `;
 }
 
 // ============================================================================
