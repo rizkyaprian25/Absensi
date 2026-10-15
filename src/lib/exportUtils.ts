@@ -2508,7 +2508,7 @@ export function generateCensoredGradesHtmlPrint(
 <body>
   <div class="sheet-wrapper">
     <div class="kop-container">
-      <img src="${LOGO_SMPN3_BASE64}" alt="Logo SMPN 3 Cibungbulang" style="width: 44px; height: auto; max-height: 52px; object-fit: contain;" />
+      <img src="${LOGO_SMPN3_BASE64}" alt="Logo SMPN 3 Cibungbulang" style="width: 44px; height: auto; max-height: 54px; object-fit: contain; display: block;" />
       <div style="flex: 1; text-align: center; padding: 0 8px;">
         <div class="kop-title-1">REKAPITULASI KELENGKAPAN TUGAS &amp; ASESMEN SISWA KELAS ${formatClassRoman(className)}</div>
         <div class="kop-title-2">${getSchoolNameWithKabupaten(mergedMeta.schoolName)}</div>
