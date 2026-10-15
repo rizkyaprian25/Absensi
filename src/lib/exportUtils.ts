@@ -2206,32 +2206,86 @@ export function generateCensoredGradesHtmlPrint(
   const studentCount = summaries.length;
   const numAssessments = assessments.length;
 
-  // 1. PARAMETER VERTIKAL ADAPTIF (Pas untuk 40 siswa dan paraf guru & kepsek)
-  let rowPaddingY = "2.6px";
-  let tableFontSize = "8pt";
-  let statusFontSize = "7.5pt";
-  let signatureSpacer = "42px";
+  // 1. PARAMETER VERTIKAL ADAPTIF (Proporsional mengisi 1 lembar Folio 33.02cm untuk s.d 40+ siswa)
+  let rowPaddingY = "3.9px";
+  let tableFontSize = "8.5pt";
+  let statusFontSize = "8pt";
+  let kopPaddingBottom = "6px";
+  let kopMarginBottom = "8px";
+  let tableMarginTop = "6px";
+  let summaryMarginTop = "8px";
+  let summaryPadding = "5px 8px";
+  let summaryFontSize = "8pt";
+  let signatureMarginTop = "20px";
+  let signatureSpacer = "52px";
+  let signatureFontSize = "8.5pt";
 
-  if (studentCount <= 32) {
-    rowPaddingY = "3.8px";
+  if (studentCount <= 28) {
+    rowPaddingY = "5.5px";
+    tableFontSize = "9pt";
+    statusFontSize = "8.5pt";
+    kopPaddingBottom = "8px";
+    kopMarginBottom = "12px";
+    tableMarginTop = "8px";
+    summaryMarginTop = "12px";
+    summaryPadding = "6px 10px";
+    summaryFontSize = "8.5pt";
+    signatureMarginTop = "32px";
+    signatureSpacer = "68px";
+    signatureFontSize = "9pt";
+  } else if (studentCount <= 34) {
+    rowPaddingY = "4.6px";
     tableFontSize = "8.5pt";
     statusFontSize = "8pt";
-    signatureSpacer = "50px";
+    kopPaddingBottom = "7px";
+    kopMarginBottom = "10px";
+    tableMarginTop = "7px";
+    summaryMarginTop = "10px";
+    summaryPadding = "5px 9px";
+    summaryFontSize = "8pt";
+    signatureMarginTop = "26px";
+    signatureSpacer = "60px";
+    signatureFontSize = "8.5pt";
   } else if (studentCount <= 40) {
-    rowPaddingY = "2.6px";
+    // Standar 35 - 40 siswa (kasus utama): isi lembar secara proporsional & ruang paraf lapang
+    rowPaddingY = "3.9px";
+    tableFontSize = "8.5pt";
+    statusFontSize = "8pt";
+    kopPaddingBottom = "6px";
+    kopMarginBottom = "8px";
+    tableMarginTop = "6px";
+    summaryMarginTop = "8px";
+    summaryPadding = "5px 8px";
+    summaryFontSize = "8pt";
+    signatureMarginTop = "20px";
+    signatureSpacer = "52px";
+    signatureFontSize = "8.5pt";
+  } else if (studentCount <= 44) {
+    rowPaddingY = "2.8px";
     tableFontSize = "8pt";
     statusFontSize = "7.5pt";
-    signatureSpacer = "42px";
-  } else if (studentCount <= 44) {
-    rowPaddingY = "2.0px";
-    tableFontSize = "7.5pt";
-    statusFontSize = "7pt";
-    signatureSpacer = "34px";
+    kopPaddingBottom = "5px";
+    kopMarginBottom = "6px";
+    tableMarginTop = "4px";
+    summaryMarginTop = "6px";
+    summaryPadding = "4px 8px";
+    summaryFontSize = "7.5pt";
+    signatureMarginTop = "14px";
+    signatureSpacer = "40px";
+    signatureFontSize = "8pt";
   } else {
-    rowPaddingY = "1.5px";
+    rowPaddingY = "1.8px";
     tableFontSize = "7pt";
     statusFontSize = "6.5pt";
-    signatureSpacer = "26px";
+    kopPaddingBottom = "4px";
+    kopMarginBottom = "5px";
+    tableMarginTop = "3px";
+    summaryMarginTop = "4px";
+    summaryPadding = "3px 6px";
+    summaryFontSize = "7pt";
+    signatureMarginTop = "10px";
+    signatureSpacer = "30px";
+    signatureFontSize = "7.5pt";
   }
 
   // 2. PARAMETER HORIZONTAL ADAPTIF (Berdasarkan situasi jumlah kolom asesmen)
@@ -2244,7 +2298,7 @@ export function generateCensoredGradesHtmlPrint(
   let asmtMinWidth = "70px";
   let asmtHeaderFont = "8pt";
   let asmtCellFont = "7.5pt";
-  let asmtCellPadding = "2.5px 6px";
+  let asmtPadX = "6px";
   let nameMaxWidth = "none";
 
   if (numAssessments <= 2) {
@@ -2258,7 +2312,7 @@ export function generateCensoredGradesHtmlPrint(
     asmtMinWidth = "70px";
     asmtHeaderFont = "8pt";
     asmtCellFont = "7.5pt";
-    asmtCellPadding = "2.5px 6px";
+    asmtPadX = "6px";
     nameMaxWidth = "none";
   } else if (numAssessments <= 4) {
     // Situasi kolom sedang (3 - 4 asesmen)
@@ -2271,7 +2325,7 @@ export function generateCensoredGradesHtmlPrint(
     asmtMinWidth = "52px";
     asmtHeaderFont = "7.5pt";
     asmtCellFont = "7pt";
-    asmtCellPadding = "2.2px 4px";
+    asmtPadX = "4px";
     nameMaxWidth = "200px";
   } else if (numAssessments <= 7) {
     // Situasi kolom banyak (5 - 7 asesmen)
@@ -2284,7 +2338,7 @@ export function generateCensoredGradesHtmlPrint(
     asmtMinWidth = "40px";
     asmtHeaderFont = "7pt";
     asmtCellFont = "6.5pt";
-    asmtCellPadding = "2px 2px";
+    asmtPadX = "2px";
     nameMaxWidth = "175px";
   } else {
     // Situasi kolom sangat banyak (8+ asesmen)
@@ -2297,7 +2351,7 @@ export function generateCensoredGradesHtmlPrint(
     asmtMinWidth = "32px";
     asmtHeaderFont = "6.5pt";
     asmtCellFont = "6pt";
-    asmtCellPadding = "1.5px 1px";
+    asmtPadX = "1px";
     nameMaxWidth = "150px";
   }
 
@@ -2309,9 +2363,9 @@ export function generateCensoredGradesHtmlPrint(
           const sc = s.scores[a.id];
           if (sc !== null && sc !== undefined) {
             done++;
-            return `<td style="text-align: center; font-weight: bold; font-size: ${asmtCellFont}; padding: ${asmtCellPadding}; background-color: #DCFCE7; color: #166534; white-space: nowrap;">✓ SUDAH</td>`;
+            return `<td style="text-align: center; font-weight: bold; font-size: ${asmtCellFont}; padding: ${rowPaddingY} ${asmtPadX}; background-color: #DCFCE7; color: #166534; white-space: nowrap;">✓ SUDAH</td>`;
           }
-          return `<td style="text-align: center; font-weight: bold; font-size: ${asmtCellFont}; padding: ${asmtCellPadding}; background-color: #FEE2E2; color: #991B1B; white-space: nowrap;">BELUM</td>`;
+          return `<td style="text-align: center; font-weight: bold; font-size: ${asmtCellFont}; padding: ${rowPaddingY} ${asmtPadX}; background-color: #FEE2E2; color: #991B1B; white-space: nowrap;">BELUM</td>`;
         })
         .join("");
 
@@ -2374,8 +2428,8 @@ export function generateCensoredGradesHtmlPrint(
       align-items: center;
       justify-content: space-between;
       border-bottom: 1.5px solid #111827;
-      padding-bottom: 4px;
-      margin-bottom: 5px;
+      padding-bottom: ${kopPaddingBottom};
+      margin-bottom: ${kopMarginBottom};
     }
     .kop-title-1 { font-size: 10.5pt; font-weight: 800; letter-spacing: 0.2px; text-transform: uppercase; line-height: 1.15; }
     .kop-title-2 { font-size: 9.5pt; font-weight: 800; letter-spacing: 0.2px; text-transform: uppercase; line-height: 1.15; margin-top: 1px; }
@@ -2385,7 +2439,7 @@ export function generateCensoredGradesHtmlPrint(
       border-collapse: collapse;
       width: 100%;
       table-layout: auto;
-      margin-top: 4px;
+      margin-top: ${tableMarginTop};
     }
     table.data-table th {
       border: 1px solid #374151;
@@ -2408,19 +2462,19 @@ export function generateCensoredGradesHtmlPrint(
       break-inside: avoid;
     }
     .summary-box {
-      margin-top: 4px;
-      font-size: 7.5pt;
+      margin-top: ${summaryMarginTop};
+      font-size: ${summaryFontSize};
       line-height: 1.15;
       background: #F9FAFB;
-      padding: 3px 8px;
+      padding: ${summaryPadding};
       border: 1px solid #E5E7EB;
       border-radius: 3px;
     }
     .signature-table {
       width: 100%;
       border: none;
-      margin-top: 10px;
-      font-size: 8pt;
+      margin-top: ${signatureMarginTop};
+      font-size: ${signatureFontSize};
       line-height: 1.2;
       page-break-inside: avoid;
       break-inside: avoid;
@@ -2435,7 +2489,7 @@ export function generateCensoredGradesHtmlPrint(
     @media print {
       @page {
         size: 21.59cm 33.02cm;
-        margin: 0.6cm ${marginX} 0.6cm ${marginX};
+        margin: 0.7cm ${marginX} 0.7cm ${marginX};
       }
       html, body {
         margin: 0 !important;
@@ -2474,7 +2528,7 @@ export function generateCensoredGradesHtmlPrint(
           ${assessments
             .map(
               (a) =>
-                `<th style="padding: ${asmtCellPadding}; font-size: ${asmtHeaderFont}; line-height: 1.1; min-width: ${asmtMinWidth};">${a.title}<br/><span style="font-size: 6.5pt; color: #4B5563; font-weight: normal;">[${a.type}]</span></th>`
+                `<th style="padding: ${rowPaddingY} ${asmtPadX}; font-size: ${asmtHeaderFont}; line-height: 1.1; min-width: ${asmtMinWidth};">${a.title}<br/><span style="font-size: 6.5pt; color: #4B5563; font-weight: normal;">[${a.type}]</span></th>`
             )
             .join("")}
           <th style="width: ${colWidthTotal}; background-color: #E0F2FE;">TOTAL</th>
