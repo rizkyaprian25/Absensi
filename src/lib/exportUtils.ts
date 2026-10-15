@@ -18,6 +18,7 @@ import {
   MOCK_SUBJECT,
 } from "../contracts/mocks/attendanceMocks";
 import XLSX from "xlsx-js-style";
+import { LOGO_SMPN3_BASE64 } from "../assets/logoBase64";
 
 export interface SchoolExportMetadata {
   schoolName?: string;
@@ -35,6 +36,94 @@ const DEFAULT_EXPORT_META: Required<SchoolExportMetadata> = {
   subject: MOCK_SUBJECT,
   location: "Cibungbulang",
   dateStr: new Date().toISOString().slice(0, 10),
+};
+
+/**
+ * Mengubah nama kelas seperti "7C", "7 C", "Kelas 7-C", "8B", dsb.
+ * menjadi format romawi resmi sekolah: "VII / C", "VIII / B", "IX / A".
+ */
+export function formatClassRoman(className: string): string {
+  if (!className) return "";
+  const cleaned = className.trim();
+
+  // Jika sudah berformat "VII / C" atau sejenisnya
+  const romanSlashMatch = cleaned.match(/^(?:kelas\s*)?([ivxlcdm]+)\s*\/\s*([a-zA-Z0-9]+)$/i);
+  if (romanSlashMatch) {
+    return `${romanSlashMatch[1].toUpperCase()} / ${romanSlashMatch[2].toUpperCase()}`;
+  }
+
+  // Tangkap angka (7-12) atau romawi, dan bagian rombel (A-Z, angka rombel, dsb.)
+  const match = cleaned.match(/^(?:kelas\s*)?([0-9]+|[ivxlcdm]+)\s*[-_\s/]?\s*([a-zA-Z0-9]+)?$/i);
+  if (!match) return cleaned.toUpperCase();
+
+  let grade = match[1].toUpperCase();
+  const section = (match[2] || "").toUpperCase();
+
+  const romanMap: Record<string, string> = {
+    "1": "I",
+    "2": "II",
+    "3": "III",
+    "4": "IV",
+    "5": "V",
+    "6": "VI",
+    "7": "VII",
+    "8": "VIII",
+    "9": "IX",
+    "10": "X",
+    "11": "XI",
+    "12": "XII",
+  };
+
+  if (romanMap[grade]) {
+    grade = romanMap[grade];
+  }
+
+  if (section) {
+    return `${grade} / ${section}`;
+  }
+  return grade;
+}
+
+/**
+ * Menstandarkan nama sekolah dan memastikan kabupaten tercantum resmi
+ */
+export function getSchoolNameWithKabupaten(schoolName?: string): string {
+  const upper = (schoolName || MOCK_SCHOOL_NAME).toUpperCase().trim();
+  if (upper.includes("KABUPATEN") || upper.includes("KAB.")) {
+    return upper;
+  }
+  return `${upper} KABUPATEN BOGOR`;
+}
+
+/**
+ * Pengaturan Margin Cetak Resmi (sesuai spesifikasi foto pengaturan halaman):
+ * - Top: 1,1 cm (0.433 in)
+ * - Bottom: 1,1 cm (0.433 in)
+ * - Left: 0,6 cm (0.236 in)
+ * - Right: 0,7 cm (0.276 in)
+ * - Header: 0,8 cm (0.315 in)
+ * - Footer: 0,8 cm (0.315 in)
+ * Nilai disimpan dalam satuan inci (standar OpenXML / xlsx-js-style)
+ */
+export const OFFICIAL_PAGE_MARGINS = {
+  top: 1.1 / 2.54,
+  bottom: 1.1 / 2.54,
+  left: 0.6 / 2.54,
+  right: 0.7 / 2.54,
+  header: 0.8 / 2.54,
+  footer: 0.8 / 2.54,
+};
+
+/**
+ * Pengaturan Format Kertas Resmi:
+ * Ukuran: 21.59 cm x 33.02 cm (Folio / F4 / US Folio / OpenXML paperSize: 14)
+ * Orientasi default: Landscape (horizontal untuk rekapitulasi data banyak kolom)
+ */
+export const OFFICIAL_PAPER_SETUP = {
+  paperSize: 14, // 14 = Folio 8.5 x 13 inci (21.59 cm x 33.02 cm / F4)
+  orientation: "landscape",
+  fitToWidth: 1,
+  fitToHeight: 0,
 };
 
 // ============================================================================
@@ -59,9 +148,9 @@ export function generateAttendanceCsvWithKop(
   const rows: string[] = [];
 
   // --- KOP SURAT RESMI SEKOLAH ---
-  rows.push(`"DAFTAR HADIR SISWA KELAS ${currentClass.name.toUpperCase()}"`);
-  rows.push(`"${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR"`);
-  rows.push(`"TAHUN PELAJARAN ${currentClass.academicYear}"`);
+  rows.push(`"DAFTAR HADIR SISWA KELAS ${formatClassRoman(currentClass.name)}"`);
+  rows.push(`"${getSchoolNameWithKabupaten(mergedMeta.schoolName)}"`);
+  rows.push(`"TAHUN PELAJARAN ${currentClass.academicYear || "2026/2027"}"`);
   rows.push(`"Mata Pelajaran: ${currentClass.subject || mergedMeta.subject} | Semester: ${currentClass.semester ?? 1}"`);
   rows.push(`"Bulan: ${monthLabel.toUpperCase()}"`);
   rows.push("");
@@ -279,6 +368,13 @@ export function generateAttendanceExcelHtmlWithKop(
   </xml>
   <![endif]-->
   <style>
+    @page {
+      size: 21.59cm 33.02cm landscape;
+      margin: 1.1cm 0.7cm 1.1cm 0.6cm;
+      mso-page-orientation: landscape;
+      mso-header-margin: 0.315in;
+      mso-footer-margin: 0.315in;
+    }
     body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; color: #1B1F1D; }
     table { border-collapse: collapse; width: 100%; }
     .kop-1 { font-size: 14pt; font-weight: bold; text-align: center; }
@@ -293,13 +389,13 @@ export function generateAttendanceExcelHtmlWithKop(
 <body>
   <table>
     <tr>
-      <td colspan="${totalCols}" class="kop-1 no-border">DAFTAR HADIR SISWA KELAS ${currentClass.name.toUpperCase()}</td>
+      <td colspan="${totalCols}" class="kop-1 no-border">DAFTAR HADIR SISWA KELAS ${formatClassRoman(currentClass.name)}</td>
     </tr>
     <tr>
-      <td colspan="${totalCols}" class="kop-2 no-border">${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR</td>
+      <td colspan="${totalCols}" class="kop-2 no-border">${getSchoolNameWithKabupaten(mergedMeta.schoolName)}</td>
     </tr>
     <tr>
-      <td colspan="${totalCols}" class="kop-3 no-border">TAHUN PELAJARAN ${currentClass.academicYear}</td>
+      <td colspan="${totalCols}" class="kop-3 no-border">TAHUN PELAJARAN ${currentClass.academicYear || "2026/2027"}</td>
     </tr>
     <tr>
       <td colspan="${totalCols}" class="kop-info no-border">
@@ -561,13 +657,13 @@ export function generateAttendanceXlsxWithKop(
   const merges: any[] = [];
 
   // 1. KOP SURAT RESMI SEKOLAH
-  rows.push([{ v: `DAFTAR HADIR SISWA KELAS ${currentClass.name.toUpperCase()}`, t: "s", s: styleKop1 }]);
+  rows.push([{ v: `DAFTAR HADIR SISWA KELAS ${formatClassRoman(currentClass.name)}`, t: "s", s: styleKop1 }]);
   merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } });
 
-  rows.push([{ v: `${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR`, t: "s", s: styleKop2 }]);
+  rows.push([{ v: getSchoolNameWithKabupaten(mergedMeta.schoolName), t: "s", s: styleKop2 }]);
   merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } });
 
-  rows.push([{ v: `TAHUN PELAJARAN ${currentClass.academicYear}`, t: "s", s: styleKop3 }]);
+  rows.push([{ v: `TAHUN PELAJARAN ${currentClass.academicYear || "2026/2027"}`, t: "s", s: styleKop3 }]);
   merges.push({ s: { r: 2, c: 0 }, e: { r: 2, c: totalCols - 1 } });
 
   rows.push([{
@@ -838,6 +934,10 @@ export function generateAttendanceXlsxWithKop(
     { wch: 10 }, // % Hadir
   ];
 
+  // Atur margin dan ukuran kertas folio resmi (21.59 cm x 33.02 cm)
+  ws["!margins"] = OFFICIAL_PAGE_MARGINS;
+  ws["!pageSetup"] = { ...OFFICIAL_PAPER_SETUP, orientation: "landscape" };
+
   const wb = XLSX.utils.book_new();
   const safeClassName = currentClass.name.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 25);
   XLSX.utils.book_append_sheet(wb, ws, `Absensi_${safeClassName}`);
@@ -896,28 +996,28 @@ export function generateSemesterAttendanceXlsxWithKop(
 
   // 1. KOP SURAT RESMI SEKOLAH
   rows.push([{
-    v: `DAFTAR HADIR SISWA KUMULATIF SEMESTER ${currentClass.semester ?? 1} (GANJIL)`,
+    v: `DAFTAR HADIR SISWA KUMULATIF SEMESTER ${currentClass.semester ?? 1} (GANJIL) KELAS ${formatClassRoman(currentClass.name)}`,
     t: "s",
     s: styleKop1,
   }]);
   merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } });
 
   rows.push([{
-    v: `${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR`,
+    v: getSchoolNameWithKabupaten(mergedMeta.schoolName),
     t: "s",
     s: styleKop2,
   }]);
   merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } });
 
   rows.push([{
-    v: `TAHUN PELAJARAN ${currentClass.academicYear}`,
+    v: `TAHUN PELAJARAN ${currentClass.academicYear || "2026/2027"}`,
     t: "s",
     s: styleKop3,
   }]);
   merges.push({ s: { r: 2, c: 0 }, e: { r: 2, c: totalCols - 1 } });
 
   rows.push([{
-    v: `Kelas: ${currentClass.name} | Mata Pelajaran: ${currentClass.subject || mergedMeta.subject} | Semester: ${currentClass.semester ?? 1} (Ganjil) | Periode: Juli - Desember 2026`,
+    v: `Mata Pelajaran: ${currentClass.subject || mergedMeta.subject} | Semester: ${currentClass.semester ?? 1} (Ganjil) | Periode: Juli - Desember 2026`,
     t: "s",
     s: styleKopInfo,
   }]);
@@ -1178,6 +1278,10 @@ export function generateSemesterAttendanceXlsxWithKop(
   );
   ws["!cols"] = colWidths;
 
+  // Atur margin dan ukuran kertas folio resmi (21.59 cm x 33.02 cm)
+  ws["!margins"] = OFFICIAL_PAGE_MARGINS;
+  ws["!pageSetup"] = { ...OFFICIAL_PAPER_SETUP, orientation: "landscape" };
+
   const wb = XLSX.utils.book_new();
   const safeClassName = currentClass.name.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 20);
   XLSX.utils.book_append_sheet(wb, ws, `Semester_${safeClassName}`);
@@ -1199,9 +1303,9 @@ export function generateSemesterAttendanceCsvWithKop(
   const rows: string[] = [];
 
   // --- KOP SURAT RESMI SEKOLAH ---
-  rows.push(`"DAFTAR HADIR SISWA KUMULATIF SEMESTER ${currentClass.semester ?? 1} (GANJIL) KELAS ${currentClass.name.toUpperCase()}"`);
-  rows.push(`"${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR"`);
-  rows.push(`"TAHUN PELAJARAN ${currentClass.academicYear}"`);
+  rows.push(`"DAFTAR HADIR SISWA KUMULATIF SEMESTER ${currentClass.semester ?? 1} (GANJIL) KELAS ${formatClassRoman(currentClass.name)}"`);
+  rows.push(`"${getSchoolNameWithKabupaten(mergedMeta.schoolName)}"`);
+  rows.push(`"TAHUN PELAJARAN ${currentClass.academicYear || "2026/2027"}"`);
   rows.push(`"Mata Pelajaran: ${currentClass.subject || mergedMeta.subject} | Semester: ${currentClass.semester ?? 1} (Ganjil) | Periode: Juli - Desember 2026"`);
   rows.push("");
 
@@ -1355,6 +1459,13 @@ export function generateGradesExcelHtmlWithKop(
 <head>
   <meta charset="utf-8">
   <style>
+    @page {
+      size: 21.59cm 33.02cm landscape;
+      margin: 1.1cm 0.7cm 1.1cm 0.6cm;
+      mso-page-orientation: landscape;
+      mso-header-margin: 0.315in;
+      mso-footer-margin: 0.315in;
+    }
     body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; color: #1B1F1D; }
     table { border-collapse: collapse; width: 100%; }
     .kop-1 { font-size: 14pt; font-weight: bold; text-align: center; }
@@ -1369,10 +1480,10 @@ export function generateGradesExcelHtmlWithKop(
 <body>
   <table>
     <tr>
-      <td colspan="${totalCols}" class="kop-1 no-border">REKAPITULASI DAFTAR NILAI SISWA KELAS ${className.toUpperCase()}</td>
+      <td colspan="${totalCols}" class="kop-1 no-border">DAFTAR NILAI SISWA KELAS ${formatClassRoman(className)}</td>
     </tr>
     <tr>
-      <td colspan="${totalCols}" class="kop-2 no-border">${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR</td>
+      <td colspan="${totalCols}" class="kop-2 no-border">${getSchoolNameWithKabupaten(mergedMeta.schoolName)}</td>
     </tr>
     <tr>
       <td colspan="${totalCols}" class="kop-3 no-border">TAHUN PELAJARAN 2026/2027</td>
@@ -1447,10 +1558,10 @@ export function generateGradesXlsxWithKop(
   const merges: any[] = [];
 
   // 1. KOP SURAT RESMI
-  rows.push([{ v: `REKAPITULASI DAFTAR NILAI SISWA KELAS ${className.toUpperCase()}`, t: "s", s: styleKop1 }]);
+  rows.push([{ v: `DAFTAR NILAI SISWA KELAS ${formatClassRoman(className)}`, t: "s", s: styleKop1 }]);
   merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } });
 
-  rows.push([{ v: `${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR`, t: "s", s: styleKop2 }]);
+  rows.push([{ v: getSchoolNameWithKabupaten(mergedMeta.schoolName), t: "s", s: styleKop2 }]);
   merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } });
 
   rows.push([{ v: "TAHUN PELAJARAN 2026/2027", t: "s", s: styleKop3 }]);
@@ -1623,6 +1734,10 @@ export function generateGradesXlsxWithKop(
   ];
   ws["!cols"] = colWidths;
 
+  // Atur margin dan ukuran kertas folio resmi (21.59 cm x 33.02 cm)
+  ws["!margins"] = OFFICIAL_PAGE_MARGINS;
+  ws["!pageSetup"] = { ...OFFICIAL_PAPER_SETUP, orientation: "landscape" };
+
   const wb = XLSX.utils.book_new();
   const safeClassName = className.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 25);
   XLSX.utils.book_append_sheet(wb, ws, `Nilai_${safeClassName}`);
@@ -1663,8 +1778,8 @@ export function generateGradesCsvWithKop(
   const rows: string[] = [];
 
   // Kop Surat Resmi Sekolah
-  rows.push(`"REKAPITULASI DAFTAR NILAI SISWA KELAS ${className.toUpperCase()}"`);
-  rows.push(`"${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR"`);
+  rows.push(`"DAFTAR NILAI SISWA KELAS ${formatClassRoman(className)}"`);
+  rows.push(`"${getSchoolNameWithKabupaten(mergedMeta.schoolName)}"`);
   rows.push(`"TAHUN PELAJARAN 2026/2027"`);
   rows.push(`"Mata Pelajaran: ${mergedMeta.subject} | KKM Standar: ${kkm}"`);
   rows.push("");
@@ -1734,10 +1849,10 @@ export function generateCensoredGradesXlsxWithKop(
   const merges: any[] = [];
 
   // 1. KOP SURAT RESMI PENGUMUMAN
-  rows.push([{ v: `REKAPITULASI KELENGKAPAN TUGAS & ASESMEN SISWA (PENGUMUMAN PUBLIK)`, t: "s", s: styleKop1 }]);
+  rows.push([{ v: `REKAPITULASI KELENGKAPAN TUGAS & ASESMEN SISWA KELAS ${formatClassRoman(className)}`, t: "s", s: styleKop1 }]);
   merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } });
 
-  rows.push([{ v: `KELAS ${className.toUpperCase()} - ${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR`, t: "s", s: styleKop2 }]);
+  rows.push([{ v: getSchoolNameWithKabupaten(mergedMeta.schoolName), t: "s", s: styleKop2 }]);
   merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } });
 
   rows.push([{ v: "TAHUN PELAJARAN 2026/2027 · SEMESTER GANJIL", t: "s", s: styleKop3 }]);
@@ -1923,6 +2038,10 @@ export function generateCensoredGradesXlsxWithKop(
   ];
   ws["!cols"] = colWidths;
 
+  // Atur margin dan ukuran kertas folio resmi (21.59 cm x 33.02 cm)
+  ws["!margins"] = OFFICIAL_PAGE_MARGINS;
+  ws["!pageSetup"] = { ...OFFICIAL_PAPER_SETUP, orientation: "landscape" };
+
   const wb = XLSX.utils.book_new();
   const safeClassName = className.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 25);
   XLSX.utils.book_append_sheet(wb, ws, `Pengumuman_${safeClassName}`);
@@ -1944,8 +2063,8 @@ export function generateCensoredGradesCsvWithKop(
   const rows: string[] = [];
 
   // Kop Surat Resmi
-  rows.push(`"REKAPITULASI KELENGKAPAN TUGAS & ASESMEN SISWA (PENGUMUMAN PUBLIK)"`);
-  rows.push(`"KELAS ${className.toUpperCase()} - ${mergedMeta.schoolName.toUpperCase()} KABUPATEN BOGOR"`);
+  rows.push(`"REKAPITULASI KELENGKAPAN TUGAS & ASESMEN SISWA KELAS ${formatClassRoman(className)}"`);
+  rows.push(`"${getSchoolNameWithKabupaten(mergedMeta.schoolName)}"`);
   rows.push(`"TAHUN PELAJARAN 2026/2027 · SEMESTER GANJIL"`);
   rows.push(`"Mata Pelajaran: ${mergedMeta.subject} | Status: Nilai Angka Disensor (UU PDP) | [SUDAH] = Tuntas, [BELUM] = Belum Mengerjakan"`);
   rows.push("");
@@ -2127,25 +2246,39 @@ export function generateCensoredGradesHtmlPrint(
   <meta charset="utf-8">
   <title>Pengumuman Kelengkapan Tugas Kelas ${className}</title>
   <style>
-    body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 10pt; color: #111827; margin: 20px; }
+    @page {
+      size: 21.59cm 33.02cm landscape;
+      margin: 1.1cm 0.7cm 1.1cm 0.6cm;
+    }
+    body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 10pt; color: #111827; margin: 15px; }
     table { border-collapse: collapse; width: 100%; margin-top: 12px; }
     .kop-1 { font-size: 13pt; font-weight: bold; text-align: center; }
     .kop-2 { font-size: 11pt; font-weight: bold; text-align: center; }
+    .kop-3 { font-size: 10.5pt; font-weight: bold; text-align: center; }
     .kop-info { font-size: 9pt; text-align: center; color: #4B5563; margin-top: 4px; }
     th { border: 1px solid #374151; background-color: #E2EFDA; padding: 6px 4px; font-size: 8.5pt; font-weight: bold; text-align: center; }
     td { border: 1px solid #6B7280; padding: 4px 6px; font-size: 8.5pt; vertical-align: middle; }
     .no-border { border: none !important; }
     @media print {
-      body { margin: 10mm; }
+      @page {
+        size: 21.59cm 33.02cm landscape;
+        margin: 1.1cm 0.7cm 1.1cm 0.6cm;
+      }
+      body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .no-print { display: none; }
     }
   </style>
 </head>
 <body>
-  <div style="text-align: center; border-bottom: 2px solid #111827; padding-bottom: 8px; margin-bottom: 12px;">
-    <div class="kop-1">REKAPITULASI KELENGKAPAN TUGAS &amp; ASESMEN SISWA</div>
-    <div class="kop-2">KELAS ${className.toUpperCase()} · ${mergedMeta.schoolName.toUpperCase()}</div>
-    <div class="kop-info">Tahun Ajaran 2026/2027 · Mata Pelajaran: ${mergedMeta.subject} · Status: Nilai Angka Disensor (UU PDP)</div>
+  <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #111827; padding-bottom: 8px; margin-bottom: 12px;">
+    <img src="${LOGO_SMPN3_BASE64}" alt="Logo SMPN 3 Cibungbulang" style="width: 58px; height: auto; object-fit: contain;" />
+    <div style="flex: 1; text-align: center; padding: 0 16px;">
+      <div class="kop-1">REKAPITULASI KELENGKAPAN TUGAS &amp; ASESMEN SISWA KELAS ${formatClassRoman(className)}</div>
+      <div class="kop-2" style="margin-top: 2px;">${getSchoolNameWithKabupaten(mergedMeta.schoolName)}</div>
+      <div class="kop-3" style="margin-top: 2px;">TAHUN PELAJARAN 2026/2027</div>
+      <div class="kop-info">Mata Pelajaran: ${mergedMeta.subject} · Status: Nilai Angka Disensor (UU PDP)</div>
+    </div>
+    <div style="width: 58px;" aria-hidden="true"></div>
   </div>
 
   <table>

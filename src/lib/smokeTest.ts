@@ -102,6 +102,9 @@ import {
   generateCensoredGradesCsvWithKop,
   generateCensoredGradesWhatsAppText,
   generateCensoredGradesHtmlPrint,
+  formatClassRoman,
+  OFFICIAL_PAGE_MARGINS,
+  OFFICIAL_PAPER_SETUP,
 } from "./exportUtils.ts";
 import { computeSemesterRecapForClass } from "../app/reports/page.tsx";
 import type { SemesterClassRecap, StudentSemesterRecap } from "../contracts/attendance.ts";
@@ -487,7 +490,7 @@ function runSmokeTest() {
     );
 
     assert.ok(attendanceCsv.startsWith("\uFEFF"), "CSV Presensi wajib diawali UTF-8 BOM");
-    assert.ok(attendanceCsv.includes("DAFTAR HADIR SISWA KELAS 7A"), "Kop harus memuat judul daftar hadir kelas");
+    assert.ok(attendanceCsv.includes("DAFTAR HADIR SISWA KELAS VII / A"), "Kop harus memuat judul daftar hadir kelas dengan format romawi VII / A");
     assert.ok(attendanceCsv.includes("SMP NEGERI 3 CIBUNGBULANG KABUPATEN BOGOR"), "Kop harus memuat nama sekolah resmi");
     assert.ok(attendanceCsv.includes("TAHUN PELAJARAN 2026/2027"), "Kop harus memuat tahun pelajaran");
     assert.ok(attendanceCsv.includes("Muhamad Rizky Aprian, S.Kom"), "Tanda tangan harus memuat nama guru");
@@ -504,7 +507,7 @@ function runSmokeTest() {
     );
 
     assert.ok(attendanceExcel.includes("xmlns:x=\"urn:schemas-microsoft-com:office:excel\""), "Format Excel harus Spreadsheet HTML Office XML");
-    assert.ok(attendanceExcel.includes("DAFTAR HADIR SISWA KELAS 7A"), "Excel harus memuat Kop baris 1");
+    assert.ok(attendanceExcel.includes("DAFTAR HADIR SISWA KELAS VII / A"), "Excel harus memuat Kop baris 1 format romawi VII / A");
     assert.ok(attendanceExcel.includes("SMP NEGERI 3 CIBUNGBULANG"), "Excel harus memuat nama sekolah");
     assert.ok(attendanceExcel.includes("DisplayGridlines"), "Excel harus menyertakan gridlines");
     assert.ok(attendanceExcel.includes("Muhamad Rizky Aprian, S.Kom"), "Excel harus memuat blok tanda tangan guru");
@@ -545,7 +548,7 @@ function runSmokeTest() {
       mockSummaries,
       DEFAULT_KKM
     );
-    assert.ok(gradesExcel.includes("REKAPITULASI DAFTAR NILAI SISWA KELAS 7A"), "Kop nilai Excel harus sesuai");
+    assert.ok(gradesExcel.includes("DAFTAR NILAI SISWA KELAS VII / A"), "Kop nilai Excel harus sesuai format romawi");
     assert.ok(gradesExcel.includes("SMP NEGERI 3 CIBUNGBULANG"), "Nama sekolah di kop nilai harus sesuai");
 
     const gradesCsv = generateGradesCsvWithKop(
@@ -555,7 +558,7 @@ function runSmokeTest() {
       DEFAULT_KKM
     );
     assert.ok(gradesCsv.startsWith("\uFEFF"), "CSV Nilai harus diawali UTF-8 BOM");
-    assert.ok(gradesCsv.includes("REKAPITULASI DAFTAR NILAI SISWA KELAS 7A"), "Kop nilai CSV harus sesuai");
+    assert.ok(gradesCsv.includes("DAFTAR NILAI SISWA KELAS VII / A"), "Kop nilai CSV harus sesuai format romawi");
 
     // 9d. Ekspor Berkas OpenXML Excel (.xlsx) Presensi Ber-Kop
     const attendanceXlsx = generateAttendanceXlsxWithKop(
@@ -569,6 +572,10 @@ function runSmokeTest() {
 
     const parsedAttendanceWb = XLSX.read(attendanceXlsx, { type: "array" });
     assert.ok(parsedAttendanceWb.SheetNames.includes("Absensi_7A"), "Worksheet harus bernama Absensi_7A");
+    const wsAttendance = parsedAttendanceWb.Sheets["Absensi_7A"];
+    assert.ok(wsAttendance["!margins"], "Worksheet presensi harus memiliki konfigurasi !margins");
+    assert.ok(Math.abs((wsAttendance["!margins"]?.top ?? 0) - (1.1 / 2.54)) < 0.001, "Margin top presensi harus 1.1 cm");
+    assert.ok(Math.abs((wsAttendance["!margins"]?.left ?? 0) - (0.6 / 2.54)) < 0.001, "Margin left presensi harus 0.6 cm");
 
     // 9e. Ekspor Berkas OpenXML Excel (.xlsx) Nilai Ber-Kop
     const gradesXlsx = generateGradesXlsxWithKop(
@@ -582,8 +589,20 @@ function runSmokeTest() {
 
     const parsedGradesWb = XLSX.read(gradesXlsx, { type: "array" });
     assert.ok(parsedGradesWb.SheetNames.includes("Nilai_7A"), "Worksheet nilai harus bernama Nilai_7A");
+    const wsGrades = parsedGradesWb.Sheets["Nilai_7A"];
+    assert.ok(wsGrades["!margins"], "Worksheet nilai harus memiliki konfigurasi !margins");
+    assert.ok(Math.abs((wsGrades["!margins"]?.top ?? 0) - (1.1 / 2.54)) < 0.001, "Margin top nilai harus 1.1 cm");
+    assert.ok(Math.abs((wsGrades["!margins"]?.left ?? 0) - (0.6 / 2.54)) < 0.001, "Margin left nilai harus 0.6 cm");
 
-    console.log("✓ LULUS: Ekspor berkas presensi dan nilai dengan format XLSX (.xlsx) dan CSV ber-Kop resmi terverifikasi 100%.");
+    // 9f. Uji Helper formatClassRoman & Margin Folio
+    assert.strictEqual(formatClassRoman("7C"), "VII / C", "formatClassRoman 7C harus VII / C");
+    assert.strictEqual(formatClassRoman("8B"), "VIII / B", "formatClassRoman 8B harus VIII / B");
+    assert.strictEqual(formatClassRoman("9A"), "IX / A", "formatClassRoman 9A harus IX / A");
+    assert.strictEqual(formatClassRoman("Kelas 7-C"), "VII / C", "formatClassRoman Kelas 7-C harus VII / C");
+    assert.ok(OFFICIAL_PAGE_MARGINS.top > 0.4 && OFFICIAL_PAGE_MARGINS.top < 0.45, "Margin top harus 1.1 cm (~0.433 in)");
+    assert.strictEqual(OFFICIAL_PAPER_SETUP.paperSize, 14, "Paper setup harus kode 14 (Folio F4)");
+
+    console.log("✓ LULUS: Ekspor berkas presensi dan nilai dengan format XLSX (.xlsx), CSV, margin & ukuran Folio resmi terverifikasi 100%.");
   }
 
   // 10. Pengujian Jurnal Agenda Pembelajaran & Materi KBM (Catatan Pembelajaran)

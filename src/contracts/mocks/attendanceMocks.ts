@@ -14,7 +14,7 @@ import { ALL_STUDENTS_BY_CLASS, STUDENTS_CLASS_8B } from "./studentsData.ts";
 export const MOCK_TEACHER_ID = "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d";
 export const MOCK_TEACHER_NAME = "Muhamad Rizky Aprian, S.Kom";
 export const MOCK_TEACHER_NIP = "19940825 202221 1 004";
-export const MOCK_SCHOOL_NAME = "SMP Negeri 3 Cibungbulang";
+export const MOCK_SCHOOL_NAME = "SMP Negeri 3 Cibungbulang Kabupaten Bogor";
 export const MOCK_SUBJECT = "Informatika";
 
 // ============================================================================
