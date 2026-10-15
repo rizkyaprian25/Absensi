@@ -25,7 +25,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#F7F5F0",
+  themeColor: "#121412",
 };
 
 export default function RootLayout({
@@ -36,9 +36,28 @@ export default function RootLayout({
   return (
     <html
       lang="id"
-      className={`${plusJakartaSans.variable} ${jetbrainsMono.variable}`}
+      className={`dark ${plusJakartaSans.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
     >
-      <body className="antialiased selection:bg-[#E3F3EA] selection:text-[#146C43]">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var savedTheme = localStorage.getItem('app_theme');
+                if (savedTheme === 'light') {
+                  document.documentElement.classList.remove('dark');
+                } else {
+                  document.documentElement.classList.add('dark');
+                }
+              } catch (e) {
+                document.documentElement.classList.add('dark');
+              }
+            `,
+          }}
+        />
+      </head>
+      <body className="antialiased selection:bg-[#163A29] selection:text-[#7FD9AC]">
         <AppShell>{children}</AppShell>
       </body>
     </html>

@@ -1255,10 +1255,10 @@ function GradesPageContent() {
                       {/* Nama & NIS Siswa */}
                       <td className="py-2.5 px-3 sticky left-10 bg-[var(--surface-card)] z-10 border-r border-[var(--border-hairline)] shadow-[2px_0_4px_rgba(0,0,0,0.02)]">
                         <div className="truncate">
-                          <p className="font-semibold text-xs text-[var(--text-primary)] truncate">
+                          <p className="font-semibold text-sm text-[var(--text-primary)] truncate">
                             {summary.studentName}
                           </p>
-                          <p className="text-[10px] text-[var(--text-secondary)] font-mono truncate">
+                          <p className="text-xs text-[var(--text-secondary)] font-mono truncate">
                             NIS {summary.nis ?? "-"} · {summary.gender === "L" ? "L" : "P"}
                           </p>
                         </div>
@@ -1266,7 +1266,7 @@ function GradesPageContent() {
 
                       {/* Kolom Nilai Tiap Asesmen */}
                       {filteredAssessments.length === 0 ? (
-                        <td className="py-2.5 px-4 text-center text-[var(--text-secondary)] italic border-r border-[var(--border-hairline)] text-[11px]">
+                        <td className="py-2.5 px-4 text-center text-[var(--text-secondary)] italic border-r border-[var(--border-hairline)] text-xs">
                           -
                         </td>
                       ) : (
@@ -1312,11 +1312,12 @@ function GradesPageContent() {
                                   value={cellInputValue}
                                   onChange={(e) => setCellInputValue(e.target.value)}
                                   onBlur={handleSaveCellEdit}
+                                  onWheel={(e) => e.currentTarget.blur()}
                                   onKeyDown={(e) => {
                                     if (e.key === "Enter") handleSaveCellEdit();
                                     if (e.key === "Escape") setEditingCell(null);
                                   }}
-                                  className="w-16 px-1.5 py-1 text-center font-mono text-xs bg-[var(--surface-card)] text-[var(--text-primary)] font-bold border-2 border-[var(--color-accent)] rounded outline-none shadow-xs"
+                                  className="w-20 px-2 py-1.5 text-center font-mono text-base md:text-lg bg-[var(--surface-card)] text-[var(--text-primary)] font-bold border-2 border-[var(--color-accent)] rounded-lg outline-none shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                               ) : (
                                 <button
@@ -1331,16 +1332,16 @@ function GradesPageContent() {
                                         : `Nilai: ${sc} (Tuntas) - Klik untuk mengedit`
                                       : "Klik untuk mengisi nilai"
                                   }
-                                  className={`w-full py-1.5 px-2 rounded-md text-xs font-mono transition-colors hover:bg-[var(--surface-recessed)] flex items-center justify-center gap-1.5 cursor-pointer ${
+                                  className={`w-full py-1.5 px-2 rounded-lg text-sm md:text-base font-mono transition-colors hover:bg-[var(--surface-recessed)] flex items-center justify-center gap-1.5 cursor-pointer ${
                                     sc === null || sc === undefined
-                                      ? "text-[var(--text-secondary)]/40"
-                                      : "text-[var(--text-primary)] font-bold"
+                                      ? "text-[var(--text-secondary)]/40 font-normal"
+                                      : "text-[var(--text-primary)] font-bold tracking-wide"
                                   }`}
                                 >
                                   <span>{sc !== null && sc !== undefined ? sc : "-"}</span>
                                   {isUnderKkm && (
                                     <span
-                                      className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"
+                                      className="w-2 h-2 rounded-full bg-rose-500 shrink-0"
                                       title={`Di bawah KKM (${kkm})`}
                                     />
                                   )}
@@ -1352,7 +1353,7 @@ function GradesPageContent() {
                       )}
 
                       {/* Nilai Rata-rata Akhir */}
-                      <td className="py-2.5 px-3 text-center font-mono text-xs border-r border-[var(--border-hairline)] bg-[var(--surface-card)]">
+                      <td className="py-2.5 px-3 text-center font-mono text-sm md:text-base border-r border-[var(--border-hairline)] bg-[var(--surface-card)]">
                         {isCensoredViewActive ? (
                           <span
                             className="text-[var(--text-secondary)] font-mono font-bold select-none text-[11px] tracking-widest opacity-60"
@@ -1367,7 +1368,7 @@ function GradesPageContent() {
                             </span>
                             {summary.finalScore !== null && summary.finalScore < kkm && (
                               <span
-                                className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"
+                                className="w-2 h-2 rounded-full bg-rose-500 shrink-0"
                                 title={`Rata-rata di bawah KKM (${kkm})`}
                               />
                             )}
@@ -1611,8 +1612,9 @@ function GradesPageContent() {
                     name="maxScore"
                     min={10}
                     max={100}
+                    onWheel={(e) => e.currentTarget.blur()}
                     defaultValue={editingAssessment?.maxScore || 100}
-                    className="w-full px-3 py-2 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[8px] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+                    className="w-full px-3 py-2 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[8px] text-sm text-[var(--text-primary)] font-mono font-bold focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
 
@@ -1625,8 +1627,9 @@ function GradesPageContent() {
                     name="weight"
                     min={1}
                     max={100}
+                    onWheel={(e) => e.currentTarget.blur()}
                     defaultValue={editingAssessment?.weight || 1}
-                    className="w-full px-3 py-2 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[8px] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+                    className="w-full px-3 py-2 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[8px] text-sm text-[var(--text-primary)] font-mono font-bold focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
               </div>
@@ -1716,7 +1719,7 @@ function GradesPageContent() {
 
               <div className="flex items-end gap-2 shrink-0">
                 <div>
-                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
                     Isi Massal Semua:
                   </label>
                   <input
@@ -1725,14 +1728,15 @@ function GradesPageContent() {
                     max={100}
                     value={bulkValue}
                     onChange={(e) => setBulkValue(e.target.value)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     placeholder="Nilai (0-100)"
-                    className="w-24 px-2 py-1.5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[8px] text-xs font-mono text-[var(--text-primary)]"
+                    className="w-28 px-3 py-1.5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[8px] text-sm md:text-base font-bold font-mono text-[var(--text-primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={handleApplyBulkScore}
-                  className="px-3 py-1.5 bg-[var(--surface-recessed)] hover:bg-[var(--surface-recessed)]/80 text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[8px] text-xs font-semibold transition-colors"
+                  className="px-3.5 py-2 bg-[var(--surface-recessed)] hover:bg-[var(--surface-recessed)]/80 text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[8px] text-xs font-semibold transition-colors cursor-pointer"
                 >
                   Terapkan
                 </button>
@@ -1889,19 +1893,19 @@ function GradesPageContent() {
                           #{String(originalIndex).padStart(2, "0")}
                         </span>
                         <div className="min-w-0">
-                          <p className="font-semibold text-xs text-[var(--text-primary)] truncate">
+                          <p className="font-semibold text-sm text-[var(--text-primary)] truncate">
                             {student.fullName}
                           </p>
-                          <p className="text-[10px] text-[var(--text-secondary)] font-mono">
+                          <p className="text-xs text-[var(--text-secondary)] font-mono">
                             NIS {student.nis ?? "-"} · {student.gender === "L" ? "Laki-laki" : "Perempuan"}
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2.5 shrink-0">
                         {numVal !== null ? (
                           <span
-                            className={`text-[10px] px-2 py-0.5 rounded-full font-semibold font-mono ${
+                            className={`text-xs px-2.5 py-1 rounded-full font-semibold font-mono ${
                               isUnderKkm
                                 ? "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
                                 : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
@@ -1910,7 +1914,7 @@ function GradesPageContent() {
                             {isUnderKkm ? "Remedial" : "Tuntas"}
                           </span>
                         ) : (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium font-mono text-[var(--text-secondary)] bg-[var(--surface-recessed)] border border-[var(--border-hairline)]/50">
+                          <span className="text-xs px-2.5 py-1 rounded-full font-medium font-mono text-[var(--text-secondary)] bg-[var(--surface-recessed)] border border-[var(--border-hairline)]/50">
                             Kosong
                           </span>
                         )}
@@ -1921,6 +1925,7 @@ function GradesPageContent() {
                           max={100}
                           value={currentVal}
                           placeholder="0-100"
+                          onWheel={(e) => e.currentTarget.blur()}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               e.preventDefault();
@@ -1939,7 +1944,7 @@ function GradesPageContent() {
                               [student.id]: val,
                             }));
                           }}
-                          className={`w-20 px-2.5 py-1.5 text-center font-mono text-xs border rounded-[8px] font-bold focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] ${
+                          className={`w-24 px-3 py-2 text-center font-mono text-base md:text-lg border-2 rounded-[10px] font-bold focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                             isUnderKkm
                               ? "border-rose-300 bg-rose-50/20 text-[var(--text-primary)]"
                               : "border-[var(--border-hairline)] bg-[var(--surface-card)] text-[var(--text-primary)]"
@@ -2055,7 +2060,7 @@ function GradesPageContent() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
                         <span className="text-xs font-semibold text-[var(--text-secondary)]">
                           KKM:
                         </span>
@@ -2064,6 +2069,7 @@ function GradesPageContent() {
                           min={50}
                           max={100}
                           value={currentVal}
+                          onWheel={(e) => e.currentTarget.blur()}
                           onChange={(e) => {
                             const val = Number(e.target.value);
                             setTempKkmByGrade((prev) => ({
@@ -2071,7 +2077,7 @@ function GradesPageContent() {
                               [item.grade]: val,
                             }));
                           }}
-                          className="w-16 px-2 py-1.5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[8px] font-mono text-sm font-bold text-center text-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                          className="w-20 px-2.5 py-1.5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[8px] font-mono text-base font-bold text-center text-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </div>
                     </div>

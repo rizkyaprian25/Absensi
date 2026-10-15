@@ -75,8 +75,21 @@ import {
  * Halaman Pengaturan, Profil Guru, Manajemen Kalender, dan Pusat Keamanan Cadangan Data
  */
 export default function SettingsPage() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("app_theme");
+      if (savedTheme === "light") {
+        setIsDarkMode(false);
+        document.documentElement.classList.remove("dark");
+      } else {
+        setIsDarkMode(true);
+        document.documentElement.classList.add("dark");
+      }
+    }
+  }, []);
 
   // State Hari Libur & Agenda Khusus
   const [holidays, setHolidays] = useState<HolidayItem[]>([]);
@@ -239,12 +252,15 @@ export default function SettingsPage() {
   };
 
   const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-    if (!isDarkMode) {
+    const nextMode = !isDarkMode;
+    setIsDarkMode(nextMode);
+    if (nextMode) {
       document.documentElement.classList.add("dark");
+      localStorage.setItem("app_theme", "dark");
       setToastMessage("Mode Gelap diaktifkan");
     } else {
       document.documentElement.classList.remove("dark");
+      localStorage.setItem("app_theme", "light");
       setToastMessage("Mode Terang diaktifkan");
     }
     setTimeout(() => setToastMessage(null), 2500);
