@@ -692,7 +692,7 @@ export default function ClassDetailPage() {
                     <div
                       key={item.row}
                       className={`p-2.5 flex items-start justify-between gap-2 ${
-                        item.isValid ? "bg-white" : "bg-[var(--status-alpa-bg)]/20"
+                        item.isValid ? "bg-[var(--surface-card)]" : "bg-[var(--status-alpa-bg)]/20"
                       }`}
                     >
                       <div className="flex items-start gap-2">

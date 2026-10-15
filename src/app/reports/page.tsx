@@ -1068,16 +1068,16 @@ export default function ReportsPage() {
                     return (
                       <tr
                         key={student.studentId}
-                        className={`hover:bg-[var(--surface-recessed)]/40 transition-colors ${
-                          isWarning ? "bg-[var(--status-alpa-bg)]/20" : ""
+                        className={`group hover:bg-[var(--surface-recessed)]/40 transition-colors ${
+                          isWarning ? "bg-[var(--status-alpa-bg)]/15" : ""
                         }`}
                       >
                         {/* Kolom Sticky Nama Siswa */}
                         <td
-                          className={`sticky left-0 z-10 p-2.5 font-medium border-r border-[var(--border-hairline)] shadow-[2px_0_4px_rgba(0,0,0,0.02)] truncate max-w-[180px] ${
+                          className={`sticky left-0 z-10 p-2.5 font-medium border-r border-[var(--border-hairline)] shadow-[2px_0_4px_rgba(0,0,0,0.02)] truncate max-w-[180px] bg-[var(--surface-card)] group-hover:bg-[var(--surface-recessed)]/30 transition-colors ${
                             isWarning
-                              ? "bg-[#FEF6F5]"
-                              : "bg-[var(--surface-card)]"
+                              ? "border-l-3 border-l-[var(--status-alpa-fg)]"
+                              : ""
                           }`}
                         >
                           <div className="flex items-center gap-1.5">
@@ -1093,7 +1093,7 @@ export default function ReportsPage() {
                                   {student.nis}
                                 </span>
                                 {isWarning && (
-                                  <span className="text-[9px] px-1 py-0.2 rounded-[3px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold">
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded-[4px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold">
                                     Perhatian
                                   </span>
                                 )}
@@ -1124,7 +1124,7 @@ export default function ReportsPage() {
                                     : code === "A"
                                     ? "bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)]"
                                     : code === "T"
-                                    ? "bg-amber-100 text-amber-800"
+                                    ? "bg-[var(--status-terlambat-bg)] text-[var(--status-terlambat-fg)]"
                                     : code === "D"
                                     ? "bg-[var(--status-dispen-bg)] text-[var(--status-dispen-fg)] ring-1 ring-[var(--status-dispen-fg)]/30 font-bold"
                                     : "text-[var(--text-secondary)]/50 font-normal"
