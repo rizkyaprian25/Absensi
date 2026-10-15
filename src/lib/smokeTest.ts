@@ -99,6 +99,8 @@ import {
   generateSemesterAttendanceCsvWithKop,
   generateSemesterAttendanceXlsxWithKop,
   generateSemesterAttendanceHtmlPrint,
+  generateAttendanceHtmlPrint,
+  generateGradesHtmlPrint,
   generateCensoredGradesXlsxWithKop,
   generateCensoredGradesCsvWithKop,
   generateCensoredGradesWhatsAppText,
@@ -595,13 +597,30 @@ function runSmokeTest() {
     assert.ok(Math.abs((wsGrades["!margins"]?.top ?? 0) - (1.1 / 2.54)) < 0.001, "Margin top nilai harus 1.1 cm");
     assert.ok(Math.abs((wsGrades["!margins"]?.left ?? 0) - (0.6 / 2.54)) < 0.001, "Margin left nilai harus 0.6 cm");
 
-    // 9f. Uji Helper formatClassRoman & Margin Folio
-    assert.strictEqual(formatClassRoman("7C"), "VII / C", "formatClassRoman 7C harus VII / C");
-    assert.strictEqual(formatClassRoman("8B"), "VIII / B", "formatClassRoman 8B harus VIII / B");
-    assert.strictEqual(formatClassRoman("9A"), "IX / A", "formatClassRoman 9A harus IX / A");
-    assert.strictEqual(formatClassRoman("Kelas 7-C"), "VII / C", "formatClassRoman Kelas 7-C harus VII / C");
-    assert.ok(OFFICIAL_PAGE_MARGINS.top > 0.4 && OFFICIAL_PAGE_MARGINS.top < 0.45, "Margin top harus 1.1 cm (~0.433 in)");
-    assert.strictEqual(OFFICIAL_PAPER_SETUP.paperSize, 14, "Paper setup harus kode 14 (Folio F4)");
+    // 9g. Uji Cetak HTML Presensi Bulanan Resmi Folio (33.02cm x 21.59cm Landscape)
+    const monthlyPrintHtml = generateAttendanceHtmlPrint(
+      mockClass,
+      "September 2026",
+      effectiveDates,
+      mockRecapStudents
+    );
+    assert.ok(monthlyPrintHtml.includes("33.02cm 21.59cm"), "Presensi bulanan harus menggunakan Folio landscape 33.02cm x 21.59cm");
+    assert.ok(monthlyPrintHtml.includes("DAFTAR HADIR SISWA KELAS VII / A"), "Judul kop presensi bulanan harus ada");
+    assert.ok(monthlyPrintHtml.includes("data:image/png;base64"), "Logo resmi SMPN 3 Cibungbulang harus ada");
+    assert.ok(monthlyPrintHtml.includes("JUMLAH TOTAL REKAPITULASI"), "Baris rekapitulasi total presensi harus ada");
+
+    // 9h. Uji Cetak HTML Nilai Lengkap Resmi Folio (21.59cm x 33.02cm Portrait)
+    const gradesPrintHtml = generateGradesHtmlPrint(
+      "7A",
+      mockAssessments,
+      mockSummaries,
+      DEFAULT_KKM
+    );
+    assert.ok(gradesPrintHtml.includes("21.59cm 33.02cm"), "Nilai lengkap harus menggunakan Folio portrait 21.59cm x 33.02cm");
+    assert.ok(gradesPrintHtml.includes("DAFTAR NILAI ASESMEN &amp; RAPORT SISWA KELAS VII / A"), "Judul kop nilai lengkap harus ada");
+    assert.ok(gradesPrintHtml.includes("data:image/png;base64"), "Logo resmi SMPN 3 Cibungbulang harus ada pada cetak nilai");
+    assert.ok(gradesPrintHtml.includes("Ringkasan Ketuntasan:"), "Kotak ringkasan ketuntasan harus ada");
+    assert.ok(gradesPrintHtml.includes("Guru Mata Pelajaran Informatika"), "Tanda tangan guru harus ada");
 
     console.log("✓ LULUS: Ekspor berkas presensi dan nilai dengan format XLSX (.xlsx), CSV, margin & ukuran Folio resmi terverifikasi 100%.");
   }

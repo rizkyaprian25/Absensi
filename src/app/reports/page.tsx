@@ -52,6 +52,7 @@ import {
   generateSemesterAttendanceCsvWithKop,
   generateSemesterAttendanceXlsxWithKop,
   generateSemesterAttendanceHtmlPrint,
+  generateAttendanceHtmlPrint,
   downloadXlsxFile,
 } from "@/lib/exportUtils";
 
@@ -609,12 +610,42 @@ export default function ReportsPage() {
     }
   };
 
-  // Cetak Dokumen via Native Window Print atau Layout Khusus Folio PDF
+  // Cetak / Simpan PDF Presensi Bulanan Resmi Folio (21.59cm x 33.02cm 1 Lembar)
+  const handlePrintMonthlyPdf = (targetClass: Class = currentClass) => {
+    const data =
+      targetClass.id === currentClass.id
+        ? recapData
+        : computeRecapForClass(targetClass, selectedMonth, holidays, savedSessions, savedRecords);
+
+    const htmlContent = generateAttendanceHtmlPrint(
+      targetClass,
+      currentMonthLabel,
+      data.effectiveDates,
+      data.students,
+      holidays,
+      {},
+      savedSessions
+    );
+    const printWin = window.open("", "_blank");
+    if (printWin) {
+      printWin.document.open();
+      printWin.document.write(htmlContent);
+      printWin.document.close();
+      setTimeout(() => {
+        printWin.focus();
+        printWin.print();
+      }, 400);
+    } else {
+      alert("Popup terblokir oleh peramban. Izinkan popup untuk mencetak atau menyimpan PDF presensi.");
+    }
+  };
+
+  // Cetak Dokumen via Layout Khusus Folio PDF Ber-Kop Resmi
   const handlePrint = () => {
     if (recapMode === "semester") {
       handlePrintSemesterPdf(currentClass);
     } else {
-      window.print();
+      handlePrintMonthlyPdf(currentClass);
     }
   };
 
@@ -719,23 +750,15 @@ export default function ReportsPage() {
             )}
           </div>
 
-          {/* Tombol Cetak / PDF (Folio) */}
+          {/* Tombol Cetak / PDF (Folio) Ber-Kop Resmi */}
           <button
             type="button"
             onClick={handlePrint}
-            className={`min-h-[44px] px-3.5 py-2 rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs active:scale-[0.98] ${
-              recapMode === "semester"
-                ? "bg-rose-600 hover:bg-rose-700 text-white"
-                : "bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] text-[var(--text-primary)] border border-[var(--border-hairline)]"
-            }`}
-            title={
-              recapMode === "semester"
-                ? "Cetak atau Simpan PDF Rekap Semester Folio (21.59 x 33.02 cm) 1 Lembar Ber-Kop Resmi"
-                : "Cetak Dokumen Presensi"
-            }
+            className="min-h-[44px] px-3.5 py-2 rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs active:scale-[0.98] bg-rose-600 hover:bg-rose-700 text-white"
+            title={`Cetak atau Simpan PDF ${recapMode === "semester" ? "Rekap Semester" : `Bulan ${currentMonthLabel}`} Folio (21.59 x 33.02 cm) 1 Lembar Ber-Kop Resmi`}
           >
-            <Printer className={`w-4 h-4 ${recapMode === "semester" ? "text-rose-100" : "text-[var(--text-secondary)]"}`} />
-            <span>{recapMode === "semester" ? "Cetak / PDF (Folio)" : "Cetak"}</span>
+            <Printer className="w-4 h-4 text-rose-100" />
+            <span>Cetak / PDF (Folio)</span>
           </button>
         </div>
       </header>
@@ -944,13 +967,35 @@ export default function ReportsPage() {
 
           {/* Matriks Presensi Harian (Tabel Scrollable Horizontal dengan Kolom Sticky) */}
           <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] overflow-hidden shadow-xs">
-            <div className="p-3 bg-[var(--surface-recessed)] border-b border-[var(--border-hairline)] flex items-center justify-between text-xs text-[var(--text-secondary)]">
-              <span className="font-bold text-[var(--text-primary)]">
-                Matriks Presensi Harian
-              </span>
-              <span className="text-[11px] italic">
-                Geser tabel ke kanan untuk melihat seluruh tanggal &rarr;
-              </span>
+            <div className="p-3 bg-[var(--surface-recessed)] border-b border-[var(--border-hairline)] flex items-center justify-between text-xs text-[var(--text-secondary)] flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-[var(--text-primary)]">
+                  Matriks Presensi Harian Bulan {currentMonthLabel}
+                </span>
+                <span className="text-[11px] font-mono">
+                  · Kelas {currentClass.name} ({recapData.students.length} Siswa)
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 print:hidden">
+                <button
+                  type="button"
+                  onClick={() => handleExportExcel(currentClass)}
+                  className="px-2.5 py-1 rounded-[6px] bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all active:scale-[0.98]"
+                  title="Unduh Berkas Excel (.xlsx) Presensi Ber-Kop Resmi"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Excel (.xlsx)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrintMonthlyPdf(currentClass)}
+                  className="px-2.5 py-1 rounded-[6px] bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all active:scale-[0.98]"
+                  title="Cetak atau Simpan PDF Presensi Bulanan Ukuran Folio (21.59 x 33.02 cm) 1 Lembar Ber-Kop Resmi"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak / PDF (Folio)</span>
+                </button>
+              </div>
             </div>
 
             {/* Kontainer Scroll Terisolasi */}

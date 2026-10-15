@@ -83,6 +83,7 @@ import {
   generateCensoredGradesCsvWithKop,
   generateCensoredGradesExcelHtmlWithKop,
   generateCensoredGradesHtmlPrint,
+  generateGradesHtmlPrint,
   generateCensoredGradesWhatsAppText,
   downloadXlsxFile,
 } from "@/lib/exportUtils";
@@ -591,6 +592,29 @@ function GradesPageContent() {
     }
   };
 
+  // Cetak / Simpan PDF Daftar Nilai Siswa Resmi Folio (21.59cm x 33.02cm 1 Lembar)
+  const handlePrintGradesHtml = () => {
+    const htmlContent = generateGradesHtmlPrint(
+      currentClass.name,
+      classAssessments,
+      studentSummaries,
+      kkm
+    );
+
+    const printWin = window.open("", "_blank");
+    if (printWin) {
+      printWin.document.open();
+      printWin.document.write(htmlContent);
+      printWin.document.close();
+      setTimeout(() => {
+        printWin.focus();
+        printWin.print();
+      }, 400);
+    } else {
+      alert("Popup terblokir oleh peramban. Izinkan popup untuk mencetak atau menyimpan PDF nilai.");
+    }
+  };
+
   // Cetak / Simpan PDF Pengumuman Disensor
   const handlePrintCensoredHtml = () => {
     const htmlContent = generateCensoredGradesHtmlPrint(
@@ -717,6 +741,17 @@ function GradesPageContent() {
           >
             <Download className="w-3.5 h-3.5 text-[var(--color-accent)]" />
             <span>Ekspor CSV</span>
+          </button>
+
+          {/* Tombol Cetak / Simpan PDF (Folio) Ber-Kop Resmi */}
+          <button
+            type="button"
+            onClick={handlePrintGradesHtml}
+            className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs active:scale-[0.98] cursor-pointer"
+            title="Cetak atau Simpan PDF Daftar Nilai Siswa Ukuran Folio (21.59 x 33.02 cm) 1 Lembar Ber-Kop Resmi"
+          >
+            <Printer className="w-3.5 h-3.5 text-rose-100" />
+            <span>Cetak / PDF (Folio)</span>
           </button>
 
           {/* Tombol Ekspor Nilai Disensor (Pengumuman / Kelengkapan Tugas) */}

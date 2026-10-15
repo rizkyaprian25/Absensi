@@ -517,6 +517,348 @@ export function generateAttendanceExcelHtmlWithKop(
 `;
 }
 
+/**
+ * Menghasilkan dokumen cetak / PDF Presensi Bulanan Resmi dengan Kop Surat Sekolah & Logo Base64
+ * Ukuran Kertas: Folio (21.59cm x 33.02cm) Landscape, penataan adaptif s.d 40 siswa dalam 1 lembar.
+ */
+export function generateAttendanceHtmlPrint(
+  currentClass: Class,
+  monthLabel: string,
+  effectiveDates: string[],
+  students: StudentMonthlyRecap[],
+  holidays: HolidayItem[] = [],
+  meta: SchoolExportMetadata = {},
+  sessions: AttendanceSession[] = []
+): string {
+  const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
+  const holidayDatesMap = new Map(holidays.map((h) => [h.date, h]));
+  const studentCount = students.length;
+
+  let totalHadirAll = 0;
+  let totalSakitAll = 0;
+  let totalIzinAll = 0;
+  let totalAlpaAll = 0;
+  let totalDispenAll = 0;
+
+  // Parameter vertikal adaptif untuk 1 lembar Folio Landscape (tinggi 21.59cm)
+  let rowPaddingY = "2.8px";
+  let tableFontSize = "7.5pt";
+  let kopPaddingBottom = "5px";
+  let kopMarginBottom = "6px";
+  let tableMarginTop = "5px";
+  let summaryMarginTop = "6px";
+  let summaryPadding = "4px 8px";
+  let summaryFontSize = "7.5pt";
+  let signatureMarginTop = "16px";
+  let signatureSpacer = "42px";
+  let signatureFontSize = "8pt";
+
+  if (studentCount <= 28) {
+    rowPaddingY = "4.2px";
+    tableFontSize = "8.5pt";
+    kopPaddingBottom = "7px";
+    kopMarginBottom = "10px";
+    tableMarginTop = "8px";
+    summaryMarginTop = "10px";
+    summaryPadding = "6px 10px";
+    summaryFontSize = "8.5pt";
+    signatureMarginTop = "24px";
+    signatureSpacer = "56px";
+    signatureFontSize = "8.5pt";
+  } else if (studentCount <= 34) {
+    rowPaddingY = "3.4px";
+    tableFontSize = "8pt";
+    kopPaddingBottom = "6px";
+    kopMarginBottom = "8px";
+    tableMarginTop = "6px";
+    summaryMarginTop = "8px";
+    summaryPadding = "5px 8px";
+    summaryFontSize = "8pt";
+    signatureMarginTop = "20px";
+    signatureSpacer = "48px";
+    signatureFontSize = "8pt";
+  } else if (studentCount <= 40) {
+    // Standar 35 - 40 siswa (kasus utama Folio Landscape)
+    rowPaddingY = "2.6px";
+    tableFontSize = "7.5pt";
+    kopPaddingBottom = "5px";
+    kopMarginBottom = "6px";
+    tableMarginTop = "5px";
+    summaryMarginTop = "6px";
+    summaryPadding = "4px 8px";
+    summaryFontSize = "7.5pt";
+    signatureMarginTop = "14px";
+    signatureSpacer = "38px";
+    signatureFontSize = "8pt";
+  } else {
+    rowPaddingY = "1.8px";
+    tableFontSize = "7pt";
+    kopPaddingBottom = "4px";
+    kopMarginBottom = "5px";
+    tableMarginTop = "4px";
+    summaryMarginTop = "5px";
+    summaryPadding = "3px 6px";
+    summaryFontSize = "7pt";
+    signatureMarginTop = "10px";
+    signatureSpacer = "28px";
+    signatureFontSize = "7.5pt";
+  }
+
+  const studentRowsHtml = students
+    .map((s, idx) => {
+      totalHadirAll += s.hadir;
+      totalSakitAll += s.sakit;
+      totalIzinAll += s.izin;
+      totalAlpaAll += s.alpa;
+      totalDispenAll += s.dispen ?? 0;
+
+      const dailyCells = effectiveDates
+        .map((date) => {
+          const raw = String(s.dailyStatus[date] ?? "-");
+          let code = raw;
+          if (raw === "HADIR") code = "H";
+          else if (raw === "SAKIT") code = "S";
+          else if (raw === "IZIN") code = "I";
+          else if (raw === "ALPA") code = "A";
+          else if (raw === "DISPEN") code = "D";
+          else if (raw === "TERLAMBAT") code = "T";
+
+          let cellStyle = `text-align: center; font-weight: bold; font-family: monospace; padding: ${rowPaddingY} 1px;`;
+          if (code === "H") cellStyle += " background-color: #DCFCE7; color: #166534;";
+          else if (code === "S") cellStyle += " background-color: #DBEAFE; color: #1E40AF;";
+          else if (code === "I") cellStyle += " background-color: #FEF9C3; color: #854D0E;";
+          else if (code === "A") cellStyle += " background-color: #FEE2E2; color: #991B1B;";
+          else if (code === "T") cellStyle += " background-color: #FFEDD5; color: #C2410C;";
+          else if (code === "D") cellStyle += " background-color: #EEF2FF; color: #4338CA;";
+          else if (code === "L") cellStyle += " background-color: #F3F4F6; color: #6B7280;";
+          else cellStyle += " color: #9CA3AF;";
+
+          return `<td style="${cellStyle}">${code}</td>`;
+        })
+        .join("");
+
+      return `<tr>
+        <td style="text-align: center; font-family: monospace; padding: ${rowPaddingY} 2px;">${idx + 1}</td>
+        <td style="text-align: center; font-family: monospace; padding: ${rowPaddingY} 2px;">${s.nis ?? "-"}</td>
+        <td style="text-align: left; padding: ${rowPaddingY} 4px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">${s.fullName}</td>
+        <td style="text-align: center; padding: ${rowPaddingY} 1px;">${s.gender ?? "-"}</td>
+        ${dailyCells}
+        <td style="text-align: center; font-family: monospace; font-weight: bold; color: #166534; padding: ${rowPaddingY} 2px;">${s.hadir}</td>
+        <td style="text-align: center; font-family: monospace; font-weight: bold; color: #1E40AF; padding: ${rowPaddingY} 2px;">${s.sakit}</td>
+        <td style="text-align: center; font-family: monospace; font-weight: bold; color: #854D0E; padding: ${rowPaddingY} 2px;">${s.izin}</td>
+        <td style="text-align: center; font-family: monospace; font-weight: bold; color: #991B1B; padding: ${rowPaddingY} 2px;">${s.alpa}</td>
+        <td style="text-align: center; font-family: monospace; font-weight: bold; color: #4338CA; padding: ${rowPaddingY} 2px;">${s.dispen ?? 0}</td>
+        <td style="text-align: center; font-family: monospace; font-weight: bold; padding: ${rowPaddingY} 2px;">${s.totalHari}</td>
+        <td style="text-align: center; font-family: monospace; font-weight: bold; padding: ${rowPaddingY} 2px; ${s.needsAttention ? "color: #991B1B; background-color: #FEE2E2;" : "color: #166534; background-color: #DCFCE7;"}">${s.persentaseKehadiran}%</td>
+      </tr>`;
+    })
+    .join("");
+
+  const avgAttendance =
+    students.length > 0
+      ? (
+          students.reduce((acc, curr) => acc + curr.persentaseKehadiran, 0) /
+          students.length
+        ).toFixed(1)
+      : "100.0";
+
+  const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
+
+  return `
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>Daftar Hadir Siswa Kelas ${currentClass.name} - Bulan ${monthLabel}</title>
+  <style>
+    @page {
+      size: 33.02cm 21.59cm;
+      margin: 0.7cm 0.7cm 0.7cm 0.7cm;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #111827;
+      font-family: 'Calibri', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      font-size: ${tableFontSize};
+      line-height: 1.15;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .sheet-wrapper {
+      width: 100%;
+      margin: 0 auto;
+      padding: 0.3cm 0.6cm;
+    }
+    .kop-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1.5px solid #111827;
+      padding-bottom: ${kopPaddingBottom};
+      margin-bottom: ${kopMarginBottom};
+    }
+    .kop-title-1 { font-size: 10.5pt; font-weight: 800; letter-spacing: 0.2px; text-transform: uppercase; line-height: 1.15; }
+    .kop-title-2 { font-size: 9.5pt; font-weight: 800; letter-spacing: 0.2px; text-transform: uppercase; line-height: 1.15; margin-top: 1px; }
+    .kop-title-3 { font-size: 9pt; font-weight: 700; line-height: 1.15; margin-top: 1px; }
+    .kop-info { font-size: 7.5pt; color: #4B5563; line-height: 1.15; margin-top: 2px; }
+    table.data-table {
+      border-collapse: collapse;
+      width: 100%;
+      table-layout: auto;
+      margin-top: ${tableMarginTop};
+    }
+    table.data-table th {
+      border: 1px solid #374151;
+      padding: ${rowPaddingY} 2px;
+      font-size: ${tableFontSize};
+      font-weight: bold;
+      text-align: center;
+      line-height: 1.1;
+    }
+    table.data-table td {
+      border: 1px solid #6B7280;
+      padding: ${rowPaddingY} 2px;
+      font-size: ${tableFontSize};
+      vertical-align: middle;
+      line-height: 1.1;
+    }
+    table.data-table tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .summary-box {
+      margin-top: ${summaryMarginTop};
+      font-size: ${summaryFontSize};
+      line-height: 1.15;
+      background: #F9FAFB;
+      padding: ${summaryPadding};
+      border: 1px solid #E5E7EB;
+      border-radius: 3px;
+    }
+    .signature-table {
+      width: 100%;
+      border: none;
+      margin-top: ${signatureMarginTop};
+      font-size: ${signatureFontSize};
+      line-height: 1.2;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .signature-table td {
+      border: none !important;
+      padding: 0;
+    }
+    .signature-spacer {
+      height: ${signatureSpacer};
+    }
+    @media print {
+      @page {
+        size: 33.02cm 21.59cm;
+        margin: 0.6cm 0.7cm 0.6cm 0.7cm;
+      }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .sheet-wrapper {
+        padding: 0 !important;
+        width: 100% !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet-wrapper">
+    <div class="kop-container">
+      <img src="${LOGO_SMPN3_BASE64}" alt="Logo SMPN 3 Cibungbulang" style="width: 44px; height: auto; max-height: 52px; object-fit: contain; display: block;" />
+      <div style="flex: 1; text-align: center; padding: 0 8px;">
+        <div class="kop-title-1">DAFTAR HADIR SISWA KELAS ${formatClassRoman(currentClass.name)}</div>
+        <div class="kop-title-2">${getSchoolNameWithKabupaten(mergedMeta.schoolName)}</div>
+        <div class="kop-title-3">SEMESTER ${currentClass.semester ?? 1} (GANJIL) TAHUN PELAJARAN ${currentClass.academicYear || "2026/2027"}</div>
+        <div class="kop-info">Mata Pelajaran: <strong>${currentClass.subject || mergedMeta.subject}</strong> · Bulan: <strong>${monthLabel}</strong> · Format: Kertas Folio (21.59 x 33.02 cm)</div>
+      </div>
+      <div style="width: 44px;" aria-hidden="true"></div>
+    </div>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 24px; background-color: #E2EFDA;">NO</th>
+          <th style="width: 68px; background-color: #E2EFDA;">NIS / NIPD</th>
+          <th style="text-align: left; padding-left: 6px; background-color: #E2EFDA;">NAMA LENGKAP SISWA</th>
+          <th style="width: 24px; background-color: #E2EFDA;">L/P</th>
+          ${effectiveDates
+            .map((d) => {
+              const hol = holidayDatesMap.get(d);
+              const isSpecial = hol?.category === "UTS" || hol?.category === "UAS" || hol?.category === "KOKURIKULER";
+              const label = hol
+                ? `${d.slice(8)}<br/><span style="font-size: 6pt; color: ${isSpecial ? "#6B21A8" : "#991B1B"}; font-weight: normal;">${hol.category === "UTS" ? "UTS" : hol.category === "UAS" ? "UAS" : hol.category === "KOKURIKULER" ? "P5" : "LIB"}</span>`
+                : d.slice(8);
+              const bgCol = hol ? (isSpecial ? "#F3E8FF" : "#FEE2E2") : "#E2EFDA";
+              return `<th style="width: 22px; background-color: ${bgCol};">${label}</th>`;
+            })
+            .join("")}
+          <th style="width: 28px; background-color: #DCFCE7; color: #166534;">H</th>
+          <th style="width: 26px; background-color: #DBEAFE; color: #1E40AF;">S</th>
+          <th style="width: 26px; background-color: #FEF9C3; color: #854D0E;">I</th>
+          <th style="width: 26px; background-color: #FEE2E2; color: #991B1B;">A</th>
+          <th style="width: 26px; background-color: #EEF2FF; color: #4338CA;">D</th>
+          <th style="width: 32px; background-color: #E0F2FE; color: #0369A1;">JML</th>
+          <th style="width: 44px; background-color: #E0F2FE; color: #0369A1;">%</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${studentRowsHtml}
+        <tr style="font-weight: bold; background-color: #F3F4F6;">
+          <td colspan="4" style="text-align: center; font-weight: bold;">JUMLAH TOTAL REKAPITULASI</td>
+          <td colspan="${effectiveDates.length}" style="text-align: center; color: #6B7280; font-size: 7.5pt;">-</td>
+          <td style="text-align: center; font-family: monospace; color: #166534;">${totalHadirAll}</td>
+          <td style="text-align: center; font-family: monospace; color: #1E40AF;">${totalSakitAll}</td>
+          <td style="text-align: center; font-family: monospace; color: #854D0E;">${totalIzinAll}</td>
+          <td style="text-align: center; font-family: monospace; color: #991B1B;">${totalAlpaAll}</td>
+          <td style="text-align: center; font-family: monospace; color: #4338CA;">${totalDispenAll}</td>
+          <td style="text-align: center; font-family: monospace;">${students.length}</td>
+          <td style="text-align: center; font-family: monospace; color: #0369A1;">${avgAttendance}%</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="summary-box">
+      <strong>Ringkasan Bulan ${monthLabel}:</strong> Total Siswa: ${students.length} | Rata-rata Kehadiran: <strong>${avgAttendance}%</strong> | Total Hadir: ${totalHadirAll} | Sakit: ${totalSakitAll} | Izin: ${totalIzinAll} | Alpa: ${totalAlpaAll} | Dispen: ${totalDispenAll}
+    </div>
+
+    <table class="signature-table">
+      <tr>
+        <td style="width: 50%; text-align: left; padding-left: 8px; vertical-align: top;">
+          Mengetahui,<br/>
+          Kepala ${mergedMeta.schoolName}<br/>
+          <div class="signature-spacer"></div>
+          <strong>( ............................................................ )</strong><br/>
+          NIP. ........................................................
+        </td>
+        <td style="width: 50%; text-align: right; padding-right: 12px; vertical-align: top;">
+          ${mergedMeta.location}, ${formattedToday}<br/>
+          Guru Mata Pelajaran Informatika,<br/>
+          <div class="signature-spacer"></div>
+          <strong><u>${mergedMeta.teacherName}</u></strong><br/>
+          NIP. ${mergedMeta.teacherNip}
+        </td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>
+  `;
+}
+
 // ============================================================================
 // KONFIGURASI STYLE & PALET WARNA RESMI OPENXML SPREADSHEET (.XLSX)
 // ============================================================================
@@ -2856,6 +3198,333 @@ export function generateCensoredGradesHtmlPrint(
 
 /** Alias untuk pratinjau HTML berkas pengumuman nilai */
 export const generateCensoredGradesExcelHtmlWithKop = generateCensoredGradesHtmlPrint;
+
+/**
+ * Menghasilkan dokumen cetak / PDF Daftar Nilai Asesmen & Raport Siswa Resmi dengan Kop Surat & Logo Base64
+ * Ukuran Kertas: Folio (21.59cm x 33.02cm), penataan adaptif s.d 40 siswa dalam 1 lembar.
+ */
+export function generateGradesHtmlPrint(
+  className: string,
+  assessments: AssessmentItem[],
+  summaries: StudentGradeSummary[],
+  kkm: number,
+  meta: SchoolExportMetadata = {}
+): string {
+  const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
+  const studentCount = summaries.length;
+  const numAssessments = assessments.length;
+
+  let tuntasCount = 0;
+  let remedialCount = 0;
+  let totalScoreSum = 0;
+  let scoredCount = 0;
+
+  summaries.forEach((s) => {
+    if (s.isPassed) tuntasCount++;
+    else remedialCount++;
+    if (s.finalScore !== null) {
+      totalScoreSum += s.finalScore;
+      scoredCount++;
+    }
+  });
+
+  const classAvg = scoredCount > 0 ? (totalScoreSum / scoredCount).toFixed(1) : "0.0";
+
+  // Parameter vertikal adaptif untuk 1 lembar Folio Portrait (33.02cm)
+  let rowPaddingY = "3.9px";
+  let tableFontSize = "8.5pt";
+  let badgeFontSize = "8pt";
+  let kopPaddingBottom = "6px";
+  let kopMarginBottom = "8px";
+  let tableMarginTop = "6px";
+  let summaryMarginTop = "8px";
+  let summaryPadding = "5px 8px";
+  let summaryFontSize = "8pt";
+  let signatureMarginTop = "20px";
+  let signatureSpacer = "52px";
+  let signatureFontSize = "8.5pt";
+
+  if (studentCount <= 28) {
+    rowPaddingY = "5.5px";
+    tableFontSize = "9pt";
+    badgeFontSize = "8.5pt";
+    kopPaddingBottom = "8px";
+    kopMarginBottom = "12px";
+    tableMarginTop = "8px";
+    summaryMarginTop = "12px";
+    summaryPadding = "6px 10px";
+    summaryFontSize = "8.5pt";
+    signatureMarginTop = "32px";
+    signatureSpacer = "68px";
+    signatureFontSize = "9pt";
+  } else if (studentCount <= 34) {
+    rowPaddingY = "4.6px";
+    tableFontSize = "8.5pt";
+    badgeFontSize = "8pt";
+    kopPaddingBottom = "7px";
+    kopMarginBottom = "10px";
+    tableMarginTop = "7px";
+    summaryMarginTop = "10px";
+    summaryPadding = "5px 9px";
+    summaryFontSize = "8pt";
+    signatureMarginTop = "26px";
+    signatureSpacer = "60px";
+    signatureFontSize = "8.5pt";
+  } else if (studentCount <= 40) {
+    // Standar 35 - 40 siswa (kasus utama Folio Portrait)
+    rowPaddingY = "3.9px";
+    tableFontSize = "8.5pt";
+    badgeFontSize = "8pt";
+    kopPaddingBottom = "6px";
+    kopMarginBottom = "8px";
+    tableMarginTop = "6px";
+    summaryMarginTop = "8px";
+    summaryPadding = "5px 8px";
+    summaryFontSize = "8pt";
+    signatureMarginTop = "20px";
+    signatureSpacer = "52px";
+    signatureFontSize = "8.5pt";
+  } else if (studentCount <= 44) {
+    rowPaddingY = "2.8px";
+    tableFontSize = "8pt";
+    badgeFontSize = "7.5pt";
+    kopPaddingBottom = "5px";
+    kopMarginBottom = "6px";
+    tableMarginTop = "4px";
+    summaryMarginTop = "6px";
+    summaryPadding = "4px 8px";
+    summaryFontSize = "7.5pt";
+    signatureMarginTop = "14px";
+    signatureSpacer = "40px";
+    signatureFontSize = "8pt";
+  } else {
+    rowPaddingY = "1.8px";
+    tableFontSize = "7pt";
+    badgeFontSize = "6.5pt";
+    kopPaddingBottom = "4px";
+    kopMarginBottom = "5px";
+    tableMarginTop = "3px";
+    summaryMarginTop = "4px";
+    summaryPadding = "3px 6px";
+    summaryFontSize = "7pt";
+    signatureMarginTop = "10px";
+    signatureSpacer = "30px";
+    signatureFontSize = "7.5pt";
+  }
+
+  // Parameter horizontal adaptif
+  let marginX = "0.8cm";
+  if (numAssessments > 6) marginX = "0.5cm";
+
+  const rowsHtml = summaries
+    .map((s, idx) => {
+      const scoreCells = assessments
+        .map((a) => {
+          const sc = s.scores[a.id];
+          const isUnderKkm = sc !== null && sc !== undefined && sc < kkm;
+          return `<td style="text-align: center; font-family: monospace; font-weight: bold; padding: ${rowPaddingY} 2px; ${
+            isUnderKkm
+              ? "background-color: #FEF3C7; color: #B45309;"
+              : sc !== null && sc !== undefined
+              ? "background-color: #DCFCE7; color: #166534;"
+              : "color: #9CA3AF;"
+          }">${sc !== null && sc !== undefined ? sc : "-"}</td>`;
+        })
+        .join("");
+
+      return `<tr>
+        <td style="text-align: center; font-family: monospace; padding: ${rowPaddingY} 2px;">${idx + 1}</td>
+        <td style="text-align: center; font-family: monospace; padding: ${rowPaddingY} 2px;">${s.nis ?? "-"}</td>
+        <td style="text-align: left; padding: ${rowPaddingY} 6px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">${s.studentName}</td>
+        <td style="text-align: center; padding: ${rowPaddingY} 2px;">${s.gender ?? "-"}</td>
+        ${scoreCells}
+        <td style="text-align: center; font-weight: bold; font-family: monospace; font-size: ${badgeFontSize}; ${
+          s.finalScore !== null && s.finalScore < kkm ? "color: #B45309;" : "color: #166534;"
+        }">${s.finalScore !== null ? s.finalScore : "-"}</td>
+        <td style="text-align: center; font-weight: bold; font-size: ${badgeFontSize};">${s.predicate}</td>
+        <td style="text-align: center; font-weight: bold; font-size: ${badgeFontSize}; ${
+          s.isPassed ? "color: #166534; background-color: #DCFCE7;" : "color: #991B1B; background-color: #FEE2E2;"
+        }">${s.isPassed ? "TUNTAS" : "REMEDIAL"}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
+
+  return `
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>Daftar Nilai Siswa Kelas ${className}</title>
+  <style>
+    @page {
+      size: 21.59cm 33.02cm;
+      margin: 0.8cm ${marginX} 0.8cm ${marginX};
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #111827;
+      font-family: 'Calibri', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      font-size: ${tableFontSize};
+      line-height: 1.15;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .sheet-wrapper {
+      width: 100%;
+      margin: 0 auto;
+      padding: 0.4cm ${marginX};
+    }
+    .kop-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1.5px solid #111827;
+      padding-bottom: ${kopPaddingBottom};
+      margin-bottom: ${kopMarginBottom};
+    }
+    .kop-title-1 { font-size: 10.5pt; font-weight: 800; letter-spacing: 0.2px; text-transform: uppercase; line-height: 1.15; }
+    .kop-title-2 { font-size: 9.5pt; font-weight: 800; letter-spacing: 0.2px; text-transform: uppercase; line-height: 1.15; margin-top: 1px; }
+    .kop-title-3 { font-size: 9pt; font-weight: 700; line-height: 1.15; margin-top: 1px; }
+    .kop-info { font-size: 7.5pt; color: #4B5563; line-height: 1.15; margin-top: 2px; }
+    table.data-table {
+      border-collapse: collapse;
+      width: 100%;
+      table-layout: auto;
+      margin-top: ${tableMarginTop};
+    }
+    table.data-table th {
+      border: 1px solid #374151;
+      padding: ${rowPaddingY} 2px;
+      font-size: ${tableFontSize};
+      font-weight: bold;
+      text-align: center;
+      line-height: 1.15;
+    }
+    table.data-table td {
+      border: 1px solid #6B7280;
+      padding: ${rowPaddingY} 3px;
+      font-size: ${tableFontSize};
+      vertical-align: middle;
+      line-height: 1.15;
+    }
+    table.data-table tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .summary-box {
+      margin-top: ${summaryMarginTop};
+      font-size: ${summaryFontSize};
+      line-height: 1.15;
+      background: #F9FAFB;
+      padding: ${summaryPadding};
+      border: 1px solid #E5E7EB;
+      border-radius: 3px;
+    }
+    .signature-table {
+      width: 100%;
+      border: none;
+      margin-top: ${signatureMarginTop};
+      font-size: ${signatureFontSize};
+      line-height: 1.2;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .signature-table td {
+      border: none !important;
+      padding: 0;
+    }
+    .signature-spacer {
+      height: ${signatureSpacer};
+    }
+    @media print {
+      @page {
+        size: 21.59cm 33.02cm;
+        margin: 0.7cm ${marginX} 0.7cm ${marginX};
+      }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .sheet-wrapper {
+        padding: 0 !important;
+        width: 100% !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet-wrapper">
+    <div class="kop-container">
+      <img src="${LOGO_SMPN3_BASE64}" alt="Logo SMPN 3 Cibungbulang" style="width: 44px; height: auto; max-height: 54px; object-fit: contain; display: block;" />
+      <div style="flex: 1; text-align: center; padding: 0 8px;">
+        <div class="kop-title-1">DAFTAR NILAI ASESMEN &amp; RAPORT SISWA KELAS ${formatClassRoman(className)}</div>
+        <div class="kop-title-2">${getSchoolNameWithKabupaten(mergedMeta.schoolName)}</div>
+        <div class="kop-title-3">TAHUN PELAJARAN 2026/2027</div>
+        <div class="kop-info">Mata Pelajaran: <strong>${mergedMeta.subject}</strong> · KKM Standar: <strong>${kkm}</strong> · Format: Kertas Folio (21.59 x 33.02 cm)</div>
+      </div>
+      <div style="width: 44px;" aria-hidden="true"></div>
+    </div>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 28px; background-color: #E2EFDA;">NO</th>
+          <th style="width: 72px; background-color: #E2EFDA;">NIS / NIPD</th>
+          <th style="text-align: left; padding-left: 6px; background-color: #E2EFDA;">NAMA LENGKAP SISWA</th>
+          <th style="width: 28px; background-color: #E2EFDA;">L/P</th>
+          ${assessments
+            .map(
+              (a) =>
+                `<th style="padding: ${rowPaddingY} 3px; background-color: #F3F4F6;">${a.title}<br/><span style="font-size: 6.5pt; color: #4B5563; font-weight: normal;">[${a.type}]</span></th>`
+            )
+            .join("")}
+          <th style="width: 50px; background-color: #E0F2FE; color: #0369A1;">NILAI AKHIR</th>
+          <th style="width: 40px; background-color: #E0F2FE; color: #0369A1;">PREDIKAT</th>
+          <th style="width: 76px; background-color: #E0F2FE; color: #0369A1;">STATUS KKM</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
+
+    <div class="summary-box">
+      <strong>Ringkasan Ketuntasan:</strong> Total Siswa: ${studentCount} | Tuntas: <span style="color: #166534; font-weight: bold;">${tuntasCount}</span> | Remedial: <span style="color: #991B1B; font-weight: bold;">${remedialCount}</span> | Rata-rata Nilai Kelas: <strong>${classAvg}</strong>
+    </div>
+
+    <table class="signature-table">
+      <tr>
+        <td style="width: 50%; text-align: left; padding-left: 8px; vertical-align: top;">
+          Mengetahui,<br/>
+          Kepala ${mergedMeta.schoolName}<br/>
+          <div class="signature-spacer"></div>
+          <strong>( ............................................................ )</strong><br/>
+          NIP. ........................................................
+        </td>
+        <td style="width: 50%; text-align: right; padding-right: 12px; vertical-align: top;">
+          ${mergedMeta.location}, ${formattedToday}<br/>
+          Guru Mata Pelajaran Informatika,<br/>
+          <div class="signature-spacer"></div>
+          <strong><u>${mergedMeta.teacherName}</u></strong><br/>
+          NIP. ${mergedMeta.teacherNip}
+        </td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>
+  `;
+}
 
 
 
