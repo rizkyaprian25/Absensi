@@ -2203,6 +2203,104 @@ export function generateCensoredGradesHtmlPrint(
   let completeCount = 0;
   let pendingCount = 0;
 
+  const studentCount = summaries.length;
+  const numAssessments = assessments.length;
+
+  // 1. PARAMETER VERTIKAL ADAPTIF (Pas untuk 40 siswa dan paraf guru & kepsek)
+  let rowPaddingY = "2.6px";
+  let tableFontSize = "8pt";
+  let statusFontSize = "7.5pt";
+  let signatureSpacer = "42px";
+
+  if (studentCount <= 32) {
+    rowPaddingY = "3.8px";
+    tableFontSize = "8.5pt";
+    statusFontSize = "8pt";
+    signatureSpacer = "50px";
+  } else if (studentCount <= 40) {
+    rowPaddingY = "2.6px";
+    tableFontSize = "8pt";
+    statusFontSize = "7.5pt";
+    signatureSpacer = "42px";
+  } else if (studentCount <= 44) {
+    rowPaddingY = "2.0px";
+    tableFontSize = "7.5pt";
+    statusFontSize = "7pt";
+    signatureSpacer = "34px";
+  } else {
+    rowPaddingY = "1.5px";
+    tableFontSize = "7pt";
+    statusFontSize = "6.5pt";
+    signatureSpacer = "26px";
+  }
+
+  // 2. PARAMETER HORIZONTAL ADAPTIF (Berdasarkan situasi jumlah kolom asesmen)
+  let marginX = "1.2cm";
+  let colWidthNo = "32px";
+  let colWidthNis = "85px";
+  let colWidthLp = "34px";
+  let colWidthTotal = "56px";
+  let colWidthStatus = "88px";
+  let asmtMinWidth = "70px";
+  let asmtHeaderFont = "8pt";
+  let asmtCellFont = "7.5pt";
+  let asmtCellPadding = "2.5px 6px";
+  let nameMaxWidth = "none";
+
+  if (numAssessments <= 2) {
+    // Situasi kolom sedikit (1 - 2 asesmen, misal hanya UTS): space kanan-kiri lebih lega agar tidak melar kosong
+    marginX = "1.2cm";
+    colWidthNo = "32px";
+    colWidthNis = "85px";
+    colWidthLp = "34px";
+    colWidthTotal = "56px";
+    colWidthStatus = "88px";
+    asmtMinWidth = "70px";
+    asmtHeaderFont = "8pt";
+    asmtCellFont = "7.5pt";
+    asmtCellPadding = "2.5px 6px";
+    nameMaxWidth = "none";
+  } else if (numAssessments <= 4) {
+    // Situasi kolom sedang (3 - 4 asesmen)
+    marginX = "0.9cm";
+    colWidthNo = "28px";
+    colWidthNis = "76px";
+    colWidthLp = "28px";
+    colWidthTotal = "48px";
+    colWidthStatus = "78px";
+    asmtMinWidth = "52px";
+    asmtHeaderFont = "7.5pt";
+    asmtCellFont = "7pt";
+    asmtCellPadding = "2.2px 4px";
+    nameMaxWidth = "200px";
+  } else if (numAssessments <= 7) {
+    // Situasi kolom banyak (5 - 7 asesmen)
+    marginX = "0.6cm";
+    colWidthNo = "24px";
+    colWidthNis = "68px";
+    colWidthLp = "24px";
+    colWidthTotal = "44px";
+    colWidthStatus = "72px";
+    asmtMinWidth = "40px";
+    asmtHeaderFont = "7pt";
+    asmtCellFont = "6.5pt";
+    asmtCellPadding = "2px 2px";
+    nameMaxWidth = "175px";
+  } else {
+    // Situasi kolom sangat banyak (8+ asesmen)
+    marginX = "0.45cm";
+    colWidthNo = "22px";
+    colWidthNis = "62px";
+    colWidthLp = "22px";
+    colWidthTotal = "40px";
+    colWidthStatus = "66px";
+    asmtMinWidth = "32px";
+    asmtHeaderFont = "6.5pt";
+    asmtCellFont = "6pt";
+    asmtCellPadding = "1.5px 1px";
+    nameMaxWidth = "150px";
+  }
+
   const rowsHtml = summaries
     .map((s, idx) => {
       let done = 0;
@@ -2211,9 +2309,9 @@ export function generateCensoredGradesHtmlPrint(
           const sc = s.scores[a.id];
           if (sc !== null && sc !== undefined) {
             done++;
-            return `<td style="text-align: center; font-weight: bold; font-size: 6.5pt; padding: 1px 1px; background-color: #DCFCE7; color: #166534; white-space: nowrap;">✓ SUDAH</td>`;
+            return `<td style="text-align: center; font-weight: bold; font-size: ${asmtCellFont}; padding: ${asmtCellPadding}; background-color: #DCFCE7; color: #166534; white-space: nowrap;">✓ SUDAH</td>`;
           }
-          return `<td style="text-align: center; font-weight: bold; font-size: 6.5pt; padding: 1px 1px; background-color: #FEE2E2; color: #991B1B; white-space: nowrap;">BELUM</td>`;
+          return `<td style="text-align: center; font-weight: bold; font-size: ${asmtCellFont}; padding: ${asmtCellPadding}; background-color: #FEE2E2; color: #991B1B; white-space: nowrap;">BELUM</td>`;
         })
         .join("");
 
@@ -2226,11 +2324,13 @@ export function generateCensoredGradesHtmlPrint(
       return `<tr>
         <td style="text-align: center; font-family: monospace;">${idx + 1}</td>
         <td style="text-align: center; font-family: monospace;">${s.nis ?? "-"}</td>
-        <td style="text-align: left; padding-left: 4px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${s.studentName}</td>
+        <td style="text-align: left; padding-left: 6px; font-weight: 500; ${
+          nameMaxWidth !== "none" ? `white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: ${nameMaxWidth};` : ""
+        }">${s.studentName}</td>
         <td style="text-align: center;">${s.gender ?? "-"}</td>
         ${cells}
-        <td style="text-align: center; font-weight: bold; font-family: monospace; font-size: 6.5pt; padding: 1px 2px;">${done} / ${assessments.length}</td>
-        <td style="text-align: center; font-weight: bold; font-size: 6.5pt; padding: 1px 2px; white-space: nowrap; ${
+        <td style="text-align: center; font-weight: bold; font-family: monospace; font-size: ${statusFontSize};">${done} / ${assessments.length}</td>
+        <td style="text-align: center; font-weight: bold; font-size: ${statusFontSize}; ${
           isAll ? "background-color: #DCFCE7; color: #166534;" : "background-color: #FEE2E2; color: #991B1B;"
         }">${isAll ? "LENGKAP" : `BELUM (${pendingTagihan})`}</td>
       </tr>`;
@@ -2248,7 +2348,7 @@ export function generateCensoredGradesHtmlPrint(
   <style>
     @page {
       size: 21.59cm 33.02cm;
-      margin: 0.6cm 0.5cm 0.6cm 0.5cm;
+      margin: 0.8cm ${marginX} 0.8cm ${marginX};
     }
     *, *::before, *::after {
       box-sizing: border-box;
@@ -2259,7 +2359,7 @@ export function generateCensoredGradesHtmlPrint(
       background: #ffffff;
       color: #111827;
       font-family: 'Calibri', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-      font-size: 7.5pt;
+      font-size: ${tableFontSize};
       line-height: 1.15;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -2267,61 +2367,61 @@ export function generateCensoredGradesHtmlPrint(
     .sheet-wrapper {
       width: 100%;
       margin: 0 auto;
-      padding: 0.4cm 0.35cm;
+      padding: 0.4cm ${marginX};
     }
     .kop-container {
       display: flex;
       align-items: center;
       justify-content: space-between;
       border-bottom: 1.5px solid #111827;
-      padding-bottom: 3px;
-      margin-bottom: 4px;
+      padding-bottom: 4px;
+      margin-bottom: 5px;
     }
-    .kop-title-1 { font-size: 10pt; font-weight: 800; letter-spacing: 0.2px; text-transform: uppercase; line-height: 1.15; }
-    .kop-title-2 { font-size: 9pt; font-weight: 800; letter-spacing: 0.2px; text-transform: uppercase; line-height: 1.15; margin-top: 1px; }
-    .kop-title-3 { font-size: 8.5pt; font-weight: 700; line-height: 1.15; margin-top: 1px; }
-    .kop-info { font-size: 7pt; color: #4B5563; line-height: 1.15; margin-top: 1px; }
+    .kop-title-1 { font-size: 10.5pt; font-weight: 800; letter-spacing: 0.2px; text-transform: uppercase; line-height: 1.15; }
+    .kop-title-2 { font-size: 9.5pt; font-weight: 800; letter-spacing: 0.2px; text-transform: uppercase; line-height: 1.15; margin-top: 1px; }
+    .kop-title-3 { font-size: 9pt; font-weight: 700; line-height: 1.15; margin-top: 1px; }
+    .kop-info { font-size: 7.5pt; color: #4B5563; line-height: 1.15; margin-top: 2px; }
     table.data-table {
       border-collapse: collapse;
       width: 100%;
       table-layout: auto;
-      margin-top: 3px;
+      margin-top: 4px;
     }
     table.data-table th {
       border: 1px solid #374151;
       background-color: #E2EFDA;
-      padding: 2px 2px;
-      font-size: 7pt;
+      padding: ${rowPaddingY} 2px;
+      font-size: ${tableFontSize};
       font-weight: bold;
       text-align: center;
-      line-height: 1.1;
+      line-height: 1.15;
     }
     table.data-table td {
       border: 1px solid #6B7280;
-      padding: 1px 2px;
-      font-size: 7pt;
+      padding: ${rowPaddingY} 3px;
+      font-size: ${tableFontSize};
       vertical-align: middle;
-      line-height: 1.1;
+      line-height: 1.15;
     }
     table.data-table tr {
       page-break-inside: avoid;
       break-inside: avoid;
     }
     .summary-box {
-      margin-top: 3px;
-      font-size: 7pt;
+      margin-top: 4px;
+      font-size: 7.5pt;
       line-height: 1.15;
       background: #F9FAFB;
-      padding: 2px 6px;
+      padding: 3px 8px;
       border: 1px solid #E5E7EB;
       border-radius: 3px;
     }
     .signature-table {
       width: 100%;
       border: none;
-      margin-top: 6px;
-      font-size: 7.5pt;
-      line-height: 1.15;
+      margin-top: 10px;
+      font-size: 8pt;
+      line-height: 1.2;
       page-break-inside: avoid;
       break-inside: avoid;
     }
@@ -2330,12 +2430,12 @@ export function generateCensoredGradesHtmlPrint(
       padding: 0;
     }
     .signature-spacer {
-      height: 26px;
+      height: ${signatureSpacer};
     }
     @media print {
       @page {
         size: 21.59cm 33.02cm;
-        margin: 0.5cm 0.4cm 0.5cm 0.4cm;
+        margin: 0.6cm ${marginX} 0.6cm ${marginX};
       }
       html, body {
         margin: 0 !important;
@@ -2354,31 +2454,31 @@ export function generateCensoredGradesHtmlPrint(
 <body>
   <div class="sheet-wrapper">
     <div class="kop-container">
-      <img src="${LOGO_SMPN3_BASE64}" alt="Logo SMPN 3 Cibungbulang" style="width: 38px; height: auto; max-height: 46px; object-fit: contain;" />
+      <img src="${LOGO_SMPN3_BASE64}" alt="Logo SMPN 3 Cibungbulang" style="width: 44px; height: auto; max-height: 52px; object-fit: contain;" />
       <div style="flex: 1; text-align: center; padding: 0 8px;">
         <div class="kop-title-1">REKAPITULASI KELENGKAPAN TUGAS &amp; ASESMEN SISWA KELAS ${formatClassRoman(className)}</div>
         <div class="kop-title-2">${getSchoolNameWithKabupaten(mergedMeta.schoolName)}</div>
         <div class="kop-title-3">TAHUN PELAJARAN 2026/2027</div>
         <div class="kop-info">Mata Pelajaran: <strong>${mergedMeta.subject}</strong> · Status: Nilai Angka Disensor (UU PDP)</div>
       </div>
-      <div style="width: 38px;" aria-hidden="true"></div>
+      <div style="width: 44px;" aria-hidden="true"></div>
     </div>
 
     <table class="data-table">
       <thead>
         <tr>
-          <th style="width: 22px;">NO</th>
-          <th style="width: 65px;">NIS</th>
-          <th style="text-align: left; padding-left: 4px;">NAMA SISWA</th>
-          <th style="width: 22px;">L/P</th>
+          <th style="width: ${colWidthNo};">NO</th>
+          <th style="width: ${colWidthNis};">NIS</th>
+          <th style="text-align: left; padding-left: 6px;">NAMA SISWA</th>
+          <th style="width: ${colWidthLp};">L/P</th>
           ${assessments
             .map(
               (a) =>
-                `<th style="padding: 2px 1px; font-size: 6.5pt; line-height: 1.05; min-width: 32px;">${a.title}<br/><span style="font-size: 6pt; color: #4B5563; font-weight: normal;">[${a.type}]</span></th>`
+                `<th style="padding: ${asmtCellPadding}; font-size: ${asmtHeaderFont}; line-height: 1.1; min-width: ${asmtMinWidth};">${a.title}<br/><span style="font-size: 6.5pt; color: #4B5563; font-weight: normal;">[${a.type}]</span></th>`
             )
             .join("")}
-          <th style="width: 42px; background-color: #E0F2FE;">TOTAL</th>
-          <th style="width: 72px;">STATUS</th>
+          <th style="width: ${colWidthTotal}; background-color: #E0F2FE;">TOTAL</th>
+          <th style="width: ${colWidthStatus};">STATUS</th>
         </tr>
       </thead>
       <tbody>
