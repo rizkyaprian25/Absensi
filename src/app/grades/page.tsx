@@ -33,6 +33,7 @@ import {
   Eye,
   Share2,
   Copy,
+  ChevronDown,
   Printer,
   Check,
 } from "lucide-react";
@@ -105,6 +106,7 @@ function GradesPageContent() {
 
   // 3. Filter & Pencarian
   const [categoryFilter, setCategoryFilter] = useState<AssessmentType | "ALL">("ALL");
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortBy, setSortBy] = useState<"absen" | "nama" | "nilai_desc" | "nilai_asc">("absen");
 
@@ -240,6 +242,24 @@ function GradesPageContent() {
     if (categoryFilter === "ALL") return classAssessments;
     return classAssessments.filter((a) => a.type === categoryFilter);
   }, [classAssessments, categoryFilter]);
+
+  // Metadata label dan total asesmen untuk kategori yang sedang dipilih saat ini
+  const activeCategoryMeta = useMemo(() => {
+    if (categoryFilter === "ALL") {
+      return {
+        label: "Semua Kategori",
+        shortLabel: "Semua",
+        count: classAssessments.length,
+      };
+    }
+    const meta = ASSESSMENT_TYPE_METAS[categoryFilter];
+    const count = classAssessments.filter((a) => a.type === categoryFilter).length;
+    return {
+      label: meta?.label || categoryFilter,
+      shortLabel: meta?.shortLabel || categoryFilter,
+      count,
+    };
+  }, [categoryFilter, classAssessments]);
 
   // Ringkasan nilai per siswa
   const studentSummaries: StudentGradeSummary[] = useMemo(() => {
@@ -926,63 +946,143 @@ function GradesPageContent() {
         </div>
       )}
 
-      {/* Filter Kategori Asesmen & Pencarian */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[var(--surface-card)] p-3 rounded-[12px] border border-[var(--border-hairline)]">
-        {/* Filter Kategori Pills dengan Smooth Horizontal Scroll */}
-        <SmoothHorizontalScroll
-          containerClassName="flex-1 min-w-0"
-          className="py-1 px-0.5"
-          activeKey={categoryFilter}
-          activeSelector="[data-active='true']"
-          gradientFromClass="from-[var(--surface-card)]"
-        >
+      {/* Filter Kategori Asesmen, Pencarian, & Aksi Cepat */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 bg-[var(--surface-card)] p-3 rounded-[12px] border border-[var(--border-hairline)]">
+        {/* Menu Dropdown Pilihan Kategori Penilaian (Menggantikan Scroll Kanan Kiri) */}
+        <div className="relative shrink-0">
           <button
             type="button"
-            data-active={categoryFilter === "ALL"}
-            onClick={() => setCategoryFilter("ALL")}
-            className={`px-3 py-1.5 rounded-[8px] text-xs font-semibold shrink-0 transition-all ${
-              categoryFilter === "ALL"
-                ? "bg-[var(--color-accent)] text-[var(--color-on-accent)] shadow-xs"
-                : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+            className={`min-h-[36px] px-3 py-1.5 rounded-[8px] text-xs font-semibold flex items-center gap-2 transition-all border shadow-2xs cursor-pointer ${
+              categoryFilter !== "ALL"
+                ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)] border-[var(--color-accent)]/50 hover:bg-[var(--color-accent)]/25"
+                : "bg-[var(--surface-recessed)] hover:bg-[var(--surface-recessed)]/80 text-[var(--text-primary)] border-[var(--border-hairline)]"
             }`}
+            title="Klik untuk memilih filter kategori penilaian: Semua, Tugas, UH, UTS, UAS, Praktik, dll."
+            aria-expanded={isCategoryDropdownOpen}
           >
-            Semua ({classAssessments.length})
+            <Filter className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+            <span>
+              Kategori: <strong className="font-bold">{activeCategoryMeta.shortLabel}</strong>
+            </span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
+                categoryFilter !== "ALL"
+                  ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                  : "bg-black/10 dark:bg-white/10 text-[var(--text-secondary)]"
+              }`}
+            >
+              {activeCategoryMeta.count}
+            </span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 text-[var(--text-secondary)] transition-transform duration-200 ${
+                isCategoryDropdownOpen ? "rotate-180 text-[var(--color-accent)]" : ""
+              }`}
+            />
           </button>
-          {(Object.keys(ASSESSMENT_TYPE_METAS) as AssessmentType[]).map((cat) => {
-            const count = classAssessments.filter((a) => a.type === cat).length;
-            const meta = ASSESSMENT_TYPE_METAS[cat];
-            const isSelected = categoryFilter === cat;
-            return (
-              <button
-                key={cat}
-                type="button"
-                data-active={isSelected}
-                onClick={() => setCategoryFilter(cat)}
-                className={`px-2.5 py-1.5 rounded-[8px] text-xs font-medium shrink-0 transition-all flex items-center gap-1.5 ${
-                  isSelected
-                    ? "bg-[var(--text-primary)] text-[var(--surface-card)] font-bold shadow-xs"
-                    : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                <span>{meta.shortLabel}</span>
-                {count > 0 && (
-                  <span
-                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                      isSelected
-                        ? "bg-white/20 text-white dark:bg-black/20 dark:text-black"
-                        : "bg-black/10 dark:bg-white/10"
+
+          {/* Menu Dropdown Popover */}
+          {isCategoryDropdownOpen && (
+            <>
+              {/* Backdrop untuk menutup dropdown saat klik di luar */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsCategoryDropdownOpen(false)}
+              />
+
+              <div className="absolute left-0 top-full mt-1.5 w-64 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[12px] shadow-lg py-1.5 z-50 text-xs animate-in fade-in">
+                <div className="px-3 py-1.5 border-b border-[var(--border-hairline)] text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center justify-between">
+                  <span>Pilih Kategori Penilaian</span>
+                  <span className="font-mono text-[10px] text-[var(--text-secondary)]">
+                    {classAssessments.length} Total
+                  </span>
+                </div>
+
+                <div className="p-1 space-y-0.5 max-h-[320px] overflow-y-auto">
+                  {/* Opsi: Semua Kategori */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCategoryFilter("ALL");
+                      setIsCategoryDropdownOpen(false);
+                    }}
+                    className={`w-full px-2.5 py-2 rounded-[8px] text-left flex items-center justify-between gap-2 transition-colors cursor-pointer ${
+                      categoryFilter === "ALL"
+                        ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-bold"
+                        : "hover:bg-[var(--surface-recessed)] text-[var(--text-primary)]"
                     }`}
                   >
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </SmoothHorizontalScroll>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-[var(--color-accent)] shrink-0" />
+                      <span className="truncate">Semua Kategori</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="font-mono text-[10px] px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">
+                        {classAssessments.length}
+                      </span>
+                      {categoryFilter === "ALL" && (
+                        <Check className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+                      )}
+                    </div>
+                  </button>
+
+                  <div className="my-1 border-t border-[var(--border-hairline)]" />
+
+                  {/* Opsi Tiap Kategori Penilaian */}
+                  {(Object.keys(ASSESSMENT_TYPE_METAS) as AssessmentType[]).map((cat) => {
+                    const count = classAssessments.filter((a) => a.type === cat).length;
+                    const meta = ASSESSMENT_TYPE_METAS[cat];
+                    const isSelected = categoryFilter === cat;
+
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => {
+                          setCategoryFilter(cat);
+                          setIsCategoryDropdownOpen(false);
+                        }}
+                        className={`w-full px-2.5 py-2 rounded-[8px] text-left flex items-center justify-between gap-2 transition-colors cursor-pointer ${
+                          isSelected
+                            ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-bold"
+                            : "hover:bg-[var(--surface-recessed)] text-[var(--text-primary)]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className={`px-1.5 py-0.5 rounded-[4px] text-[9px] font-mono font-bold uppercase shrink-0 border ${meta.badgeClass}`}
+                          >
+                            {meta.shortLabel}
+                          </span>
+                          <span className="truncate text-xs">{meta.label}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span
+                            className={`font-mono text-[10px] px-1.5 py-0.2 rounded-full ${
+                              count > 0
+                                ? isSelected
+                                  ? "bg-[var(--color-accent)] text-[var(--color-on-accent)] font-bold"
+                                  : "bg-black/10 dark:bg-white/10 font-semibold"
+                                : "opacity-30"
+                            }`}
+                          >
+                            {count}
+                          </span>
+                          {isSelected && (
+                            <Check className="w-3.5 h-3.5 text-[var(--color-accent)] shrink-0" />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Input Pencarian & Sort */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 md:w-56">
             <Search className="w-3.5 h-3.5 text-[var(--text-secondary)] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
