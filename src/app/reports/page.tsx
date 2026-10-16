@@ -1407,43 +1407,43 @@ export default function ReportsPage() {
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-[var(--surface-recessed)]/50 border-b border-[var(--border-hairline)] text-[var(--text-secondary)]">
-                      <th className="sticky left-0 z-10 bg-[var(--surface-card)] p-2.5 font-bold w-12 text-center border-r border-[var(--border-hairline)] shadow-[2px_0_4px_rgba(0,0,0,0.02)]">
+                      <th className="sticky left-0 z-10 bg-[var(--surface-card)] p-2 font-bold w-10 text-center border-r border-[var(--border-hairline)] shadow-[2px_0_4px_rgba(0,0,0,0.02)]">
                         No
                       </th>
-                      <th className="p-2.5 font-bold min-w-[100px] border-r border-[var(--border-hairline)] text-center font-mono">
+                      <th className="p-2 font-bold w-24 border-r border-[var(--border-hairline)] text-center font-mono">
                         NIS / NIPD
                       </th>
-                      <th className="p-2.5 font-bold min-w-[200px] border-r border-[var(--border-hairline)]">
+                      <th className="p-2 font-bold min-w-[160px] border-r border-[var(--border-hairline)]">
                         Nama Lengkap Siswa
                       </th>
-                      <th className="p-2.5 font-bold text-center w-12 border-r border-[var(--border-hairline)]">
+                      <th className="p-2 font-bold text-center w-10 border-r border-[var(--border-hairline)]">
                         L/P
                       </th>
-                      <th className="p-2.5 text-center font-bold text-[var(--status-hadir-fg)] w-14 border-r border-[var(--border-hairline)]" title="Hadir (H)">
-                        Hadir (H)
+                      <th className="p-2 text-center font-bold text-[var(--status-hadir-fg)] w-11 border-r border-[var(--border-hairline)]" title="Hadir (H)">
+                        Hadir
                       </th>
-                      <th className="p-2.5 text-center font-bold text-[var(--status-sakit-fg)] w-14 border-r border-[var(--border-hairline)]" title="Sakit (S)">
-                        Sakit (S)
+                      <th className="p-2 text-center font-bold text-[var(--status-sakit-fg)] w-11 border-r border-[var(--border-hairline)]" title="Sakit (S)">
+                        Sakit
                       </th>
-                      <th className="p-2.5 text-center font-bold text-[var(--status-izin-fg)] w-14 border-r border-[var(--border-hairline)]" title="Izin (I)">
-                        Izin (I)
+                      <th className="p-2 text-center font-bold text-[var(--status-izin-fg)] w-11 border-r border-[var(--border-hairline)]" title="Izin (I)">
+                        Izin
                       </th>
-                      <th className="p-2.5 text-center font-bold text-[var(--status-alpa-fg)] w-14 border-r border-[var(--border-hairline)]" title="Alpa (A)">
-                        Alpa (A)
+                      <th className="p-2 text-center font-bold text-[var(--status-alpa-fg)] w-11 border-r border-[var(--border-hairline)]" title="Alpa (A)">
+                        Alpa
                       </th>
-                      <th className="p-2.5 text-center font-bold text-amber-700 dark:text-amber-400 w-14 border-r border-[var(--border-hairline)]" title="Terlambat (T)">
-                        Telat (T)
+                      <th className="p-2 text-center font-bold text-amber-700 dark:text-amber-400 w-11 border-r border-[var(--border-hairline)]" title="Terlambat (T)">
+                        Telat
                       </th>
-                      <th className="p-2.5 text-center font-bold text-[var(--status-dispen-fg)] w-14 border-r border-[var(--border-hairline)]" title="Dispensasi (D)">
-                        Dispen (D)
+                      <th className="p-2 text-center font-bold text-[var(--status-dispen-fg)] w-11 border-r border-[var(--border-hairline)]" title="Dispensasi (D)">
+                        Dispen
                       </th>
-                      <th className="p-2.5 text-center font-bold text-[var(--text-primary)] w-16 border-r border-[var(--border-hairline)]" title="Total Hari Belajar">
+                      <th className="p-2 text-center font-bold text-[var(--text-primary)] w-12 border-r border-[var(--border-hairline)]" title="Total Hari Belajar">
                         Total
                       </th>
-                      <th className="p-2.5 text-center font-bold text-[var(--text-primary)] min-w-[70px] border-r border-[var(--border-hairline)]">
+                      <th className="p-2 text-center font-bold text-[var(--text-primary)] w-16 border-r border-[var(--border-hairline)]">
                         % Hadir
                       </th>
-                      <th className="p-2.5 text-center font-bold text-[var(--text-primary)] min-w-[120px]">
+                      <th className="p-2 text-center font-bold text-[var(--text-primary)] min-w-[110px]">
                         Predikat Raport
                       </th>
                     </tr>
@@ -1458,47 +1458,47 @@ export default function ReportsPage() {
                             isWarning ? "bg-[var(--status-alpa-bg)]/20" : ""
                           }`}
                         >
-                          <td className="sticky left-0 z-10 p-2.5 text-center font-mono text-[11px] text-[var(--text-secondary)] border-r border-[var(--border-hairline)] bg-[var(--surface-card)]">
+                          <td className="sticky left-0 z-10 p-2 text-center font-mono text-[11px] text-[var(--text-secondary)] border-r border-[var(--border-hairline)] bg-[var(--surface-card)]">
                             {idx + 1}
                           </td>
-                          <td className="p-2.5 text-center font-mono text-[11px] border-r border-[var(--border-hairline)]">
+                          <td className="p-2 text-center font-mono text-[11px] border-r border-[var(--border-hairline)]">
                             {st.nis ?? "-"}
                           </td>
-                          <td className="p-2.5 font-semibold text-[var(--text-primary)] border-r border-[var(--border-hairline)]">
+                          <td className="p-2 font-semibold text-[var(--text-primary)] border-r border-[var(--border-hairline)]">
                             <div className="flex items-center gap-1.5">
-                              <span>{st.fullName}</span>
+                              <span className="truncate">{st.fullName}</span>
                               {isWarning && (
-                                <span className="text-[9px] px-1 py-0.2 rounded-[3px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold">
+                                <span className="text-[9px] px-1 py-0.2 rounded-[3px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold shrink-0">
                                   Perhatian
                                 </span>
                               )}
                             </div>
                           </td>
-                          <td className="p-2.5 text-center border-r border-[var(--border-hairline)]">
+                          <td className="p-2 text-center border-r border-[var(--border-hairline)]">
                             {st.gender ?? "-"}
                           </td>
-                          <td className="p-2.5 text-center font-mono font-bold text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]">
+                          <td className="p-2 text-center font-mono font-bold text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]">
                             {st.totalHadir}
                           </td>
-                          <td className="p-2.5 text-center font-mono font-semibold text-[var(--status-sakit-fg)] border-r border-[var(--border-hairline)]">
+                          <td className="p-2 text-center font-mono font-semibold text-[var(--status-sakit-fg)] border-r border-[var(--border-hairline)]">
                             {st.totalSakit}
                           </td>
-                          <td className="p-2.5 text-center font-mono font-semibold text-[var(--status-izin-fg)] border-r border-[var(--border-hairline)]">
+                          <td className="p-2 text-center font-mono font-semibold text-[var(--status-izin-fg)] border-r border-[var(--border-hairline)]">
                             {st.totalIzin}
                           </td>
-                          <td className="p-2.5 text-center font-mono font-bold text-[var(--status-alpa-fg)] border-r border-[var(--border-hairline)]">
+                          <td className="p-2 text-center font-mono font-bold text-[var(--status-alpa-fg)] border-r border-[var(--border-hairline)]">
                             {st.totalAlpa}
                           </td>
-                          <td className="p-2.5 text-center font-mono text-amber-700 dark:text-amber-400 border-r border-[var(--border-hairline)]">
+                          <td className="p-2 text-center font-mono text-amber-700 dark:text-amber-400 border-r border-[var(--border-hairline)]">
                             {st.totalTerlambat}
                           </td>
-                          <td className="p-2.5 text-center font-mono font-semibold text-[var(--status-dispen-fg)] border-r border-[var(--border-hairline)]">
+                          <td className="p-2 text-center font-mono font-semibold text-[var(--status-dispen-fg)] border-r border-[var(--border-hairline)]">
                             {st.totalDispen}
                           </td>
-                          <td className="p-2.5 text-center font-mono font-bold border-r border-[var(--border-hairline)]">
+                          <td className="p-2 text-center font-mono font-bold border-r border-[var(--border-hairline)]">
                             {st.totalHari}
                           </td>
-                          <td className="p-2.5 text-center font-mono font-bold border-r border-[var(--border-hairline)]">
+                          <td className="p-2 text-center font-mono font-bold border-r border-[var(--border-hairline)]">
                             <span
                               className={`px-2 py-0.5 rounded-[4px] ${
                                 isWarning
@@ -1509,9 +1509,9 @@ export default function ReportsPage() {
                               {st.persentaseSemester}%
                             </span>
                           </td>
-                          <td className="p-2.5 text-center">
+                          <td className="p-2 text-center">
                             <span
-                              className={`px-2.5 py-1 rounded-[6px] text-[11px] font-bold inline-block ${
+                              className={`px-2.5 py-0.5 rounded-[6px] text-[11px] font-bold inline-block ${
                                 st.predikat === "Sangat Baik"
                                   ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                                   : st.predikat === "Baik"
@@ -1531,34 +1531,34 @@ export default function ReportsPage() {
                   {/* Footer Baris Total */}
                   <tfoot>
                     <tr className="bg-[var(--surface-recessed)] font-bold text-center border-t-2 border-[var(--border-hairline)] text-xs">
-                      <td colSpan={4} className="p-2.5 text-left pl-4 border-r border-[var(--border-hairline)]">
+                      <td colSpan={4} className="p-2 text-left pl-4 border-r border-[var(--border-hairline)]">
                         TOTAL KEHADIRAN KELAS ({semesterRecapData.students.length} Siswa)
                       </td>
-                      <td className="p-2.5 font-mono text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]">
+                      <td className="p-2 font-mono text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]">
                         {semesterRecapData.students.reduce((acc, curr) => acc + curr.totalHadir, 0)}
                       </td>
-                      <td className="p-2.5 font-mono text-[var(--status-sakit-fg)] border-r border-[var(--border-hairline)]">
+                      <td className="p-2 font-mono text-[var(--status-sakit-fg)] border-r border-[var(--border-hairline)]">
                         {semesterRecapData.students.reduce((acc, curr) => acc + curr.totalSakit, 0)}
                       </td>
-                      <td className="p-2.5 font-mono text-[var(--status-izin-fg)] border-r border-[var(--border-hairline)]">
+                      <td className="p-2 font-mono text-[var(--status-izin-fg)] border-r border-[var(--border-hairline)]">
                         {semesterRecapData.students.reduce((acc, curr) => acc + curr.totalIzin, 0)}
                       </td>
-                      <td className="p-2.5 font-mono text-[var(--status-alpa-fg)] border-r border-[var(--border-hairline)]">
+                      <td className="p-2 font-mono text-[var(--status-alpa-fg)] border-r border-[var(--border-hairline)]">
                         {semesterRecapData.students.reduce((acc, curr) => acc + curr.totalAlpa, 0)}
                       </td>
-                      <td className="p-2.5 font-mono text-amber-700 dark:text-amber-400 border-r border-[var(--border-hairline)]">
+                      <td className="p-2 font-mono text-amber-700 dark:text-amber-400 border-r border-[var(--border-hairline)]">
                         {semesterRecapData.students.reduce((acc, curr) => acc + curr.totalTerlambat, 0)}
                       </td>
-                      <td className="p-2.5 font-mono text-[var(--status-dispen-fg)] border-r border-[var(--border-hairline)]">
+                      <td className="p-2 font-mono text-[var(--status-dispen-fg)] border-r border-[var(--border-hairline)]">
                         {semesterRecapData.students.reduce((acc, curr) => acc + curr.totalDispen, 0)}
                       </td>
-                      <td className="p-2.5 font-mono border-r border-[var(--border-hairline)]">
+                      <td className="p-2 font-mono border-r border-[var(--border-hairline)]">
                         {semesterRecapData.students.reduce((acc, curr) => acc + curr.totalHari, 0)}
                       </td>
-                      <td className="p-2.5 font-mono text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]">
+                      <td className="p-2 font-mono text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]">
                         {semesterRecapData.averageAttendance}%
                       </td>
-                      <td className="p-2.5 text-[var(--text-secondary)]">-</td>
+                      <td className="p-2 text-[var(--text-secondary)]">-</td>
                     </tr>
                   </tfoot>
                 </table>

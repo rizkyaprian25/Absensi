@@ -115,9 +115,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Kontainer Konten Utama */}
+      {/* Kontainer Konten Utama: Responsif & Lega untuk Tabel & Rekapitulasi Data */}
       <main className="flex-1 flex flex-col min-h-screen overflow-x-hidden pb-20 md:pb-6">
-        <div className="w-full max-w-md mx-auto md:max-w-4xl p-4 md:p-6 flex-1 flex flex-col">
+        <div className="w-full max-w-full mx-auto md:max-w-5xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-[1560px] p-4 md:p-6 flex-1 flex flex-col transition-all">
           {children}
         </div>
       </main>
