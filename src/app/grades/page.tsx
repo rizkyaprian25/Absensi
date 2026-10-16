@@ -1537,7 +1537,7 @@ function GradesPageContent() {
                                     if (e.key === "Enter") handleSaveCellEdit();
                                     if (e.key === "Escape") setEditingCell(null);
                                   }}
-                                  className="w-20 px-2 py-1.5 text-center font-mono text-base md:text-lg bg-[var(--surface-card)] text-[var(--text-primary)] font-bold border-2 border-[var(--color-accent)] rounded-lg outline-none shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  className="w-16 px-1.5 py-1 text-center font-mono text-sm bg-[var(--surface-card)] text-[var(--text-primary)] font-bold border-2 border-[var(--color-accent)] rounded-md outline-none shadow-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                               ) : (
                                 <button
@@ -1552,7 +1552,7 @@ function GradesPageContent() {
                                         : `Nilai: ${sc} (Tuntas) - Klik untuk mengedit`
                                       : "Klik untuk mengisi nilai"
                                   }
-                                  className={`w-full py-1.5 px-2 rounded-lg text-sm md:text-base font-mono transition-colors hover:bg-[var(--surface-recessed)] flex items-center justify-center gap-1.5 cursor-pointer ${
+                                  className={`w-full py-1 px-1.5 rounded-md text-xs md:text-sm font-mono transition-colors hover:bg-[var(--surface-recessed)] flex items-center justify-center gap-1.5 cursor-pointer ${
                                     sc === null || sc === undefined
                                       ? "text-[var(--text-secondary)]/40 font-normal"
                                       : "text-[var(--text-primary)] font-bold tracking-wide"
@@ -1573,7 +1573,7 @@ function GradesPageContent() {
                       )}
 
                       {/* Nilai Rata-rata Akhir */}
-                      <td className="py-2.5 px-3 text-center font-mono text-sm md:text-base border-r border-[var(--border-hairline)] bg-[var(--surface-card)]">
+                      <td className="py-2.5 px-3 text-center font-mono text-xs md:text-sm border-r border-[var(--border-hairline)] bg-[var(--surface-card)]">
                         {isCensoredViewActive ? (
                           <span
                             className="text-[var(--text-secondary)] font-mono font-bold select-none text-[11px] tracking-widest opacity-60"
@@ -1968,7 +1968,7 @@ function GradesPageContent() {
                       onChange={(e) => setBulkValue(e.target.value)}
                       onWheel={(e) => e.currentTarget.blur()}
                       placeholder="0-100"
-                      className="w-20 px-2.5 py-1.5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[8px] text-xs font-bold font-mono text-[var(--text-primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-20 px-2.5 py-1.5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[8px] text-sm font-bold font-mono text-[var(--text-primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                   <button
@@ -2183,7 +2183,7 @@ function GradesPageContent() {
                               [student.id]: val,
                             }));
                           }}
-                          className={`w-24 px-3 py-2 text-center font-mono text-base md:text-lg border-2 rounded-[10px] font-bold focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                          className={`w-20 px-2.5 py-1.5 text-center font-mono text-sm border rounded-[8px] font-bold focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                             isUnderKkm
                               ? "border-rose-300 bg-rose-50/20 text-[var(--text-primary)]"
                               : "border-[var(--border-hairline)] bg-[var(--surface-card)] text-[var(--text-primary)]"
@@ -2559,7 +2559,7 @@ function GradesPageContent() {
                               [item.grade]: val,
                             }));
                           }}
-                          className="w-20 px-2.5 py-1.5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[8px] font-mono text-base font-bold text-center text-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="w-18 px-2 py-1.5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[8px] font-mono text-sm font-bold text-center text-[var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </div>
                     </div>
