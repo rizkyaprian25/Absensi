@@ -36,6 +36,8 @@ import {
   ChevronDown,
   Printer,
   Check,
+  Upload,
+  Clipboard,
 } from "lucide-react";
 import { Toast } from "@/components/ui/Toast";
 
@@ -88,6 +90,12 @@ import {
   generateCensoredGradesWhatsAppText,
   downloadXlsxFile,
 } from "@/lib/exportUtils";
+import {
+  parseGradesFromFile,
+  parseGradesFromPastedText,
+  generateGradeImportTemplateXlsx,
+  type GradeImportResult,
+} from "@/lib/gradeImportUtils";
 import { SmoothHorizontalScroll } from "@/components/ui/SmoothHorizontalScroll";
 
 function GradesPageContent() {
@@ -120,6 +128,14 @@ function GradesPageContent() {
   const [bulkValue, setBulkValue] = useState<string>("");
   const [quickSearchQuery, setQuickSearchQuery] = useState<string>("");
   const [quickStatusFilter, setQuickStatusFilter] = useState<"ALL" | "UNGRADED" | "GRADED" | "REMEDIAL">("ALL");
+
+  // 4b. State Modal Impor Nilai Siswa (Excel / CSV / Paste)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importTab, setImportTab] = useState<"file" | "paste">("file");
+  const [importPastedText, setImportPastedText] = useState("");
+  const [importResult, setImportResult] = useState<GradeImportResult | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importFileName, setImportFileName] = useState<string | null>(null);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const showToast = (msg: string) => {
@@ -483,6 +499,75 @@ function GradesPageContent() {
     });
     setQuickScores(updated);
     showToast(`Nilai massal ${num} diterapkan untuk ${targetStudents.length} siswa.`);
+  };
+
+  // Unduh Template Excel untuk Impor Nilai Kelas Aktif
+  const handleDownloadImportTemplate = () => {
+    const asmt = classAssessments.find((a) => a.id === quickEntryAssessmentId);
+    const asmtTitle = asmt ? asmt.title : "Penilaian";
+    const templateBytes = generateGradeImportTemplateXlsx(
+      currentClass.name,
+      asmtTitle,
+      students
+    );
+    const filename = `Template_Impor_Nilai_${currentClass.name}_${asmtTitle.replace(/\s+/g, "_")}.xlsx`;
+    downloadXlsxFile(templateBytes, filename);
+    showToast(`Template Excel untuk ${students.length} siswa berhasil diunduh.`);
+  };
+
+  // Unggah & Parsing Berkas Excel/CSV Impor Nilai
+  const handleFileUploadForImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setImportFileName(file.name);
+    try {
+      const result = await parseGradesFromFile(file, students);
+      setImportResult(result);
+      if (result.matchedCount === 0) {
+        showToast("Peringatan: Tidak ada nilai siswa yang cocok pada berkas ini.");
+      } else {
+        showToast(`Berhasil membaca ${result.matchedCount} nilai siswa dari "${file.name}".`);
+      }
+    } catch (err: any) {
+      alert(`Gagal membaca berkas: ${err.message || "Format berkas tidak valid"}`);
+      setImportResult(null);
+    } finally {
+      setIsImporting(false);
+      e.target.value = "";
+    }
+  };
+
+  // Proses Teks Salin-Tempel (Paste) dari Spreadsheet
+  const handleProcessPastedText = () => {
+    if (!importPastedText.trim()) {
+      alert("Silakan tempel (paste) data nilai terlebih dahulu.");
+      return;
+    }
+    const result = parseGradesFromPastedText(importPastedText, students);
+    setImportResult(result);
+    if (result.matchedCount === 0) {
+      showToast("Peringatan: Tidak ada nilai angka yang cocok.");
+    } else {
+      showToast(`Berhasil memetakan ${result.matchedCount} nilai siswa.`);
+    }
+  };
+
+  // Terapkan Hasil Impor ke Form Input Nilai Cepat
+  const handleApplyImportedScores = () => {
+    if (!importResult || importResult.matchedCount === 0) return;
+
+    setQuickScores((prev) => ({
+      ...prev,
+      ...importResult.scoresMap,
+    }));
+
+    setIsImportModalOpen(false);
+    setImportResult(null);
+    setImportPastedText("");
+    setImportFileName(null);
+    showToast(`✓ Nilai ${importResult.matchedCount} siswa berhasil diterapkan ke form.`);
   };
 
   // Simpan Pengaturan KKM per Angkatan
@@ -1833,7 +1918,7 @@ function GradesPageContent() {
               </button>
             </div>
 
-            {/* Kontrol Penilaian & Nilai Massal */}
+            {/* Kontrol Penilaian & Aksi Cepat (Isi Massal & Impor) */}
             <div className="p-4 bg-[var(--surface-recessed)]/50 border-b border-[var(--border-hairline)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
               <div className="flex-1 min-w-0">
                 <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">
@@ -1852,29 +1937,48 @@ function GradesPageContent() {
                 </select>
               </div>
 
-              <div className="flex items-end gap-2 shrink-0">
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
-                    Isi Massal Semua:
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={bulkValue}
-                    onChange={(e) => setBulkValue(e.target.value)}
-                    onWheel={(e) => e.currentTarget.blur()}
-                    placeholder="Nilai (0-100)"
-                    className="w-28 px-3 py-1.5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[8px] text-sm md:text-base font-bold font-mono text-[var(--text-primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
+              <div className="flex items-end gap-2 shrink-0 flex-wrap">
+                {/* Tombol Impor Nilai (Excel / CSV / Paste) */}
                 <button
                   type="button"
-                  onClick={handleApplyBulkScore}
-                  className="px-3.5 py-2 bg-[var(--surface-recessed)] hover:bg-[var(--surface-recessed)]/80 text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[8px] text-xs font-semibold transition-colors cursor-pointer"
+                  onClick={() => {
+                    setImportResult(null);
+                    setImportPastedText("");
+                    setImportFileName(null);
+                    setIsImportModalOpen(true);
+                  }}
+                  className="min-h-[36px] px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[8px] text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+                  title="Impor nilai dari berkas Excel (.xlsx), CSV, atau salin-tempel langsung tanpa perlu input manual"
                 >
-                  Terapkan
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Impor Nilai (Excel/CSV)</span>
                 </button>
+
+                {/* Input Isi Massal */}
+                <div className="flex items-end gap-1.5">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">
+                      Isi Massal:
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={bulkValue}
+                      onChange={(e) => setBulkValue(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      placeholder="0-100"
+                      className="w-20 px-2.5 py-1.5 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[8px] text-xs font-bold font-mono text-[var(--text-primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleApplyBulkScore}
+                    className="min-h-[34px] px-2.5 py-1.5 bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[8px] text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Terapkan
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -2113,6 +2217,249 @@ function GradesPageContent() {
                   Simpan Seluruh Nilai
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Impor Nilai Siswa (Excel, CSV, Paste dari Spreadsheet) */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-xl max-h-[90vh] flex flex-col bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[16px] shadow-2xl overflow-hidden animate-in zoom-in-95">
+            {/* Header Modal Impor */}
+            <div className="p-4 border-b border-[var(--border-hairline)] flex items-center justify-between shrink-0 bg-[var(--surface-card)]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 flex items-center justify-center shrink-0 font-bold">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-[var(--text-primary)]">
+                    Impor Nilai Siswa Otomatis
+                  </h3>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Kelas {currentClass.name} · {students.length} Siswa Terdaftar
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(false)}
+                className="p-1 rounded-full text-[var(--text-secondary)] hover:bg-[var(--surface-recessed)] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Pilihan Tab Mode Impor */}
+            <div className="px-4 pt-3 border-b border-[var(--border-hairline)] bg-[var(--surface-recessed)]/50 shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportTab("file");
+                    setImportResult(null);
+                  }}
+                  className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+                    importTab === "file"
+                      ? "border-[var(--color-accent)] text-[var(--color-accent)]"
+                      : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Unggah Berkas Excel / CSV</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportTab("paste");
+                    setImportResult(null);
+                  }}
+                  className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+                    importTab === "paste"
+                      ? "border-[var(--color-accent)] text-[var(--color-accent)]"
+                      : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  <Clipboard className="w-3.5 h-3.5" />
+                  <span>Salin &amp; Tempel (Paste)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Konten Tab */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {importTab === "file" ? (
+                <>
+                  {/* Banner Unduh Format Excel Siap Isi */}
+                  <div className="p-3 rounded-[12px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] flex items-center justify-between gap-3 text-xs">
+                    <div>
+                      <p className="font-semibold text-[var(--text-primary)]">
+                        Belum punya format Excel?
+                      </p>
+                      <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                        Unduh template Excel resmi yang sudah berisi nomor absen, NIS, dan nama siswa kelas ini.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDownloadImportTemplate}
+                      className="px-3 py-1.5 rounded-[8px] bg-[var(--surface-card)] hover:bg-[var(--border-hairline)] text-[var(--color-accent)] border border-[var(--border-hairline)] font-bold text-xs shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Unduh Template (.xlsx)</span>
+                    </button>
+                  </div>
+
+                  {/* Area Upload File */}
+                  <div className="border-2 border-dashed border-[var(--border-hairline)] hover:border-[var(--color-accent)]/60 rounded-[14px] p-6 text-center bg-[var(--surface-recessed)]/30 transition-colors">
+                    <input
+                      id="grade-file-import-input"
+                      type="file"
+                      accept=".xlsx, .xls, .csv"
+                      onChange={handleFileUploadForImport}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="grade-file-import-input"
+                      className="flex flex-col items-center justify-center cursor-pointer"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-[var(--color-accent)]/10 text-[var(--color-accent)] flex items-center justify-center mb-3">
+                        <Upload className="w-6 h-6" />
+                      </div>
+                      <p className="font-bold text-xs text-[var(--text-primary)]">
+                        {isImporting ? "Membaca berkas..." : "Klik di sini untuk memilih berkas Excel atau CSV"}
+                      </p>
+                      <p className="text-[11px] text-[var(--text-secondary)] mt-1">
+                        Mendukung format .xlsx, .xls, dan .csv
+                      </p>
+                      <span className="mt-3 px-3 py-1.5 bg-[var(--color-accent)] text-[var(--color-on-accent)] rounded-[8px] text-xs font-semibold shadow-xs">
+                        Pilih Berkas Komputer
+                      </span>
+                    </label>
+                  </div>
+
+                  {importFileName && (
+                    <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5 bg-[var(--surface-recessed)] px-3 py-2 rounded-[8px]">
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                      <span>Berkas terpilih: <strong>{importFileName}</strong></span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Tab Salin-Tempel (Paste) */
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--text-primary)] mb-1">
+                      Tempelkan Kolom Nilai dari Excel / Spreadsheet:
+                    </label>
+                    <p className="text-[11px] text-[var(--text-secondary)] mb-2">
+                      Buka berkas Anda di Excel &rarr; Blok kolom nilai siswa &rarr; Salin (Ctrl+C) &rarr; Tempelkan di kotak bawah ini:
+                    </p>
+                    <textarea
+                      rows={6}
+                      value={importPastedText}
+                      onChange={(e) => setImportPastedText(e.target.value)}
+                      placeholder={"85\n92\n78\n88\n...\n(atau salin langsung kolom NIS dan Nilai dari Excel)"}
+                      className="w-full p-3 font-mono text-xs bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleProcessPastedText}
+                    className="w-full py-2 bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[8px] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+                    <span>Proses Data Tempel</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Pratinjau Hasil Pembacaan Impor */}
+              {importResult && (
+                <div className="border border-[var(--border-hairline)] rounded-[12px] overflow-hidden bg-[var(--surface-card)] animate-in fade-in">
+                  <div className="p-3 bg-[var(--surface-recessed)] border-b border-[var(--border-hairline)] flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span className="font-bold text-[var(--text-primary)]">
+                        Hasil Pembacaan: {importResult.matchedCount} dari {importResult.totalStudentsInClass} Siswa Cocok
+                      </span>
+                    </div>
+                    {importResult.unmatchedCount > 0 && (
+                      <span className="font-mono text-[11px] text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
+                        {importResult.unmatchedCount} belum ada nilai
+                      </span>
+                    )}
+                  </div>
+
+                  {/* List Pratinjau Baris Siswa */}
+                  <div className="max-h-[220px] overflow-y-auto divide-y divide-[var(--border-hairline)] text-xs">
+                    {importResult.rows.map((r) => (
+                      <div
+                        key={r.studentId}
+                        className="px-3 py-2 flex items-center justify-between gap-2 hover:bg-[var(--surface-recessed)]/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono text-[11px] text-[var(--text-secondary)] w-6 text-center">
+                            #{String(r.originalIndex).padStart(2, "0")}
+                          </span>
+                          <div className="truncate">
+                            <p className="font-semibold truncate text-[var(--text-primary)]">
+                              {r.studentName}
+                            </p>
+                            <p className="text-[10px] text-[var(--text-secondary)] font-mono">
+                              NIS: {r.nis || "-"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {r.score !== null ? (
+                            <>
+                              <span className="px-2 py-0.5 rounded font-mono font-bold text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                {r.score}
+                              </span>
+                              <span className="text-[10px] text-[var(--text-secondary)]">
+                                ({r.matchType === "NIS" ? "Cocok NIS" : r.matchType === "NAME" ? "Cocok Nama" : "Urutan Absen"})
+                              </span>
+                            </>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded font-mono text-[11px] text-[var(--text-secondary)] bg-[var(--surface-recessed)] italic">
+                              Tidak Ada Nilai
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Modal Impor */}
+            <div className="p-3 border-t border-[var(--border-hairline)] bg-[var(--surface-recessed)] flex items-center justify-between gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(false)}
+                className="px-3.5 py-2 rounded-[8px] text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-card)] cursor-pointer"
+              >
+                Tutup
+              </button>
+
+              {importResult && importResult.matchedCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={handleApplyImportedScores}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[8px] text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Terapkan Nilai ({importResult.matchedCount} Siswa)</span>
+                </button>
+              ) : (
+                <span className="text-[11px] text-[var(--text-secondary)] italic">
+                  Pilih berkas atau tempel data untuk melihat pratinjau nilai
+                </span>
+              )}
             </div>
           </div>
         </div>

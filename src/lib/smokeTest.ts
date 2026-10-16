@@ -112,6 +112,12 @@ import {
 import { computeSemesterRecapForClass } from "../app/reports/page.tsx";
 import type { SemesterClassRecap, StudentSemesterRecap } from "../contracts/attendance.ts";
 import XLSX from "xlsx-js-style";
+import {
+  matchGradeRowsToStudents,
+  parseGradesFromPastedText,
+  generateGradeImportTemplateXlsx,
+  parseScoreValue,
+} from "./gradeImportUtils.ts";
 
 /**
  * Smoke Test Mandiri (Fase 4 SOP §3.5 & PRD §14)
@@ -1211,6 +1217,66 @@ function runSmokeTest() {
     assert.strictEqual(htmlPrint.includes(">95<"), false, "Nilai aktual 95 dilarang bocor di HTML cetak disensor");
 
     console.log("✓ LULUS: Ekspor & Pengumuman Nilai Disensor (Excel .xlsx, CSV, WhatsApp 1-Klik, & Cetak HTML Mading) terverifikasi 100% aman privasi.");
+  }
+
+  // ============================================================================
+  // TEST 17: Menguji Parser & Mesin Pencocokan Impor Nilai Siswa (Excel / CSV / Paste)
+  // ============================================================================
+  {
+    console.log("[TEST 17] Menguji mesin impor nilai siswa cerdas (Excel/CSV/Paste)...");
+
+    // 17.1 Uji sanitasi angka nilai
+    assert.strictEqual(parseScoreValue(85).num, 85);
+    assert.strictEqual(parseScoreValue("87.5").num, 87.5);
+    assert.strictEqual(parseScoreValue("92,5").num, 92.5); // Koma desimal Indonesia
+    assert.strictEqual(parseScoreValue("").num, null);
+    assert.strictEqual(parseScoreValue("-").num, null);
+    assert.strictEqual(parseScoreValue(150).num, 100); // Clamped ke 100
+    assert.strictEqual(parseScoreValue(-10).num, 0);   // Clamped ke 0
+
+    const testStudents = [
+      { id: "s1", classId: "c1", nis: "262707001", fullName: "ABDULLAH AL SAFWA", gender: "L" as const, isActive: true, createdAt: "2026-08-01" },
+      { id: "s2", classId: "c1", nis: "262707002", fullName: "AINUN DEPIRJA SOLEGAR", gender: "P" as const, isActive: true, createdAt: "2026-08-01" },
+      { id: "s3", classId: "c1", nis: "262707003", fullName: "AIRIL", gender: "L" as const, isActive: true, createdAt: "2026-08-01" },
+    ];
+
+    // 17.2 Uji pencocokan via NIS dan Nama dari 2D Matrix (simulasi Excel)
+    const mockExcelMatrix = [
+      ["FORMAT NILAI SISWA"],
+      ["NO", "NIS", "NAMA SISWA", "NILAI"],
+      [1, "262707001", "Abdullah Al Safwa", "88"],
+      [2, "262707002", "Ainun Depirja", "95.5"],
+      [3, "999999999", "Airil", "78"], // NIS beda tapi nama cocok
+    ];
+
+    const matchResult = matchGradeRowsToStudents(mockExcelMatrix, testStudents);
+    assert.strictEqual(matchResult.matchedCount, 3, "Ketiga siswa harus berhasil dicocokkan");
+    assert.strictEqual(matchResult.scoresMap["s1"], "88", "Nilai s1 harus 88");
+    assert.strictEqual(matchResult.scoresMap["s2"], "95.5", "Nilai s2 harus 95.5");
+    assert.strictEqual(matchResult.scoresMap["s3"], "78", "Nilai s3 harus 78 melalui nama");
+
+    // 17.3 Uji pencocokan teks copy-paste dari spreadsheet (Tab Delimited)
+    const pastedText = "85\t90\t77"; // 1 baris multi-kolom atau multi-baris
+    const pastedMultiLine = "82\n89\n94"; // 3 baris nilai berurutan sesuai absen
+    const pasteResult = parseGradesFromPastedText(pastedMultiLine, testStudents);
+    assert.strictEqual(pasteResult.matchedCount, 3, "Pasted sekuensial harus mencocokkan 3 siswa");
+    assert.strictEqual(pasteResult.scoresMap["s1"], "82");
+    assert.strictEqual(pasteResult.scoresMap["s2"], "89");
+    assert.strictEqual(pasteResult.scoresMap["s3"], "94");
+
+    // 17.4 Uji pembuatan berkas template Excel (.xlsx)
+    const templateBytes = generateGradeImportTemplateXlsx("7A", "Tugas 1", testStudents);
+    assert.ok(templateBytes instanceof Uint8Array, "Template harus menghasilkan Uint8Array");
+    assert.ok(templateBytes.length > 500, "Ukuran template harus realistis");
+
+    const templateWb = XLSX.read(templateBytes, { type: "array" });
+    assert.ok(templateWb.SheetNames.includes("Input Nilai"), "Worksheet harus bernama 'Input Nilai'");
+    const wsTemplate = templateWb.Sheets["Input Nilai"];
+    const templateCsv = XLSX.utils.sheet_to_csv(wsTemplate);
+    assert.ok(templateCsv.includes("ABDULLAH AL SAFWA"), "Template harus memuat nama siswa");
+    assert.ok(templateCsv.includes("262707001"), "Template harus memuat NIS siswa");
+
+    console.log("✓ LULUS: Fitur mesin impor nilai (Excel/CSV/Paste/Template) terverifikasi 100% akurat.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");
