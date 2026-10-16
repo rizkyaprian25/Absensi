@@ -1986,7 +1986,7 @@ function GradesPageContent() {
 
             {/* Toolbar Pencarian Siswa & Filter Status */}
             <div className="p-3 bg-[var(--surface-card)] border-b border-[var(--border-hairline)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
-              <div className="relative flex-1">
+              <div className="relative flex-1 min-w-0">
                 <Search className="w-3.5 h-3.5 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
@@ -2000,7 +2000,7 @@ function GradesPageContent() {
                       document.getElementById(`quick-score-${firstStudent.student.id}`)?.focus();
                     }
                   }}
-                  placeholder="Ketik nama siswa atau NIS untuk mencari..."
+                  placeholder="Cari nama siswa atau NIS..."
                   className="w-full pl-9 pr-8 py-2 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] text-xs text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
                 />
                 {quickSearchQuery && (
@@ -2017,8 +2017,8 @@ function GradesPageContent() {
 
               {/* Status Filter Pills dengan Smooth Horizontal Scroll */}
               <SmoothHorizontalScroll
-                containerClassName="w-full text-[11px]"
-                className="py-0.5 px-0.5"
+                containerClassName="w-full sm:w-auto shrink-0 text-[11px]"
+                className="py-0.5 px-0.5 flex items-center gap-1.5"
                 activeKey={quickStatusFilter}
                 activeSelector="[data-active='true']"
                 gradientFromClass="from-[var(--surface-recessed)]"
