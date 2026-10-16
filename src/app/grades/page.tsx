@@ -59,6 +59,7 @@ import {
   getGradePredicate,
 } from "@/contracts/grades";
 import {
+  initGrade7AssessmentsIfMissing,
   getStoredAssessments,
   getStoredScores,
   getStoredKKM,
@@ -164,6 +165,7 @@ function GradesPageContent() {
 
   // Muat data awal dari localStorage
   const refreshData = () => {
+    initGrade7AssessmentsIfMissing();
     setAssessments(getStoredAssessments());
     setScores(getStoredScores());
     const savedKkmMap = getStoredKkmByGrade();

@@ -14,6 +14,8 @@ import {
 import type { Student } from "../contracts/attendance";
 import {
   INITIAL_MOCK_ASSESSMENTS,
+  GRADE_7_TARGET_CLASSES,
+  generateAssessmentsForClass7,
   generateInitialMockScores,
 } from "../contracts/mocks/gradesMocks";
 import { triggerAutoSnapshot } from "./backupManager.ts";
@@ -23,6 +25,7 @@ export const STORAGE_KEY_SCORES = "absensi_student_scores_v2";
 export const STORAGE_KEY_KKM = "absensi_grade_kkm_v1";
 export const STORAGE_KEY_KKM_BY_GRADE = "absensi_grade_kkm_by_grade_v1";
 export const STORAGE_KEY_ASSESSMENT_ORDER = "absensi_grade_assessment_order_v1";
+export const STORAGE_KEY_GRADE_7_SEEDED = "absensi_grade_7_defaults_seeded_v1";
 
 // ============================================================================
 // AKSES PENYIMPANAN LOKAL (LOCALSTORAGE OFFLINE-FIRST)
@@ -54,6 +57,49 @@ function cleanupLegacyMockData(): void {
 }
 
 /**
+ * Menginisialisasi 4 penilaian baku untuk seluruh kelas 7 (kecuali 7A dan 7D yang dikelola mandiri oleh guru).
+ * Dijalankan sekali saat inisialisasi agar browser guru yang sudah memiliki data 7A/7D langsung mendapatkan
+ * 4 penilaian di kelas 7B, 7C, 7E, 7F, 7G, dan 7H tanpa menimpa data 7A dan 7D.
+ */
+export function initGrade7AssessmentsIfMissing(): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    const isSeeded = localStorage.getItem(STORAGE_KEY_GRADE_7_SEEDED) === "true";
+    if (isSeeded) {
+      return;
+    }
+
+    const existing = getStoredAssessments();
+    let hasChanges = false;
+    const result = [...existing];
+
+    for (const target of GRADE_7_TARGET_CLASSES) {
+      const existingForClass = result.filter((a) => a.classId === target.id);
+      const defaults = generateAssessmentsForClass7(target.id, target.dates);
+
+      for (const def of defaults) {
+        const alreadyExists = existingForClass.some(
+          (a) => a.id === def.id || a.title.trim().toLowerCase() === def.title.trim().toLowerCase()
+        );
+        if (!alreadyExists) {
+          result.push(def);
+          hasChanges = true;
+        }
+      }
+    }
+
+    localStorage.setItem(STORAGE_KEY_GRADE_7_SEEDED, "true");
+
+    if (hasChanges) {
+      localStorage.setItem(STORAGE_KEY_ASSESSMENTS, JSON.stringify(result));
+    }
+  } catch (err) {
+    console.warn("Gagal menginisialisasi asesmen kelas 7:", err);
+  }
+}
+
+/**
  * Mengambil daftar seluruh penilaian (asesmen) yang tersimpan
  */
 export function getStoredAssessments(): AssessmentItem[] {
@@ -67,6 +113,7 @@ export function getStoredAssessments(): AssessmentItem[] {
     const raw = localStorage.getItem(STORAGE_KEY_ASSESSMENTS);
     if (!raw) {
       localStorage.setItem(STORAGE_KEY_ASSESSMENTS, JSON.stringify(INITIAL_MOCK_ASSESSMENTS));
+      localStorage.setItem(STORAGE_KEY_GRADE_7_SEEDED, "true");
       return INITIAL_MOCK_ASSESSMENTS;
     }
     const parsed = JSON.parse(raw);

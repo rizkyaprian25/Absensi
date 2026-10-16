@@ -67,7 +67,14 @@ import {
   saveStoredKkmByGrade,
   getStoredKKM,
   saveStoredKKM,
+  initGrade7AssessmentsIfMissing,
+  STORAGE_KEY_GRADE_7_SEEDED,
 } from "./gradeStorage.ts";
+import {
+  INITIAL_MOCK_ASSESSMENTS,
+  generateInitialMockScores,
+  GRADE_7_TARGET_CLASSES,
+} from "../contracts/mocks/gradesMocks.ts";
 import {
   DEFAULT_KKM,
   DEFAULT_KKM_BY_GRADE,
@@ -1277,6 +1284,71 @@ function runSmokeTest() {
     assert.ok(templateCsv.includes("262707001"), "Template harus memuat NIS siswa");
 
     console.log("✓ LULUS: Fitur mesin impor nilai (Excel/CSV/Paste/Template) terverifikasi 100% akurat.");
+  }
+
+  // --------------------------------------------------------------------------
+  // TEST 18: Pengujian inisialisasi asesmen baku kelas 7 (kecuali 7A & 7D)
+  // --------------------------------------------------------------------------
+  {
+    console.log("[TEST 18] Menguji pembuatan asesmen awal Kelas 7 otomatis (7B, 7C, 7E, 7F, 7G, 7H; kecuali 7A & 7D)...");
+
+    // 18.1 Pastikan 7A dan 7D tidak ada di INITIAL_MOCK_ASSESSMENTS
+    const class7aAssessments = INITIAL_MOCK_ASSESSMENTS.filter((a) => a.classId === "class-7a");
+    const class7dAssessments = INITIAL_MOCK_ASSESSMENTS.filter((a) => a.classId === "class-7d");
+    assert.strictEqual(class7aAssessments.length, 0, "Kelas 7A harus dikecualikan dari asesmen otomatis");
+    assert.strictEqual(class7dAssessments.length, 0, "Kelas 7D harus dikecualikan dari asesmen otomatis");
+
+    // 18.2 Pastikan setiap kelas target (7B, 7C, 7E, 7F, 7G, 7H) memiliki 4 asesmen baku
+    const targetClassIds = ["class-7b", "class-7c", "class-7e", "class-7f", "class-7g", "class-7h"];
+    for (const classId of targetClassIds) {
+      const asmts = INITIAL_MOCK_ASSESSMENTS.filter((a) => a.classId === classId);
+      assert.strictEqual(asmts.length, 4, `Kelas ${classId} harus memiliki tepat 4 asesmen baku`);
+
+      const titles = asmts.map((a) => a.title);
+      assert.ok(titles.includes("Tugas 1 : Algoritma"), `Kelas ${classId} harus memuat Tugas 1 : Algoritma`);
+      assert.ok(titles.includes("Tugas 2 : Optimasi"), `Kelas ${classId} harus memuat Tugas 2 : Optimasi`);
+      assert.ok(titles.includes("Tugas 3 : Penjelasan Data"), `Kelas ${classId} harus memuat Tugas 3 : Penjelasan Data`);
+      assert.ok(titles.includes("UH 1 : Data dan Fungsi Tombol Keyboard"), `Kelas ${classId} harus memuat UH 1`);
+
+      const uh1 = asmts.find((a) => a.title.startsWith("UH 1"));
+      assert.strictEqual(uh1?.type, "UH", "UH 1 harus berkategori UH");
+
+      const tugasItems = asmts.filter((a) => a.title.startsWith("Tugas"));
+      assert.strictEqual(tugasItems.length, 3, "Harus ada 3 tugas");
+      tugasItems.forEach((t) => assert.strictEqual(t.type, "TUGAS", "Tugas harus berkategori TUGAS"));
+    }
+
+    // 18.3 Nilai awal harus kosong
+    const initialScores = generateInitialMockScores();
+    assert.strictEqual(initialScores.length, 0, "Catatan nilai awal siswa harus kosong sesuai permintaan");
+
+    // 18.4 Uji fungsi initGrade7AssessmentsIfMissing menjaga data 7A/7D mandiri tetap utuh
+    localStorage.removeItem(STORAGE_KEY_GRADE_7_SEEDED);
+    const mockUserAssessments: AssessmentItem[] = [
+      {
+        id: "asmt-user-7a-custom",
+        classId: "class-7a",
+        subject: "Informatika",
+        type: "TUGAS",
+        title: "Tugas Mandiri Buatan Guru di 7A",
+        date: "2026-08-01",
+        maxScore: 100,
+        weight: 1,
+        createdAt: "2026-08-01T00:00:00Z",
+      },
+    ];
+    localStorage.setItem(STORAGE_KEY_ASSESSMENTS, JSON.stringify(mockUserAssessments));
+
+    initGrade7AssessmentsIfMissing();
+
+    const storedAfterInit = JSON.parse(localStorage.getItem(STORAGE_KEY_ASSESSMENTS) || "[]") as AssessmentItem[];
+    const user7aPreserved = storedAfterInit.find((a) => a.id === "asmt-user-7a-custom");
+    assert.ok(user7aPreserved, "Asesmen mandiri di 7A tidak boleh hilang atau tertimpa");
+
+    const seeded7b = storedAfterInit.filter((a) => a.classId === "class-7b");
+    assert.strictEqual(seeded7b.length, 4, "Kelas 7B harus terisi 4 asesmen oleh mesin seed");
+
+    console.log("✓ LULUS: Inisialisasi 4 penilaian baku seluruh kelas 7 (kecuali 7A & 7D) terverifikasi 100% aman dan akurat.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");
