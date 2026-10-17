@@ -875,7 +875,11 @@ function runSmokeTest() {
     assert.ok(fullBackup.data.sessions !== undefined, "Blok sesi harus ada");
     assert.ok(fullBackup.data.records !== undefined, "Blok rekaman harus ada");
     // Uji integritas hierarki relasi Foreign Key (classes & students)
-    assert.strictEqual(MOCK_CLASSES.length, 10, "Harus tersedia 10 rombel resmi SMPN 3 Cibungbulang");
+    assert.strictEqual(
+      MOCK_CLASSES.length,
+      22,
+      "Harus tersedia 22 rombel resmi SMPN 3 Cibungbulang (7A-7H, 8A-8G, 9A-9G)"
+    );
     const classIdSet = new Set(MOCK_CLASSES.map((c) => c.id));
 
     // Seluruh siswa resmi harus memiliki class_id yang terdaftar di classes
@@ -888,7 +892,11 @@ function runSmokeTest() {
         totalVerifiedStudents++;
       }
     }
-    assert.strictEqual(totalVerifiedStudents, 401, "Harus ada 401 siswa otentik terverifikasi relasi foreign key-nya");
+    assert.strictEqual(
+      totalVerifiedStudents,
+      600,
+      "Harus ada 600 siswa otentik terverifikasi relasi foreign key-nya (319 di Kelas 7, 281 di Kelas 8)"
+    );
 
     // Uji isolasi & penyaringan rekaman yatim (orphan record filter simulation)
     const mockSyncedSessionIds = new Set(["session-valid-1"]);
