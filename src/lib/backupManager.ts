@@ -46,10 +46,13 @@ import {
 } from "./academicStorage.ts";
 import {
   getStoredDynamicStudentsMap,
+  getStoredStudentMutations,
   STORAGE_KEY_DYNAMIC_STUDENTS,
   STORAGE_KEY_ALUMNI_STUDENTS,
+  STORAGE_KEY_STUDENT_MUTATIONS,
   type AlumniStudentRecord,
 } from "./rolloverStorage.ts";
+import type { StudentMutationRecord } from "../contracts/academic.ts";
 
 export const STORAGE_KEY_AUTO_SNAPSHOTS = "absensi_auto_snapshots_v1";
 export const STORAGE_KEY_CUSTOM_STUDENTS = "absensi_custom_students_v1";
@@ -88,6 +91,7 @@ export interface AppBackupPayload {
     teacherAssignments?: TeacherAssignment[];
     dynamicStudents?: Record<string, Student[]>;
     alumniStudents?: AlumniStudentRecord[];
+    studentMutations?: StudentMutationRecord[];
   };
 }
 
@@ -174,6 +178,8 @@ export function createFullBackupPayload(): AppBackupPayload {
     console.warn("Gagal membaca alumni untuk cadangan:", e);
   }
 
+  const studentMutations = getStoredStudentMutations();
+
   const dataPayload = {
     sessions,
     records,
@@ -189,6 +195,7 @@ export function createFullBackupPayload(): AppBackupPayload {
     teacherAssignments,
     dynamicStudents,
     alumniStudents,
+    studentMutations,
   };
 
   const contentStr = JSON.stringify(dataPayload);
@@ -565,6 +572,10 @@ export function applyBackupPayloadToLocalStorage(payload: AppBackupPayload): voi
 
   if (Array.isArray(data.alumniStudents)) {
     localStorage.setItem(STORAGE_KEY_ALUMNI_STUDENTS, JSON.stringify(data.alumniStudents));
+  }
+
+  if (Array.isArray(data.studentMutations)) {
+    localStorage.setItem(STORAGE_KEY_STUDENT_MUTATIONS, JSON.stringify(data.studentMutations));
   }
 
   // Perbarui juga replika IndexedDB

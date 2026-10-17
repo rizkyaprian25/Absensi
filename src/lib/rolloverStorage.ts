@@ -1,15 +1,22 @@
 import XLSX from "xlsx-js-style";
 import type { Student, Class } from "../contracts/attendance.ts";
 import { ALL_STUDENTS_BY_CLASS, MOCK_CLASSES } from "../contracts/mocks/attendanceMocks.ts";
-import type { StudentPpdbImportRow, StudentPromotionRecord } from "../contracts/academic.ts";
+import type {
+  StudentPpdbImportRow,
+  StudentPromotionRecord,
+  StudentMutationRecord,
+  StudentMutationReasonCategory,
+  StudentAcademicStatus,
+} from "../contracts/academic.ts";
 
 // ============================================================================
-// KUNCI PENYIMPANAN DATA ROLLOVER & PPDB (LOCALSTORAGE SSOT)
+// KUNCI PENYIMPANAN DATA ROLLOVER, PPDB & MUTASI (LOCALSTORAGE SSOT)
 // ============================================================================
 
 export const STORAGE_KEY_DYNAMIC_STUDENTS = "absensi_dynamic_students_v1";
 export const STORAGE_KEY_PROMOTION_LOGS = "absensi_promotion_logs_v1";
 export const STORAGE_KEY_ALUMNI_STUDENTS = "absensi_alumni_students_v1";
+export const STORAGE_KEY_STUDENT_MUTATIONS = "absensi_student_mutations_v1";
 
 export interface AlumniStudentRecord {
   id: string;
@@ -675,5 +682,268 @@ export function executeParallelPromotion(
     promotedToGrade9,
     promotedToGrade8,
     retainedCount,
+  };
+}
+
+// ============================================================================
+// MODUL BUKU INDUK DIGITAL & PENGARSIPAN MUTASI SISWA (AUDIT TRAIL DINAS)
+// ============================================================================
+
+/**
+ * Mengambil seluruh arsip riwayat mutasi / siswa keluar dari penyimpanan lokal
+ */
+export function getStoredStudentMutations(): StudentMutationRecord[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_STUDENT_MUTATIONS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.warn("Gagal membaca arsip mutasi siswa:", err);
+    return [];
+  }
+}
+
+/**
+ * Menyimpan seluruh arsip riwayat mutasi siswa ke penyimpanan lokal
+ */
+export function saveStoredStudentMutations(mutations: StudentMutationRecord[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEY_STUDENT_MUTATIONS, JSON.stringify(mutations));
+  } catch (err) {
+    console.warn("Gagal menyimpan arsip mutasi siswa:", err);
+  }
+}
+
+/**
+ * Mengeluarkan atau memutasikan siswa dari rombel kelas aktif (Soft Deactivation)
+ * Siswa tidak dihapus permanen, melainkan dipindahkan ke Buku Induk & Arsip Mutasi.
+ * Seluruh riwayat presensi dan nilai lampau siswa tetap utuh 100%.
+ */
+export function deactivateStudentWithMutation(params: {
+  studentId: string;
+  classId: string;
+  status?: StudentAcademicStatus;
+  mutationDate: string;
+  reasonCategory: StudentMutationReasonCategory;
+  reasonDetail: string;
+  destinationSchool?: string;
+  referenceLetterNo?: string;
+  adminUser: { id: string; fullName: string };
+}): { success: boolean; mutationRecord?: StudentMutationRecord; error?: string } {
+  const currentMap = getStoredDynamicStudentsMap();
+  const classStudents = currentMap[params.classId] || [];
+  const targetStudent = classStudents.find((s) => s.id === params.studentId);
+
+  if (!targetStudent) {
+    return {
+      success: false,
+      error: `Siswa dengan ID "${params.studentId}" tidak ditemukan di rombel kelas terpilih.`,
+    };
+  }
+
+  const classObj = MOCK_CLASSES.find((c) => c.id === params.classId);
+  const className = classObj?.name || params.classId;
+
+  // 1. Keluarkan siswa dari rombel aktif
+  currentMap[params.classId] = classStudents.filter((s) => s.id !== params.studentId);
+  saveDynamicStudentsMap(currentMap);
+
+  // 2. Buat rekaman resmi mutasi (Audit Trail)
+  const mutationRecord: StudentMutationRecord = {
+    id: `mut-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    studentId: targetStudent.id,
+    studentNis: targetStudent.nis || "-",
+    studentNisn: null,
+    studentName: targetStudent.fullName,
+    gender: (targetStudent.gender as "L" | "P") || "L",
+    lastClassId: params.classId,
+    lastClassName: className,
+    academicYear: "2026/2027",
+    semester: 1,
+    status: params.status || "TRANSFERRED",
+    mutationDate: params.mutationDate,
+    reasonCategory: params.reasonCategory,
+    reasonDetail: params.reasonDetail,
+    destinationSchool: params.destinationSchool?.trim() || null,
+    referenceLetterNo: params.referenceLetterNo?.trim() || null,
+    processedByUserId: params.adminUser.id,
+    processedByUserName: params.adminUser.fullName,
+    createdAt: new Date().toISOString(),
+  };
+
+  const existingMutations = getStoredStudentMutations();
+  const updatedMutations = [mutationRecord, ...existingMutations];
+  saveStoredStudentMutations(updatedMutations);
+
+  return {
+    success: true,
+    mutationRecord,
+  };
+}
+
+/**
+ * Memulihkan siswa dari arsip mutasi kembali ke rombel kelas aktif (Reactivate / Pembatalan Mutasi)
+ */
+export function reactivateStudentFromMutation(mutationId: string): {
+  success: boolean;
+  error?: string;
+} {
+  const mutations = getStoredStudentMutations();
+  const index = mutations.findIndex((m) => m.id === mutationId);
+
+  if (index === -1) {
+    return { success: false, error: "Rekaman mutasi siswa tidak ditemukan." };
+  }
+
+  const record = mutations[index];
+  const currentMap = getStoredDynamicStudentsMap();
+  if (!currentMap[record.lastClassId]) {
+    currentMap[record.lastClassId] = [];
+  }
+
+  // Cek apakah siswa sudah ada di kelas tersebut
+  const alreadyInClass = currentMap[record.lastClassId].some((s) => s.id === record.studentId);
+  if (!alreadyInClass) {
+    const restoredStudent: Student = {
+      id: record.studentId,
+      classId: record.lastClassId,
+      nis: record.studentNis !== "-" ? record.studentNis : null,
+      fullName: record.studentName,
+      gender: record.gender,
+      isActive: true,
+      createdAt: record.createdAt,
+    };
+    currentMap[record.lastClassId].push(restoredStudent);
+    // Urutkan berdasarkan nama
+    currentMap[record.lastClassId].sort((a, b) => a.fullName.localeCompare(b.fullName, "id"));
+    saveDynamicStudentsMap(currentMap);
+  }
+
+  // Hapus dari daftar mutasi aktif
+  const updatedMutations = mutations.filter((m) => m.id !== mutationId);
+  saveStoredStudentMutations(updatedMutations);
+
+  return { success: true };
+}
+
+/**
+ * Mengambil rekam jejak historis lengkap siswa (Presensi & Nilai) untuk keperluan audit Dinas Pendidikan
+ */
+export function getStudentHistoricalAuditData(studentId: string): {
+  attendanceStats: {
+    totalSessions: number;
+    hadir: number;
+    sakit: number;
+    izin: number;
+    alpa: number;
+    dispen: number;
+    terlambat: number;
+    persentase: number;
+  };
+  scores: Array<{
+    assessmentId: string;
+    subject: string;
+    title: string;
+    type: string;
+    date: string;
+    score: number;
+    maxScore: number;
+  }>;
+} {
+  let hadir = 0;
+  let sakit = 0;
+  let izin = 0;
+  let alpa = 0;
+  let dispen = 0;
+  let terlambat = 0;
+  let totalSessions = 0;
+
+  if (typeof window !== "undefined") {
+    try {
+      const recordsRaw = localStorage.getItem("absensi_saved_records_v1");
+      if (recordsRaw) {
+        const records = JSON.parse(recordsRaw);
+        if (Array.isArray(records)) {
+          const studentRecords = records.filter((r: any) => r.studentId === studentId);
+          totalSessions = studentRecords.length;
+          for (const r of studentRecords) {
+            if (r.status === "HADIR") hadir++;
+            else if (r.status === "SAKIT") sakit++;
+            else if (r.status === "IZIN") izin++;
+            else if (r.status === "ALPA") alpa++;
+            else if (r.status === "DISPEN") dispen++;
+            else if (r.status === "TERLAMBAT") terlambat++;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Gagal membaca rekam presensi siswa:", e);
+    }
+  }
+
+  const effectivePresence = hadir + dispen + terlambat;
+  const persentase = totalSessions > 0 ? Number(((effectivePresence / totalSessions) * 100).toFixed(1)) : 100;
+
+  // Baca rekam nilai siswa
+  const scores: Array<{
+    assessmentId: string;
+    subject: string;
+    title: string;
+    type: string;
+    date: string;
+    score: number;
+    maxScore: number;
+  }> = [];
+
+  if (typeof window !== "undefined") {
+    try {
+      const asgnsRaw = localStorage.getItem("absensi_grade_assessments_v2");
+      const scoresRaw = localStorage.getItem("absensi_student_scores_v2");
+
+      if (asgnsRaw && scoresRaw) {
+        const assessments = JSON.parse(asgnsRaw);
+        const allScores = JSON.parse(scoresRaw);
+
+        if (Array.isArray(assessments) && Array.isArray(allScores)) {
+          const studentScores = allScores.filter((s: any) => s.studentId === studentId);
+          for (const sc of studentScores) {
+            const asgn = assessments.find((a: any) => a.id === sc.assessmentId);
+            if (asgn) {
+              scores.push({
+                assessmentId: asgn.id,
+                subject: asgn.subject || "Informatika",
+                title: asgn.title,
+                type: asgn.type,
+                date: asgn.date,
+                score: sc.score,
+                maxScore: asgn.maxScore || 100,
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Gagal membaca rekam nilai siswa:", e);
+    }
+  }
+
+  return {
+    attendanceStats: {
+      totalSessions,
+      hadir,
+      sakit,
+      izin,
+      alpa,
+      dispen,
+      terlambat,
+      persentase,
+    },
+    scores,
   };
 }

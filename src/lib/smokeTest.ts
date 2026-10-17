@@ -172,6 +172,11 @@ import {
   executeGraduationClass9,
   getSchoolTotalStudentsStats,
   STORAGE_KEY_DYNAMIC_STUDENTS,
+  getStoredDynamicStudentsMap,
+  getStoredStudentMutations,
+  deactivateStudentWithMutation,
+  reactivateStudentFromMutation,
+  getStudentHistoricalAuditData,
 } from "./rolloverStorage.ts";
 
 /**
@@ -1912,6 +1917,89 @@ function runSmokeTest() {
     assert.strictEqual(assignmentsAfterDelete.length, 0, "Seluruh penugasan mengajar guru yang dihapus harus bersih 100%");
 
     console.log("✓ LULUS: Kredensial username/password transparan dan proteksi penghapusan akun guru terverifikasi 100% aman.");
+  }
+
+  // 26. Pengujian Modul Buku Induk Digital & Arsip Mutasi Siswa (Audit Trail Dinas)
+  {
+    console.log("\n--- [TEST 26] Buku Induk Digital, Arsip Mutasi Siswa & Kepatuhan Audit Dinas ---");
+
+    // 1. Verifikasi Pembacaan Awal Arsip Mutasi
+    const initialMutations = getStoredStudentMutations();
+    assert.ok(Array.isArray(initialMutations), "Arsip mutasi harus mengembalikan array");
+
+    // 2. Pilih Siswa Sampel dari Rombel Kelas 7A
+    const dynamicMap = getStoredDynamicStudentsMap();
+    const students7a = dynamicMap["class-7a"] || [];
+    assert.ok(students7a.length > 0, "Kelas 7A harus memiliki siswa terdaftar");
+    const targetStudent = students7a[0];
+    const initialCount7a = students7a.length;
+
+    // 3. Eksekusi Pengeluaran / Mutasi Keluar Siswa (Soft Deactivation)
+    const mutationResult = deactivateStudentWithMutation({
+      studentId: targetStudent.id,
+      classId: "class-7a",
+      status: "TRANSFERRED",
+      mutationDate: "2026-10-15",
+      reasonCategory: "PINDAH_SEKOLAH",
+      reasonDetail: "Pindah mengikuti domisili orang tua ke luar kota",
+      destinationSchool: "SMP Negeri 1 Leuwiliang",
+      referenceLetterNo: "421.3/089/SMPN3/X/2026",
+      adminUser: {
+        id: "user-admin",
+        fullName: "Administrator Sekolah",
+      },
+    });
+
+    assert.strictEqual(mutationResult.success, true, "Eksekusi mutasi siswa harus berhasil");
+    assert.ok(mutationResult.mutationRecord, "Record mutasi harus dihasilkan");
+    assert.strictEqual(mutationResult.mutationRecord.studentId, targetStudent.id);
+    assert.strictEqual(mutationResult.mutationRecord.destinationSchool, "SMP Negeri 1 Leuwiliang");
+    assert.strictEqual(mutationResult.mutationRecord.referenceLetterNo, "421.3/089/SMPN3/X/2026");
+
+    // 4. Verifikasi Siswa Keluar dari Rombel Aktif (Tidak Muncul di KBM Berjalan)
+    const mapAfterMutation = getStoredDynamicStudentsMap();
+    const students7aAfter = mapAfterMutation["class-7a"] || [];
+    assert.strictEqual(students7aAfter.length, initialCount7a - 1, "Jumlah siswa kelas 7A harus berkurang 1");
+    assert.strictEqual(
+      students7aAfter.some((s) => s.id === targetStudent.id),
+      false,
+      "Siswa yang dimutasi dilarang muncul di rombel aktif"
+    );
+
+    // 5. Verifikasi Data Tersimpan di Arsip Mutasi (Audit Trail Dinas)
+    const mutationsAfter = getStoredStudentMutations();
+    const savedRecord = mutationsAfter.find((m) => m.studentId === targetStudent.id);
+    assert.ok(savedRecord, "Siswa wajib tercatat di arsip mutasi");
+    assert.strictEqual(savedRecord.studentName, targetStudent.fullName);
+    assert.strictEqual(savedRecord.reasonCategory, "PINDAH_SEKOLAH");
+
+    // 6. Verifikasi Rekam Jejak Historis (Buku Induk Digital)
+    const auditData = getStudentHistoricalAuditData(targetStudent.id);
+    assert.ok(auditData.attendanceStats, "Statistik kehadiran harus tersedia");
+    assert.ok(typeof auditData.attendanceStats.persentase === "number", "Persentase kehadiran harus bertipe number");
+    assert.ok(Array.isArray(auditData.scores), "Daftar nilai harus berupa array");
+
+    // 7. Verifikasi Pemulihan Siswa Kembali ke Kelas (Reactivate / Pembatalan Mutasi)
+    const reactivateRes = reactivateStudentFromMutation(mutationResult.mutationRecord.id);
+    assert.strictEqual(reactivateRes.success, true, "Pemulihan siswa ke kelas harus sukses");
+
+    const mapAfterReactivate = getStoredDynamicStudentsMap();
+    const students7aRestored = mapAfterReactivate["class-7a"] || [];
+    assert.strictEqual(students7aRestored.length, initialCount7a, "Jumlah siswa kelas 7A harus kembali semula");
+    assert.strictEqual(
+      students7aRestored.some((s) => s.id === targetStudent.id),
+      true,
+      "Siswa harus kembali aktif di rombel kelas 7A"
+    );
+
+    const mutationsAfterReactivate = getStoredStudentMutations();
+    assert.strictEqual(
+      mutationsAfterReactivate.some((m) => m.id === mutationResult.mutationRecord!.id),
+      false,
+      "Record mutasi harus bersih setelah dipulihkan"
+    );
+
+    console.log("✓ LULUS: Pengarsipan mutasi siswa, audit trail dinas, dan pemulihan siswa terverifikasi 100% aman.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");

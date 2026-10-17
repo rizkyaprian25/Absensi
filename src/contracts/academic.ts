@@ -460,4 +460,45 @@ export const StudentPpdbImportResultSchema = z.object({
 
 export type StudentPpdbImportResult = z.infer<typeof StudentPpdbImportResultSchema>;
 
+// ============================================================================
+// SKEMA MUTASI SISWA & PENGARSIPAN BUKU INDUK DIGITAL
+// ============================================================================
+
+export const StudentMutationReasonCategorySchema = z.enum([
+  "PINDAH_SEKOLAH",      // Mutasi keluar ke sekolah lain
+  "IKUT_ORANG_TUA",      // Mengikuti domisili / kepindahan orang tua
+  "MENGUNDURKAN_DIRI",   // Mengundurkan diri atas kemauan sendiri
+  "PELANGGARAN_DISIPLIN",// Dikeluarkan akibat pelanggaran berat tata tertib
+  "WAFAT",               // Meninggal dunia
+  "LAINNYA",             // Alasan administratif kedinasan lainnya
+]);
+export type StudentMutationReasonCategory = z.infer<typeof StudentMutationReasonCategorySchema>;
+
+export const StudentMutationRecordSchema = z.object({
+  id: z.string(),
+  studentId: z.string(),
+  studentNis: z.string(),
+  studentNisn: z.string().optional().nullable(),
+  studentName: z.string(),
+  gender: z.enum(["L", "P"]),
+  lastClassId: z.string(),
+  lastClassName: z.string(),
+  academicYear: z.string().default("2026/2027"),
+  semester: z.number().int().default(1),
+
+  // Detail Mutasi Keluar
+  status: StudentAcademicStatusSchema.default("TRANSFERRED"),
+  mutationDate: z.string(), // YYYY-MM-DD (Tanggal resmi keluar)
+  reasonCategory: StudentMutationReasonCategorySchema.default("PINDAH_SEKOLAH"),
+  reasonDetail: z.string(), // Rincian catatan alasan
+  destinationSchool: z.string().optional().nullable(), // Contoh: "SMP Negeri 1 Leuwiliang"
+  referenceLetterNo: z.string().optional().nullable(), // Contoh: "421.3/089/SMPN3/X/2026"
+
+  // Jejak Audit (Audit Trail)
+  processedByUserId: z.string(),
+  processedByUserName: z.string(),
+  createdAt: z.string(),
+});
+export type StudentMutationRecord = z.infer<typeof StudentMutationRecordSchema>;
+
 

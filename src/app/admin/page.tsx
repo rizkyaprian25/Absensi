@@ -24,6 +24,7 @@ import {
   RefreshCw,
   Search,
   Filter,
+  BookOpen,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Toast } from "@/components/ui/Toast";
@@ -570,7 +571,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Grid Pintasan Modul Utama Admin */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Modul 1: Pusat Tutup Tahun, Kenaikan Kelas & PPDB */}
         <Link
           href="/admin/rollover"
@@ -580,17 +581,36 @@ export default function AdminDashboardPage() {
             <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center mb-4">
               <GraduationCap className="w-6 h-6 text-white" />
             </div>
-            <h3 className="text-lg font-bold">Kenaikan Kelas & PPDB Baru</h3>
-            <p className="text-xs text-blue-100 mt-1 leading-relaxed">
-              Impor siswa baru via template Excel (.xlsx), alokasi rombel berimbang, promosi kelas paralel (7-&gt;8, 8-&gt;9), dan kelulusan alumni.
+            <h3 className="text-base font-bold">Kenaikan Kelas & PPDB</h3>
+            <p className="text-xs text-blue-100 mt-1 leading-relaxed line-clamp-3">
+              Impor siswa baru via Excel (.xlsx), alokasi rombel berimbang, promosi kelas paralel (7-&gt;8, 8-&gt;9), dan kelulusan.
             </p>
           </div>
-          <div className="mt-6 flex items-center gap-2 text-xs font-bold text-white group-hover:translate-x-1 transition-transform">
-            Buka Modul Tutup Tahun <ArrowRight className="w-4 h-4" />
+          <div className="mt-5 flex items-center gap-2 text-xs font-bold text-white group-hover:translate-x-1 transition-transform">
+            Buka Tutup Tahun <ArrowRight className="w-4 h-4" />
           </div>
         </Link>
 
-        {/* Modul 2: Manajemen Pengguna & Akun Guru */}
+        {/* Modul 2: Buku Induk & Arsip Mutasi Siswa (Audit Dinas) */}
+        <Link
+          href="/admin/students"
+          className="group p-5 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-hairline)] shadow-xs hover:border-rose-500/50 transition-all flex flex-col justify-between"
+        >
+          <div>
+            <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center mb-4">
+              <BookOpen className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-[var(--text-primary)]">Buku Induk & Mutasi</h3>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed line-clamp-3">
+              Pengarsipan mutasi keluar/pindah sekolah, buku induk digital, rekam jejak nilai & presensi untuk audit Dinas Pendidikan.
+            </p>
+          </div>
+          <div className="mt-5 flex items-center gap-2 text-xs font-bold text-rose-600 group-hover:translate-x-1 transition-transform">
+            Buku Induk Siswa <ArrowRight className="w-4 h-4" />
+          </div>
+        </Link>
+
+        {/* Modul 3: Manajemen Pengguna & Akun Guru */}
         <Link
           href="/admin/users"
           className="group p-5 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-hairline)] shadow-xs hover:border-[var(--color-accent)] transition-all flex flex-col justify-between"
@@ -599,17 +619,17 @@ export default function AdminDashboardPage() {
             <div className="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center mb-4">
               <Users className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-[var(--text-primary)]">Manajemen Guru & Akun</h3>
-            <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
-              Kelola akun seluruh guru, reset kata sandi, aktif/nonaktifkan guru mutasi, serta pantau matriks penugasan kelas sekolah.
+            <h3 className="text-base font-bold text-[var(--text-primary)]">Manajemen Guru</h3>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed line-clamp-3">
+              Kelola akun seluruh guru, transparansi username & sandi, aktif/nonaktifkan guru, dan matriks penugasan mengajar.
             </p>
           </div>
-          <div className="mt-6 flex items-center gap-2 text-xs font-bold text-[var(--color-accent)] group-hover:translate-x-1 transition-transform">
+          <div className="mt-5 flex items-center gap-2 text-xs font-bold text-[var(--color-accent)] group-hover:translate-x-1 transition-transform">
             Kelola Guru <ArrowRight className="w-4 h-4" />
           </div>
         </Link>
 
-        {/* Modul 3: Konfigurasi Sekolah & Vault Cadangan */}
+        {/* Modul 4: Konfigurasi Sekolah & Vault Cadangan */}
         <Link
           href="/settings"
           className="group p-5 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-hairline)] shadow-xs hover:border-[var(--color-accent)] transition-all flex flex-col justify-between"
@@ -618,12 +638,12 @@ export default function AdminDashboardPage() {
             <div className="w-12 h-12 rounded-xl bg-stone-500/10 text-stone-600 dark:text-stone-400 flex items-center justify-center mb-4">
               <Settings className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-[var(--text-primary)]">Pengaturan & Cadangan</h3>
-            <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
-              Pengaturan profil resmi sekolah, kop surat raport, identitas Kepala Sekolah, dan disaster recovery (IndexedDB + Supabase).
+            <h3 className="text-base font-bold text-[var(--text-primary)]">Pengaturan & Cadangan</h3>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed line-clamp-3">
+              Profil resmi sekolah, kop surat raport, identitas Kepala Sekolah, dan disaster recovery multi-tier.
             </p>
           </div>
-          <div className="mt-6 flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)] group-hover:translate-x-1 transition-transform">
+          <div className="mt-5 flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)] group-hover:translate-x-1 transition-transform">
             Buka Pengaturan <ArrowRight className="w-4 h-4" />
           </div>
         </Link>
