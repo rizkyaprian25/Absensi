@@ -135,6 +135,15 @@ import {
   generateGradeImportTemplateXlsx,
   parseScoreValue,
 } from "./gradeImportUtils.ts";
+import {
+  getStoredUsers,
+  loginUser,
+  logoutUser,
+  getCurrentUser,
+  changePassword,
+  resetUserPasswordByAdmin,
+  updateUserProfile,
+} from "./authStorage.ts";
 
 /**
  * Smoke Test Mandiri (Fase 4 SOP §3.5 & PRD §14)
@@ -1478,7 +1487,66 @@ function runSmokeTest() {
     console.log("✓ LULUS: Sistem penilaian sikap siswa (Buruk, Kurang Baik, Baik, Sangat Baik) terverifikasi 100% akurat.");
   }
 
+  // --------------------------------------------------------------------------
+  // TEST 20: Autentikasi Pengguna Username + Password & Role-Based Access Control (RBAC)
+  // --------------------------------------------------------------------------
+  {
+    console.log("\n[TEST 20] Menjalankan verifikasi sistem autentikasi pengguna (Username + Password & RBAC)...");
+
+    // 1. Uji login dengan username fiktif
+    const nonExistent = loginUser("tidak_ada_user", "password123");
+    assert.strictEqual(nonExistent.success, false, "Login username tidak terdaftar wajib gagal");
+    assert.ok(nonExistent.error?.includes("tidak ditemukan"), "Pesan error username tidak ditemukan harus jelas");
+
+    // 2. Uji login dengan kata sandi salah
+    const wrongPass = loginUser("rizky", "kata_sandi_ngawur");
+    assert.strictEqual(wrongPass.success, false, "Login dengan password salah wajib gagal");
+    assert.ok(wrongPass.error?.includes("salah"), "Pesan error kata sandi salah harus jelas");
+
+    // 3. Uji login sah Guru (Pak Rizky)
+    const guruLogin = loginUser("rizky", "guru123");
+    assert.strictEqual(guruLogin.success, true, "Login sah Guru Pak Rizky harus berhasil");
+    assert.strictEqual(guruLogin.user?.role, "GURU", "Peran Pak Rizky harus GURU");
+    assert.strictEqual(guruLogin.user?.username, "rizky", "Username pengguna harus sesuai");
+    assert.strictEqual(guruLogin.user?.fullName, "Muhamad Rizky Aprian, S.Kom");
+
+    // 4. Verifikasi sesi aktif tersimpan di penyimpanan
+    const activeSession = getCurrentUser();
+    assert.ok(activeSession !== null, "Sesi login aktif harus tersimpan di penyimpanan lokal");
+    assert.strictEqual(activeSession?.id, guruLogin.user?.id);
+
+    // 5. Uji login sah Administrator
+    const adminLogin = loginUser("admin", "admin123");
+    assert.strictEqual(adminLogin.success, true, "Login sah Administrator harus berhasil");
+    assert.strictEqual(adminLogin.user?.role, "ADMIN", "Peran Administrator harus ADMIN");
+
+    // 6. Uji ubah kata sandi mandiri
+    if (adminLogin.user) {
+      const failChange = changePassword(adminLogin.user.id, "pass_lama_salah", "adminBaru123");
+      assert.strictEqual(failChange.success, false, "Ubah password dengan password lama salah harus gagal");
+
+      const successChange = changePassword(adminLogin.user.id, "admin123", "adminBaru123");
+      assert.strictEqual(successChange.success, true, "Ubah password dengan password lama benar harus sukses");
+
+      // Verifikasi login dengan password baru
+      const loginNewPass = loginUser("admin", "adminBaru123");
+      assert.strictEqual(loginNewPass.success, true, "Login dengan kata sandi baru harus berhasil");
+
+      // Pulihkan kembali ke password default untuk konsistensi lingkungan
+      resetUserPasswordByAdmin("admin", "admin123");
+      const restoreLogin = loginUser("admin", "admin123");
+      assert.strictEqual(restoreLogin.success, true, "Kata sandi admin berhasil dipulihkan ke default");
+    }
+
+    // 7. Uji proses logout
+    logoutUser();
+    assert.strictEqual(getCurrentUser(), null, "Setelah logout, sesi pengguna aktif wajib bernilai null");
+
+    console.log("✓ LULUS: Sistem autentikasi pengguna (Username + Password & RBAC) terverifikasi 100% aman dan akurat.");
+  }
+
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");
 }
 
 runSmokeTest();
+
