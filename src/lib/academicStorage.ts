@@ -12,22 +12,118 @@ export const STORAGE_KEY_TEACHER_ASSIGNMENTS = "absensi_teacher_assignments_v1";
 
 /**
  * Penugasan awal bawaan untuk Bapak Muhamad Rizky Aprian, S.Kom
- * Mengajar Informatika di seluruh kelas 7 (7A-7H) dan kelas 8 (8A-8B)
+/**
+ * Matriks Distribusi Resmi Pembagian Tugas Jam Mengajar Guru
+ * SMP Negeri 3 Cibungbulang TP 2026/2027 (Surat Keputusan Kepala Sekolah)
+ * Total Beban KBM: 924 Jam (Kelas VII: 336 Jam, Kelas VIII: 294 Jam, Kelas IX: 294 Jam)
  */
-export const DEFAULT_TEACHER_ASSIGNMENTS: TeacherAssignment[] = [
-  // Kelas 7
-  { id: "asgn-rizky-inf-7a", teacherId: "user-rizky", subjectId: "sub-inf", classId: "class-7a", academicYear: "2026/2027", semester: 1, scheduleDay: "Senin", scheduleTime: "08:00 – 09:45", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "asgn-rizky-inf-7b", teacherId: "user-rizky", subjectId: "sub-inf", classId: "class-7b", academicYear: "2026/2027", semester: 1, scheduleDay: "Selasa", scheduleTime: "09:15 – 11:25", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "asgn-rizky-inf-7c", teacherId: "user-rizky", subjectId: "sub-inf", classId: "class-7c", academicYear: "2026/2027", semester: 1, scheduleDay: "Kamis", scheduleTime: "09:15 – 11:25", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "asgn-rizky-inf-7d", teacherId: "user-rizky", subjectId: "sub-inf", classId: "class-7d", academicYear: "2026/2027", semester: 1, scheduleDay: "Senin", scheduleTime: "10:10 – 11:55", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "asgn-rizky-inf-7e", teacherId: "user-rizky", subjectId: "sub-inf", classId: "class-7e", academicYear: "2026/2027", semester: 1, scheduleDay: "Rabu", scheduleTime: "09:15 – 11:25", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "asgn-rizky-inf-7f", teacherId: "user-rizky", subjectId: "sub-inf", classId: "class-7f", academicYear: "2026/2027", semester: 1, scheduleDay: "Rabu", scheduleTime: "07:30 – 09:15", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "asgn-rizky-inf-7g", teacherId: "user-rizky", subjectId: "sub-inf", classId: "class-7g", academicYear: "2026/2027", semester: 1, scheduleDay: "Jumat", scheduleTime: "08:50 – 10:35", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "asgn-rizky-inf-7h", teacherId: "user-rizky", subjectId: "sub-inf", classId: "class-7h", academicYear: "2026/2027", semester: 1, scheduleDay: "Jumat", scheduleTime: "07:00 – 08:45", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  // Kelas 8
-  { id: "asgn-rizky-inf-8a", teacherId: "user-rizky", subjectId: "sub-inf", classId: "class-8a", academicYear: "2026/2027", semester: 1, scheduleDay: "Kamis", scheduleTime: "07:30 – 09:15", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
-  { id: "asgn-rizky-inf-8b", teacherId: "user-rizky", subjectId: "sub-inf", classId: "class-8b", academicYear: "2026/2027", semester: 1, scheduleDay: "Selasa", scheduleTime: "07:30 – 09:15", isActive: true, createdAt: "2026-07-15T00:00:00Z" },
+const OFFICIAL_TEACHING_DISTRIBUTION: { teacherId: string; subjectId: string; classes: string[] }[] = [
+  // 1. Aini Supiyah, S.Pd, MM (IPS - 32 Jam)
+  { teacherId: "user-aini-supiyah", subjectId: "sub-ips", classes: ["8g", "9a", "9b", "9c", "9d", "9e", "9f", "9g"] },
+
+  // 2. Lilis Yuliati, M.Pd (IPA - 30 Jam)
+  { teacherId: "user-lilis-yuliati", subjectId: "sub-ipa", classes: ["8a", "8b", "8c", "8d", "8e", "8f"] },
+
+  // 3. Hj. Heny Susana, S.Pd (Pendidikan Pancasila - 33 Jam)
+  { teacherId: "user-heny-susana", subjectId: "sub-ppkn", classes: ["7a", "7b", "7c", "7d", "7e", "7f", "7g", "7h", "9a", "9b", "9c"] },
+
+  // 4. Dewi Nurhandayani, S.Pd (Bahasa Inggris - 28 Jam)
+  { teacherId: "user-dewi-nurhandayani", subjectId: "sub-bing", classes: ["8a", "8b", "8c", "8d", "8e", "8f", "8g"] },
+
+  // 5. Mohamad Reza Septiyani, S.Pd (PJOK - 33 Jam)
+  { teacherId: "user-mohamad-reza", subjectId: "sub-pjok", classes: ["7a", "7b", "7c", "7d", "9a", "9b", "9c", "9d", "9e", "9f", "9g"] },
+
+  // 6. Wilda Fajaratu Rahmi A, S.Pd (Bahasa Indonesia - 30 Jam)
+  { teacherId: "user-wilda-fajaratu", subjectId: "sub-bind", classes: ["7a", "7b", "7c", "7d", "7e"] },
+
+  // 7. Nika Musrifah, S.Pd (Bimbingan Konseling - 22 Jam)
+  { teacherId: "user-nika-musrifah", subjectId: "sub-bk", classes: ["7a", "7b", "7c", "7d", "7e", "7f", "7g", "7h", "8a", "8b", "8c", "8d", "8e", "8f", "8g", "9a", "9b", "9c", "9d", "9e", "9f", "9g"] },
+
+  // 8. Wiwin Djueriah, S.Pd, M.Han (Matematika - 35 Jam)
+  { teacherId: "user-wiwin-djueriah", subjectId: "sub-mtk", classes: ["9a", "9b", "9c", "9d", "9e", "9f", "9g"] },
+
+  // 9. Reza Kusnendar, S.Pd (Matematika - 35 Jam)
+  { teacherId: "user-reza-kusnendar", subjectId: "sub-mtk", classes: ["7a", "7b", "7c", "7d", "7e", "7f", "7g"] },
+
+  // 10. Acip Sulaeman, S.Pd I (IPS & PAIBP - 33 Jam)
+  { teacherId: "user-acip-sulaeman", subjectId: "sub-ips", classes: ["7a", "7b", "7c"] },
+  { teacherId: "user-acip-sulaeman", subjectId: "sub-pai", classes: ["9a", "9b", "9c", "9d", "9e", "9f", "9g"] },
+
+  // 11. Awaliyatussa'dah M, S.Pd.I (PAIBP & Bahasa Sunda - 30 Jam)
+  { teacherId: "user-awaliyatussadah", subjectId: "sub-pai", classes: ["7a", "7b", "7c", "7d", "7e", "7f", "7g", "7h"] },
+  { teacherId: "user-awaliyatussadah", subjectId: "sub-snd", classes: ["9a", "9b", "9c"] },
+
+  // 12. Saherudin, S.Pd (IPS - 32 Jam)
+  { teacherId: "user-saherudin", subjectId: "sub-ips", classes: ["7g", "7h", "8a", "8b", "8c", "8d", "8e", "8f"] },
+
+  // 13. Anwar Sanusi, M.Pd (Bahasa Indonesia - 30 Jam)
+  { teacherId: "user-anwar-sanusi", subjectId: "sub-bind", classes: ["9a", "9b", "9c", "9d", "9e"] },
+
+  // 14. Siti Mariam Ulfah, S.Pd (Bahasa Indonesia - 36 Jam)
+  { teacherId: "user-siti-mariam", subjectId: "sub-bind", classes: ["7f", "7g", "7h", "8e", "8f", "8g"] },
+
+  // 15. Iip Latifah, S.Pd.I (Prakarya & PAIBP - 33 Jam)
+  { teacherId: "user-iip-latifah", subjectId: "sub-prak", classes: ["7e", "7f", "7g", "7h"] },
+  { teacherId: "user-iip-latifah", subjectId: "sub-pai", classes: ["8a", "8b", "8c", "8d", "8e", "8f", "8g"] },
+
+  // 16. Adam Yahya, S.Pd (PJOK - 33 Jam)
+  { teacherId: "user-adam-yahya", subjectId: "sub-pjok", classes: ["7e", "7f", "7g", "7h", "8a", "8b", "8c", "8d", "8e", "8f", "8g"] },
+
+  // 17. Siti Maesaroh, S.Pd (Bahasa Indonesia - 36 Jam)
+  { teacherId: "user-siti-maesaroh", subjectId: "sub-bind", classes: ["8a", "8b", "8c", "8d", "9f", "9g"] },
+
+  // 18. Taufik Zulkarnaen, S.Pd (Matematika & Bahasa Inggris - 33 Jam)
+  { teacherId: "user-taufik-zulkarnaen", subjectId: "sub-mtk", classes: ["7h"] },
+  { teacherId: "user-taufik-zulkarnaen", subjectId: "sub-bing", classes: ["9a", "9b", "9c", "9d", "9e", "9f", "9g"] },
+
+  // 19. Imas Masitoh, S.Pd (Bahasa Inggris - 28 Jam)
+  { teacherId: "user-imas-masitoh", subjectId: "sub-bing", classes: ["7a", "7b", "7c", "7d", "7e", "7f", "7g"] },
+
+  // 20. Nia Kurniawati, S.Pd (IPA - 35 Jam)
+  { teacherId: "user-nia-kurniawati", subjectId: "sub-ipa", classes: ["7a", "7b", "7c", "7d", "7e", "7f", "7g"] },
+
+  // 21. Dian Permatasari, S.Pd (IPA - 35 Jam)
+  { teacherId: "user-dian-permatasari", subjectId: "sub-ipa", classes: ["9a", "9b", "9c", "9d", "9e", "9f", "9g"] },
+
+  // 22. Aisyah Nurul Amini, S.Pd (Matematika - 35 Jam)
+  { teacherId: "user-aisyah-nurul", subjectId: "sub-mtk", classes: ["8a", "8b", "8c", "8d", "8e", "8f", "8g"] },
+
+  // 23. Ainun Fitri, S.Pd (Prakarya - 33 Jam)
+  { teacherId: "user-ainun-fitri", subjectId: "sub-prak", classes: ["7a", "7b", "7c", "7d", "9a", "9b", "9c", "9d", "9e", "9f", "9g"] },
+
+  // 24. Sofiyah, S.Sos (Pendidikan Pancasila - 33 Jam)
+  { teacherId: "user-sofiyah", subjectId: "sub-ppkn", classes: ["8a", "8b", "8c", "8d", "8e", "8f", "8g", "9d", "9e", "9f", "9g"] },
+
+  // 25. Fingkan Ellita, S.Pd (IPS, Bahasa Inggris, Prakarya - 37 Jam)
+  { teacherId: "user-fingkan-ellita", subjectId: "sub-ips", classes: ["7d", "7e", "7f"] },
+  { teacherId: "user-fingkan-ellita", subjectId: "sub-bing", classes: ["7h"] },
+  { teacherId: "user-fingkan-ellita", subjectId: "sub-prak", classes: ["8a", "8b", "8c", "8d", "8e", "8f", "8g"] },
+
+  // 26. Lucky Aditya Putra, S.Kom (Informatika - 36 Jam)
+  { teacherId: "user-lucky-aditya", subjectId: "sub-inf", classes: ["8c", "8d", "8e", "8f", "8g", "9a", "9b", "9c", "9d", "9e", "9f", "9g"] },
+
+  // 27. Mohammad Fauzi Rahman, M.I.Kom (Bahasa Sunda - 38 Jam)
+  { teacherId: "user-fauzi-rahman", subjectId: "sub-snd", classes: ["7a", "7b", "7c", "7d", "7e", "7f", "7g", "7h", "8a", "8b", "8c", "8d", "8e", "8f", "8g", "9d", "9e", "9f", "9g"] },
+
+  // 28. Muhamad Rizky Aprian, S.Kom (Informatika - 30 Jam)
+  { teacherId: "user-rizky", subjectId: "sub-inf", classes: ["7a", "7b", "7c", "7d", "7e", "7f", "7g", "7h", "8a", "8b"] },
+
+  // 29. Wikrama Wardana, S.Pd (IPA - 10 Jam)
+  { teacherId: "user-wikrama-wardana", subjectId: "sub-ipa", classes: ["7h", "8g"] },
 ];
+
+export const DEFAULT_TEACHER_ASSIGNMENTS: TeacherAssignment[] = OFFICIAL_TEACHING_DISTRIBUTION.flatMap((d) =>
+  d.classes.map((c) => ({
+    id: `asgn-${d.teacherId.replace("user-", "")}-${d.subjectId.replace("sub-", "")}-${c}`,
+    teacherId: d.teacherId,
+    subjectId: d.subjectId,
+    classId: `class-${c}`,
+    academicYear: "2026/2027",
+    semester: 1,
+    isActive: true,
+    createdAt: "2026-07-15T00:00:00Z",
+  }))
+);
 
 /**
  * Mengambil daftar mata pelajaran dari penyimpanan lokal
@@ -44,7 +140,19 @@ export function getStoredSubjects(): Subject[] {
       return DEFAULT_SUBJECTS;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_SUBJECTS;
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      // Periksa apakah mata pelajaran BK sudah termuat
+      const hasBk = parsed.some((s) => s.id === "sub-bk");
+      if (!hasBk || parsed.length < DEFAULT_SUBJECTS.length) {
+        const existingIds = new Set(parsed.map((s) => s.id));
+        const missing = DEFAULT_SUBJECTS.filter((s) => !existingIds.has(s.id));
+        const merged = [...parsed, ...missing];
+        localStorage.setItem(STORAGE_KEY_SUBJECTS, JSON.stringify(merged));
+        return merged;
+      }
+      return parsed;
+    }
+    return DEFAULT_SUBJECTS;
   } catch (err) {
     console.warn("Gagal membaca daftar mata pelajaran:", err);
     return DEFAULT_SUBJECTS;
@@ -65,6 +173,7 @@ export function saveStoredSubjects(subjects: Subject[]): void {
 
 /**
  * Mengambil seluruh data penugasan mengajar guru dari penyimpanan lokal
+ * Otomatis menyinkronkan 264 penugasan resmi seluruh guru jika belum tersimpan
  */
 export function getStoredTeacherAssignments(): TeacherAssignment[] {
   if (typeof window === "undefined") {
@@ -78,7 +187,19 @@ export function getStoredTeacherAssignments(): TeacherAssignment[] {
       return DEFAULT_TEACHER_ASSIGNMENTS;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : DEFAULT_TEACHER_ASSIGNMENTS;
+    if (Array.isArray(parsed)) {
+      // Periksa apakah penugasan seluruh guru sekolah (29 Guru, 264 rombel-mapel) sudah termuat
+      const hasLucky = parsed.some((a) => a.teacherId === "user-lucky-aditya");
+      if (!hasLucky || parsed.length < DEFAULT_TEACHER_ASSIGNMENTS.length) {
+        const existingIds = new Set(parsed.map((a) => a.id));
+        const missingAssignments = DEFAULT_TEACHER_ASSIGNMENTS.filter((a) => !existingIds.has(a.id));
+        const merged = [...parsed, ...missingAssignments];
+        localStorage.setItem(STORAGE_KEY_TEACHER_ASSIGNMENTS, JSON.stringify(merged));
+        return merged;
+      }
+      return parsed;
+    }
+    return DEFAULT_TEACHER_ASSIGNMENTS;
   } catch (err) {
     console.warn("Gagal membaca penugasan guru:", err);
     return DEFAULT_TEACHER_ASSIGNMENTS;
@@ -162,8 +283,10 @@ export function getEnrolledClassesForUser(
 ): Class[] {
   if (!user) {
     // Fallback awal default untuk Pak Rizky (10 kelas: 7A-7H & 8A-8B)
-    const defaultIds = new Set(DEFAULT_TEACHER_ASSIGNMENTS.map((a) => a.classId));
-    return MOCK_CLASSES.filter((c) => defaultIds.has(c.id));
+    const rizkyIds = new Set(
+      DEFAULT_TEACHER_ASSIGNMENTS.filter((a) => a.teacherId === "user-rizky").map((a) => a.classId)
+    );
+    return MOCK_CLASSES.filter((c) => rizkyIds.has(c.id));
   }
 
   // Admin memiliki akses supervisi ke seluruh rombel sekolah (22 kelas)
@@ -173,8 +296,8 @@ export function getEnrolledClassesForUser(
 
   // Untuk Guru: Ambil penugasan mengajar aktif
   let assignments = getTeacherAssignments(user.id);
-  if (assignments.length === 0 && (user.username === "rizky" || user.id === "user-rizky")) {
-    assignments = DEFAULT_TEACHER_ASSIGNMENTS;
+  if (assignments.length === 0) {
+    assignments = DEFAULT_TEACHER_ASSIGNMENTS.filter((a) => a.teacherId === user.id);
   }
 
   // Filter berdasarkan mata pelajaran jika ditentukan
@@ -198,8 +321,8 @@ export function getEnrolledSubjectsForUser(user: AppUser | null): Subject[] {
   }
 
   let assignments = getTeacherAssignments(user.id);
-  if (assignments.length === 0 && (user.username === "rizky" || user.id === "user-rizky")) {
-    assignments = DEFAULT_TEACHER_ASSIGNMENTS;
+  if (assignments.length === 0) {
+    assignments = DEFAULT_TEACHER_ASSIGNMENTS.filter((a) => a.teacherId === user.id);
   }
 
   const enrolledSubjectIds = new Set(assignments.map((a) => a.subjectId));

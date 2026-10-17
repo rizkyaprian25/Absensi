@@ -15,6 +15,8 @@ import { formatIndonesianDate, getCategoryLabel } from "./calendarUtils";
 import {
   MOCK_TEACHER_NAME,
   MOCK_TEACHER_NIP,
+  MOCK_HEADMASTER_NAME,
+  MOCK_HEADMASTER_NIP,
   MOCK_SCHOOL_NAME,
   MOCK_SUBJECT,
 } from "../contracts/mocks/attendanceMocks";
@@ -23,6 +25,8 @@ import { LOGO_SMPN3_BASE64 } from "../assets/logoBase64";
 
 export interface SchoolExportMetadata {
   schoolName?: string;
+  headmasterName?: string;
+  headmasterNip?: string;
   teacherName?: string;
   teacherNip?: string;
   subject?: string;
@@ -32,6 +36,8 @@ export interface SchoolExportMetadata {
 
 const DEFAULT_EXPORT_META: Required<SchoolExportMetadata> = {
   schoolName: MOCK_SCHOOL_NAME,
+  headmasterName: MOCK_HEADMASTER_NAME,
+  headmasterNip: MOCK_HEADMASTER_NIP,
   teacherName: MOCK_TEACHER_NAME,
   teacherNip: MOCK_TEACHER_NIP,
   subject: MOCK_SUBJECT,
@@ -239,11 +245,11 @@ export function generateAttendanceCsvWithKop(
   const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
   rows.push(`"Mengetahui,","","","","${effectiveDates.map(() => '""').join(",")}"`);
   rows.push(`"Kepala Sekolah,","","","","${effectiveDates.map(() => '""').join(",")}","${mergedMeta.location}, ${formattedToday}"`);
-  rows.push(`"","","","","${effectiveDates.map(() => '""').join(",")}","Guru Mata Pelajaran,"`);
+  rows.push(`"","","","","${effectiveDates.map(() => '""').join(",")}","Guru Mata Pelajaran ${mergedMeta.subject || "Informatika"},"`);
   rows.push(`""`);
   rows.push(`""`);
-  rows.push(`"( ............................................ )","","","","${effectiveDates.map(() => '""').join(",")}","${mergedMeta.teacherName}"`);
-  rows.push(`"NIP. ........................................","","","","${effectiveDates.map(() => '""').join(",")}","NIP. ${mergedMeta.teacherNip}"`);
+  rows.push(`"${mergedMeta.headmasterName}","","","","${effectiveDates.map(() => '""').join(",")}","${mergedMeta.teacherName}"`);
+  rows.push(`"NIP. ${mergedMeta.headmasterNip}","","","","${effectiveDates.map(() => '""').join(",")}","NIP. ${mergedMeta.teacherNip}"`);
 
   // --- JURNAL AGENDA PEMBELAJARAN (KBM) ---
   if (sessions && sessions.length > 0) {
@@ -455,12 +461,12 @@ export function generateAttendanceExcelHtmlWithKop(
       <td colspan="4" class="no-border" style="width: 50%; text-align: left; padding-left: 20px;">
         Mengetahui,<br/>
         Kepala ${mergedMeta.schoolName}<br/><br/><br/><br/>
-        <strong>( ............................................................ )</strong><br/>
-        NIP. ........................................................
+        <strong><u>${mergedMeta.headmasterName}</u></strong><br/>
+        NIP. ${mergedMeta.headmasterNip}
       </td>
       <td colspan="${Math.max(1, totalCols - 4)}" class="no-border" style="width: 50%; text-align: right; padding-right: 30px;">
         ${mergedMeta.location}, ${formattedToday}<br/>
-        Guru Mata Pelajaran Informatika,<br/><br/><br/><br/>
+        Guru Mata Pelajaran ${mergedMeta.subject || "Informatika"},<br/><br/><br/><br/>
         <strong><u>${mergedMeta.teacherName}</u></strong><br/>
         NIP. ${mergedMeta.teacherNip}
       </td>
@@ -842,12 +848,12 @@ export function generateAttendanceHtmlPrint(
           Mengetahui,<br/>
           Kepala ${mergedMeta.schoolName}<br/>
           <div class="signature-spacer"></div>
-          <strong>( ............................................................ )</strong><br/>
-          NIP. ........................................................
+          <strong><u>${mergedMeta.headmasterName}</u></strong><br/>
+          NIP. ${mergedMeta.headmasterNip}
         </td>
         <td style="width: 50%; text-align: right; padding-right: 12px; vertical-align: top;">
           ${mergedMeta.location}, ${formattedToday}<br/>
-          Guru Mata Pelajaran Informatika,<br/>
+          Guru Mata Pelajaran ${mergedMeta.subject || "Informatika"},<br/>
           <div class="signature-spacer"></div>
           <strong><u>${mergedMeta.teacherName}</u></strong><br/>
           NIP. ${mergedMeta.teacherNip}
@@ -1230,7 +1236,7 @@ export function generateAttendanceXlsxWithKop(
   ];
   while (signRow1.length < signColRight) signRow1.push({ v: "", t: "s" });
   signRow1.push({
-    v: `${mergedMeta.location}, ${formattedToday}\nGuru Mata Pelajaran Informatika,`,
+    v: `${mergedMeta.location}, ${formattedToday}\nGuru Mata Pelajaran ${mergedMeta.subject || "Informatika"},`,
     t: "s",
     s: { alignment: { horizontal: "center", wrapText: true } },
   });
@@ -1245,7 +1251,7 @@ export function generateAttendanceXlsxWithKop(
 
   const signRow2: any[] = [
     { v: "", t: "s" },
-    { v: "( ............................................................ )\nNIP. ........................................................", t: "s", s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } } },
+    { v: `( ${mergedMeta.headmasterName} )\nNIP. ${mergedMeta.headmasterNip}`, t: "s", s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } } },
     { v: "", t: "s" },
     { v: "", t: "s" },
   ];
@@ -1529,7 +1535,7 @@ export function generateSemesterAttendanceXlsxWithKop(
     { v: "", t: "s" },
     { v: "", t: "s" },
     {
-      v: `${mergedMeta.location}, ${formattedToday}\nGuru Mata Pelajaran Informatika,`,
+      v: `${mergedMeta.location}, ${formattedToday}\nGuru Mata Pelajaran ${mergedMeta.subject || "Informatika"},`,
       t: "s",
       s: { alignment: { horizontal: "center", wrapText: true } },
     },
@@ -1545,7 +1551,7 @@ export function generateSemesterAttendanceXlsxWithKop(
 
   const signRow2: any[] = [
     { v: "", t: "s" },
-    { v: "( ............................................................ )\nNIP. ........................................................", t: "s", s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } } },
+    { v: `( ${mergedMeta.headmasterName} )\nNIP. ${mergedMeta.headmasterNip}`, t: "s", s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } } },
     { v: "", t: "s" },
     { v: "", t: "s" },
     { v: "", t: "s" },
@@ -1681,11 +1687,11 @@ export function generateSemesterAttendanceCsvWithKop(
   // --- TITIMANGSA & BLOK TANDA TANGAN ---
   const formattedToday = formatIndonesianDate(mergedMeta.dateStr);
   rows.push(`"Mengetahui,","","","","","","","${mergedMeta.location}, ${formattedToday}"`);
-  rows.push(`"Kepala Sekolah,","","","","","","","Guru Mata Pelajaran,"`);
+  rows.push(`"Kepala Sekolah,","","","","","","","Guru Mata Pelajaran ${mergedMeta.subject || "Informatika"},"`);
   rows.push(`""`);
   rows.push(`""`);
-  rows.push(`"( ............................................ )","","","","","","","${mergedMeta.teacherName}"`);
-  rows.push(`"NIP. ........................................","","","","","","","NIP. ${mergedMeta.teacherNip}"`);
+  rows.push(`"${mergedMeta.headmasterName}","","","","","","","${mergedMeta.teacherName}"`);
+  rows.push(`"NIP. ${mergedMeta.headmasterNip}","","","","","","","NIP. ${mergedMeta.teacherNip}"`);
 
   return "\uFEFF" + rows.join("\r\n");
 }
@@ -2017,12 +2023,12 @@ export function generateSemesterAttendanceHtmlPrint(
           Mengetahui,<br/>
           Kepala ${mergedMeta.schoolName}<br/>
           <div class="signature-spacer"></div>
-          <strong>( ............................................................ )</strong><br/>
-          NIP. ........................................................
+          <strong><u>${mergedMeta.headmasterName}</u></strong><br/>
+          NIP. ${mergedMeta.headmasterNip}
         </td>
         <td style="width: 50%; text-align: right; padding-right: 12px; vertical-align: top;">
           ${mergedMeta.location}, ${formattedToday}<br/>
-          Guru Mata Pelajaran Informatika,<br/>
+          Guru Mata Pelajaran ${mergedMeta.subject || "Informatika"},<br/>
           <div class="signature-spacer"></div>
           <strong><u>${mergedMeta.teacherName}</u></strong><br/>
           NIP. ${mergedMeta.teacherNip}
@@ -2153,12 +2159,12 @@ export function generateGradesExcelHtmlWithKop(
       <td colspan="4" class="no-border" style="width: 50%; text-align: left; padding-left: 20px;">
         Mengetahui,<br/>
         Kepala ${mergedMeta.schoolName}<br/><br/><br/><br/>
-        <strong>( ............................................................ )</strong><br/>
-        NIP. ........................................................
+        <strong><u>${mergedMeta.headmasterName}</u></strong><br/>
+        NIP. ${mergedMeta.headmasterNip}
       </td>
       <td colspan="${Math.max(1, totalCols - 4)}" class="no-border" style="width: 50%; text-align: right; padding-right: 30px;">
         ${mergedMeta.location}, ${formattedToday}<br/>
-        Guru Mata Pelajaran Informatika,<br/><br/><br/><br/>
+        Guru Mata Pelajaran ${mergedMeta.subject || "Informatika"},<br/><br/><br/><br/>
         <strong><u>${mergedMeta.teacherName}</u></strong><br/>
         NIP. ${mergedMeta.teacherNip}
       </td>
@@ -2325,7 +2331,7 @@ export function generateGradesXlsxWithKop(
   ];
   while (signRow1.length < signColRight) signRow1.push({ v: "", t: "s" });
   signRow1.push({
-    v: `${mergedMeta.location}, ${formattedToday}\nGuru Mata Pelajaran Informatika,`,
+    v: `${mergedMeta.location}, ${formattedToday}\nGuru Mata Pelajaran ${mergedMeta.subject || "Informatika"},`,
     t: "s",
     s: { alignment: { horizontal: "center", wrapText: true } },
   });
@@ -2340,7 +2346,7 @@ export function generateGradesXlsxWithKop(
 
   const signRow2: any[] = [
     { v: "", t: "s" },
-    { v: "( ............................................................ )\nNIP. ........................................................", t: "s", s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } } },
+    { v: `( ${mergedMeta.headmasterName} )\nNIP. ${mergedMeta.headmasterNip}`, t: "s", s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } } },
     { v: "", t: "s" },
   ];
   while (signRow2.length < signColRight) signRow2.push({ v: "", t: "s" });
@@ -2451,11 +2457,11 @@ export function generateGradesCsvWithKop(
   rows.push("");
   rows.push(`"Mengetahui,","","","","${assessments.map(() => '""').join(",")}"`);
   rows.push(`"Kepala Sekolah,","","","","${assessments.map(() => '""').join(",")}","${mergedMeta.location}, ${formattedToday}"`);
-  rows.push(`"","","","","${assessments.map(() => '""').join(",")}","Guru Mata Pelajaran,"`);
+  rows.push(`"","","","","${assessments.map(() => '""').join(",")}","Guru Mata Pelajaran ${mergedMeta.subject || "Informatika"},"`);
   rows.push(`""`);
   rows.push(`""`);
-  rows.push(`"( ............................................ )","","","","${assessments.map(() => '""').join(",")}","${mergedMeta.teacherName}"`);
-  rows.push(`"NIP. ........................................","","","","${assessments.map(() => '""').join(",")}","NIP. ${mergedMeta.teacherNip}"`);
+  rows.push(`"${mergedMeta.headmasterName}","","","","${assessments.map(() => '""').join(",")}","${mergedMeta.teacherName}"`);
+  rows.push(`"NIP. ${mergedMeta.headmasterNip}","","","","${assessments.map(() => '""').join(",")}","NIP. ${mergedMeta.teacherNip}"`);
 
   return "\uFEFF" + rows.join("\r\n");
 }
@@ -2631,7 +2637,7 @@ export function generateCensoredGradesXlsxWithKop(
   ];
   while (signRow1.length < signColRight) signRow1.push({ v: "", t: "s" });
   signRow1.push({
-    v: `${mergedMeta.location}, ${formattedToday}\nGuru Mata Pelajaran Informatika,`,
+    v: `${mergedMeta.location}, ${formattedToday}\nGuru Mata Pelajaran ${mergedMeta.subject || "Informatika"},`,
     t: "s",
     s: { alignment: { horizontal: "center", wrapText: true } },
   });
@@ -2646,7 +2652,7 @@ export function generateCensoredGradesXlsxWithKop(
 
   const signRow2: any[] = [
     { v: "", t: "s" },
-    { v: "( ............................................................ )\nNIP. ........................................................", t: "s", s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } } },
+    { v: `( ${mergedMeta.headmasterName} )\nNIP. ${mergedMeta.headmasterNip}`, t: "s", s: { font: { bold: true }, alignment: { horizontal: "center", wrapText: true } } },
     { v: "", t: "s" },
   ];
   while (signRow2.length < signColRight) signRow2.push({ v: "", t: "s" });
@@ -2743,11 +2749,11 @@ export function generateCensoredGradesCsvWithKop(
   rows.push("");
   rows.push(`"Mengetahui,","","","","${assessments.map(() => '""').join(",")}"`);
   rows.push(`"Kepala Sekolah,","","","","${assessments.map(() => '""').join(",")}","${mergedMeta.location}, ${formattedToday}"`);
-  rows.push(`"","","","","${assessments.map(() => '""').join(",")}","Guru Mata Pelajaran,"`);
+  rows.push(`"","","","","${assessments.map(() => '""').join(",")}","Guru Mata Pelajaran ${mergedMeta.subject || "Informatika"},"`);
   rows.push(`""`);
   rows.push(`""`);
-  rows.push(`"( ............................................ )","","","","${assessments.map(() => '""').join(",")}","${mergedMeta.teacherName}"`);
-  rows.push(`"NIP. ........................................","","","","${assessments.map(() => '""').join(",")}","NIP. ${mergedMeta.teacherNip}"`);
+  rows.push(`"${mergedMeta.headmasterName}","","","","${assessments.map(() => '""').join(",")}","${mergedMeta.teacherName}"`);
+  rows.push(`"NIP. ${mergedMeta.headmasterNip}","","","","${assessments.map(() => '""').join(",")}","NIP. ${mergedMeta.teacherNip}"`);
 
   return "\uFEFF" + rows.join("\r\n");
 }
@@ -3183,12 +3189,12 @@ export function generateCensoredGradesHtmlPrint(
           Mengetahui,<br/>
           Kepala ${mergedMeta.schoolName}<br/>
           <div class="signature-spacer"></div>
-          <strong>( ............................................................ )</strong><br/>
-          NIP. ........................................................
+          <strong><u>${mergedMeta.headmasterName}</u></strong><br/>
+          NIP. ${mergedMeta.headmasterNip}
         </td>
         <td style="width: 50%; text-align: right; padding-right: 12px; vertical-align: top;">
           ${mergedMeta.location}, ${formattedToday}<br/>
-          Guru Mata Pelajaran Informatika,<br/>
+          Guru Mata Pelajaran ${mergedMeta.subject || "Informatika"},<br/>
           <div class="signature-spacer"></div>
           <strong><u>${mergedMeta.teacherName}</u></strong><br/>
           NIP. ${mergedMeta.teacherNip}
@@ -3523,12 +3529,12 @@ export function generateGradesHtmlPrint(
           Mengetahui,<br/>
           Kepala ${mergedMeta.schoolName}<br/>
           <div class="signature-spacer"></div>
-          <strong>( ............................................................ )</strong><br/>
-          NIP. ........................................................
+          <strong><u>${mergedMeta.headmasterName}</u></strong><br/>
+          NIP. ${mergedMeta.headmasterNip}
         </td>
         <td style="width: 50%; text-align: right; padding-right: 12px; vertical-align: top;">
           ${mergedMeta.location}, ${formattedToday}<br/>
-          Guru Mata Pelajaran Informatika,<br/>
+          Guru Mata Pelajaran ${mergedMeta.subject || "Informatika"},<br/>
           <div class="signature-spacer"></div>
           <strong><u>${mergedMeta.teacherName}</u></strong><br/>
           NIP. ${mergedMeta.teacherNip}

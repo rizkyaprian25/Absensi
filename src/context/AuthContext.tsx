@@ -19,7 +19,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isGuru: boolean;
-  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string; user?: AppUser }>;
   logout: () => void;
   refreshUser: () => void;
 }
@@ -58,13 +58,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (
     username: string,
     password: string
-  ): Promise<{ success: boolean; error?: string }> => {
+  ): Promise<{ success: boolean; error?: string; user?: AppUser }> => {
     setIsLoading(true);
     try {
       const result = loginUser(username, password);
       if (result.success && result.user) {
         setCurrentUserState(result.user);
-        return { success: true };
+        return { success: true, user: result.user };
       }
       return { success: false, error: result.error || "Gagal melakukan autentikasi." };
     } catch (err) {

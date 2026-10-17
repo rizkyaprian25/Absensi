@@ -14,6 +14,8 @@ import { ALL_STUDENTS_BY_CLASS, STUDENTS_CLASS_8B } from "./studentsData.ts";
 export const MOCK_TEACHER_ID = "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d";
 export const MOCK_TEACHER_NAME = "Muhamad Rizky Aprian, S.Kom";
 export const MOCK_TEACHER_NIP = "19940825 202221 1 004";
+export const MOCK_HEADMASTER_NAME = "Dra. Juwariyah, M.Pd";
+export const MOCK_HEADMASTER_NIP = "196904041997022002";
 export const MOCK_SCHOOL_NAME = "SMP Negeri 3 Cibungbulang Kabupaten Bogor";
 export const MOCK_SUBJECT = "Informatika";
 
@@ -23,7 +25,7 @@ export const MOCK_SUBJECT = "Informatika";
 // ============================================================================
 
 export const MOCK_CLASSES: Class[] = [
-  // SENIN
+  // KELAS 7 (7A - 7H)
   {
     id: "class-7a",
     teacherId: MOCK_TEACHER_ID,
@@ -36,6 +38,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 1–3",
     scheduleTime: "08:00 – 09:45",
     subject: "Informatika",
+    homeroomTeacherName: "Reza Kusnendar, S.Pd",
   },
   {
     id: "class-7d",
@@ -49,21 +52,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 4–6",
     scheduleTime: "10:10 – 11:55",
     subject: "Informatika",
-  },
-
-  // SELASA
-  {
-    id: "class-8b",
-    teacherId: MOCK_TEACHER_ID,
-    name: "8B",
-    academicYear: "2026/2027",
-    semester: 1,
-    archivedAt: null,
-    createdAt: "2026-07-15T00:00:00Z",
-    scheduleDay: "Selasa",
-    schedulePeriod: "Jam Ke 1–3",
-    scheduleTime: "07:30 – 09:15",
-    subject: "Informatika",
+    homeroomTeacherName: "Imas Masitoh, S.Pd",
   },
   {
     id: "class-7b",
@@ -77,9 +66,8 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 4–6",
     scheduleTime: "09:15 – 11:25",
     subject: "Informatika",
+    homeroomTeacherName: "Ainun Fitri, S.Pd",
   },
-
-  // RABU
   {
     id: "class-7f",
     teacherId: MOCK_TEACHER_ID,
@@ -92,6 +80,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 1–3",
     scheduleTime: "07:30 – 09:15",
     subject: "Informatika",
+    homeroomTeacherName: "Nia Kurniawati, S.Pd",
   },
   {
     id: "class-7e",
@@ -105,21 +94,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 4–6",
     scheduleTime: "09:15 – 11:25",
     subject: "Informatika",
-  },
-
-  // KAMIS
-  {
-    id: "class-8a",
-    teacherId: MOCK_TEACHER_ID,
-    name: "8A",
-    academicYear: "2026/2027",
-    semester: 1,
-    archivedAt: null,
-    createdAt: "2026-07-15T00:00:00Z",
-    scheduleDay: "Kamis",
-    schedulePeriod: "Jam Ke 1–3",
-    scheduleTime: "07:30 – 09:15",
-    subject: "Informatika",
+    homeroomTeacherName: "Wilda Fajaratu Rahmi A, S.Pd",
   },
   {
     id: "class-7h",
@@ -133,9 +108,8 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 4–6",
     scheduleTime: "09:15 – 11:25",
     subject: "Informatika",
+    homeroomTeacherName: "Fingkan Ellita, S.Pd",
   },
-
-  // JUMAT
   {
     id: "class-7g",
     teacherId: MOCK_TEACHER_ID,
@@ -148,6 +122,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 1–2",
     scheduleTime: "08:00 – 09:30",
     subject: "Informatika",
+    homeroomTeacherName: "Awaliyatussa'dah M, S.Pd.I",
   },
   {
     id: "class-7c",
@@ -161,9 +136,38 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 3–4",
     scheduleTime: "09:50 – 11:20",
     subject: "Informatika",
+    homeroomTeacherName: "Acip Sulaeman, S.Pd I",
   },
 
-  // KELAS 8 LANJUTAN (8C - 8G)
+  // KELAS 8 (8A - 8G)
+  {
+    id: "class-8a",
+    teacherId: MOCK_TEACHER_ID,
+    name: "8A",
+    academicYear: "2026/2027",
+    semester: 1,
+    archivedAt: null,
+    createdAt: "2026-07-15T00:00:00Z",
+    scheduleDay: "Kamis",
+    schedulePeriod: "Jam Ke 1–3",
+    scheduleTime: "07:30 – 09:15",
+    subject: "Informatika",
+    homeroomTeacherName: "Nika Musrifah, S.Pd",
+  },
+  {
+    id: "class-8b",
+    teacherId: MOCK_TEACHER_ID,
+    name: "8B",
+    academicYear: "2026/2027",
+    semester: 1,
+    archivedAt: null,
+    createdAt: "2026-07-15T00:00:00Z",
+    scheduleDay: "Selasa",
+    schedulePeriod: "Jam Ke 1–3",
+    scheduleTime: "07:30 – 09:15",
+    subject: "Informatika",
+    homeroomTeacherName: "Iip Latifah, S.Pd.I",
+  },
   {
     id: "class-8c",
     teacherId: MOCK_TEACHER_ID,
@@ -176,6 +180,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 1–3",
     scheduleTime: "07:30 – 09:15",
     subject: "Informatika",
+    homeroomTeacherName: "Dewi Nurhandayani, S.Pd",
   },
   {
     id: "class-8d",
@@ -189,6 +194,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 4–6",
     scheduleTime: "09:15 – 11:25",
     subject: "Informatika",
+    homeroomTeacherName: "Aisyah Nurul Amini, S.Pd",
   },
   {
     id: "class-8e",
@@ -202,6 +208,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 1–3",
     scheduleTime: "07:30 – 09:15",
     subject: "Informatika",
+    homeroomTeacherName: "Siti Mariam Ulfah, S.Pd",
   },
   {
     id: "class-8f",
@@ -215,6 +222,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 4–6",
     scheduleTime: "09:15 – 11:25",
     subject: "Informatika",
+    homeroomTeacherName: "Adam Yahya, S.Pd",
   },
   {
     id: "class-8g",
@@ -228,6 +236,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 1–2",
     scheduleTime: "08:50 – 10:35",
     subject: "Informatika",
+    homeroomTeacherName: "Sofiyah, S.Sos",
   },
 
   // KELAS 9 (9A - 9G)
@@ -243,6 +252,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 1–3",
     scheduleTime: "07:30 – 09:15",
     subject: "Informatika",
+    homeroomTeacherName: "Anwar Sanusi, M.Pd",
   },
   {
     id: "class-9b",
@@ -256,6 +266,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 4–6",
     scheduleTime: "09:15 – 11:25",
     subject: "Informatika",
+    homeroomTeacherName: "Wiwin Djueriah, S.Pd, M.Han",
   },
   {
     id: "class-9c",
@@ -269,6 +280,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 1–3",
     scheduleTime: "07:30 – 09:15",
     subject: "Informatika",
+    homeroomTeacherName: "Hj. Heny Susana, S.Pd",
   },
   {
     id: "class-9d",
@@ -282,6 +294,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 4–6",
     scheduleTime: "09:15 – 11:25",
     subject: "Informatika",
+    homeroomTeacherName: "Taufik Zulkarnaen, S.Pd",
   },
   {
     id: "class-9e",
@@ -295,6 +308,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 1–3",
     scheduleTime: "07:30 – 09:15",
     subject: "Informatika",
+    homeroomTeacherName: "Mohamad Reza Septiyani, S.Pd",
   },
   {
     id: "class-9f",
@@ -308,6 +322,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 1–3",
     scheduleTime: "07:30 – 09:15",
     subject: "Informatika",
+    homeroomTeacherName: "Dian Permatasari, S.Pd",
   },
   {
     id: "class-9g",
@@ -321,6 +336,7 @@ export const MOCK_CLASSES: Class[] = [
     schedulePeriod: "Jam Ke 1–2",
     scheduleTime: "07:00 – 08:45",
     subject: "Informatika",
+    homeroomTeacherName: "Siti Maesaroh, S.Pd",
   },
 ];
 

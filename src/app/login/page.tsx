@@ -39,8 +39,8 @@ export default function LoginPage() {
       return;
     }
 
-    // Arahkan ke rute yang sesuai
-    if (username.trim().toLowerCase() === "admin") {
+    // Arahkan ke rute yang sesuai berdasarkan hak akses pengguna
+    if (res.user?.role === "ADMIN") {
       router.replace("/admin");
     } else {
       router.replace("/");
@@ -48,10 +48,14 @@ export default function LoginPage() {
   };
 
   // Pintasan login cepat untuk kemudahan pengujian
-  const handleQuickLogin = (demoUser: "rizky" | "admin") => {
+  const handleQuickLogin = (demoUser: "rizky" | "admin" | "juwariyah") => {
     if (demoUser === "rizky") {
       setUsername("rizky");
       setPassword("guru123");
+      setErrorMessage(null);
+    } else if (demoUser === "juwariyah") {
+      setUsername("juwariyah");
+      setPassword("admin123");
       setErrorMessage(null);
     } else {
       setUsername("admin");
@@ -194,6 +198,25 @@ export default function LoginPage() {
 
             <button
               type="button"
+              onClick={() => handleQuickLogin("juwariyah")}
+              className="w-full p-2.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-recessed)] hover:border-purple-500 text-left flex items-center justify-between group transition-all"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-xs">
+                  🎓
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-[var(--text-primary)] group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                    Kepala Sekolah (Dra. Juwariyah, M.Pd)
+                  </p>
+                  <p className="text-[10px] text-[var(--text-secondary)] font-mono">user: juwariyah · pass: admin123 (Akses Admin)</p>
+                </div>
+              </div>
+              <CheckCircle2 className="w-4 h-4 text-[var(--text-tertiary)] group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors" />
+            </button>
+
+            <button
+              type="button"
               onClick={() => handleQuickLogin("admin")}
               className="w-full p-2.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-recessed)] hover:border-blue-500 text-left flex items-center justify-between group transition-all"
             >
@@ -203,7 +226,7 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-[var(--text-primary)] group-hover:text-blue-500 transition-colors">
-                    Masuk sebagai Administrator
+                    Masuk sebagai Administrator TU
                   </p>
                   <p className="text-[10px] text-[var(--text-secondary)] font-mono">user: admin · pass: admin123</p>
                 </div>

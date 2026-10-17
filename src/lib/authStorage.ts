@@ -14,14 +14,42 @@ export const STORAGE_KEY_PASSWORDS = "absensi_auth_passwords_v1";
  * Menggunakan username unik, bukan NIP, demi keamanan data pribadi guru (UU PDP)
  */
 export const DEFAULT_PASSWORDS: Record<string, string> = {
-  admin: "admin123",
-  rizky: "guru123",
-  "siti.rahmawati": "guru123",
-  "budi.santoso": "guru123",
+  "admin": "admin123",
+  "juwariyah": "admin123",
+  "aini.supiyah": "guru123",
+  "lilis.yuliati": "guru123",
+  "heny.susana": "guru123",
+  "dewi.nurhandayani": "guru123",
+  "mohamad.reza": "guru123",
+  "wilda.fajaratu": "guru123",
+  "nika.musrifah": "guru123",
+  "wiwin.djueriah": "guru123",
+  "reza.kusnendar": "guru123",
+  "acip.sulaeman": "guru123",
+  "awaliyatussadah": "guru123",
+  "saherudin": "guru123",
+  "anwar.sanusi": "guru123",
+  "siti.mariam": "guru123",
+  "iip.latifah": "guru123",
+  "adam.yahya": "guru123",
+  "siti.maesaroh": "guru123",
+  "taufik.zulkarnaen": "guru123",
+  "imas.masitoh": "guru123",
+  "nia.kurniawati": "guru123",
+  "dian.permatasari": "guru123",
+  "aisyah.nurul": "guru123",
+  "ainun.fitri": "guru123",
+  "sofiyah": "guru123",
+  "fingkan.ellita": "guru123",
+  "lucky.aditya": "guru123",
+  "fauzi.rahman": "guru123",
+  "rizky": "guru123",
+  "wikrama.wardana": "guru123",
 };
 
 /**
  * Mengambil daftar seluruh pengguna dari penyimpanan lokal
+ * Otomatis menyinkronkan akun baru (Kepala Sekolah & 29 Guru) jika belum ada di browser
  */
 export function getStoredUsers(): AppUser[] {
   if (typeof window === "undefined") {
@@ -35,7 +63,19 @@ export function getStoredUsers(): AppUser[] {
       return DEFAULT_USERS;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : DEFAULT_USERS;
+    if (Array.isArray(parsed)) {
+      // Periksa apakah seluruh akun baku (Kepala Sekolah & 29 Guru) sudah tersimpan
+      const hasKepsek = parsed.some((u) => u.username === "juwariyah");
+      if (!hasKepsek || parsed.length < DEFAULT_USERS.length) {
+        const existingIds = new Set(parsed.map((u) => u.id));
+        const missingUsers = DEFAULT_USERS.filter((u) => !existingIds.has(u.id));
+        const merged = [...parsed, ...missingUsers];
+        localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(merged));
+        return merged;
+      }
+      return parsed;
+    }
+    return DEFAULT_USERS;
   } catch (err) {
     console.warn("Gagal membaca daftar pengguna lokal:", err);
     return DEFAULT_USERS;
@@ -44,6 +84,7 @@ export function getStoredUsers(): AppUser[] {
 
 /**
  * Mengambil kamus kata sandi dari penyimpanan lokal
+ * Otomatis menyinkronkan kata sandi akun baru jika belum ada
  */
 export function getStoredPasswords(): Record<string, string> {
   if (typeof window === "undefined") {
@@ -57,7 +98,15 @@ export function getStoredPasswords(): Record<string, string> {
       return DEFAULT_PASSWORDS;
     }
     const parsed = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null ? parsed : DEFAULT_PASSWORDS;
+    if (typeof parsed === "object" && parsed !== null) {
+      if (!parsed["juwariyah"] || Object.keys(parsed).length < Object.keys(DEFAULT_PASSWORDS).length) {
+        const mergedPasswords = { ...DEFAULT_PASSWORDS, ...parsed };
+        localStorage.setItem(STORAGE_KEY_PASSWORDS, JSON.stringify(mergedPasswords));
+        return mergedPasswords;
+      }
+      return parsed;
+    }
+    return DEFAULT_PASSWORDS;
   } catch (err) {
     console.warn("Gagal membaca kata sandi lokal:", err);
     return DEFAULT_PASSWORDS;

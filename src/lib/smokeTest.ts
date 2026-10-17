@@ -105,6 +105,8 @@ import {
 import {
   MOCK_CLASSES,
   ALL_STUDENTS_BY_CLASS,
+  MOCK_HEADMASTER_NAME,
+  MOCK_HEADMASTER_NIP,
 } from "../contracts/mocks/attendanceMocks.ts";
 import {
   generateAttendanceCsvWithKop,
@@ -150,6 +152,8 @@ import {
   setTeacherEnrollmentMatrix,
   DEFAULT_TEACHER_ASSIGNMENTS,
   saveTeacherAssignmentsForTeacher,
+  getEnrolledClassesForUser,
+  getEnrolledSubjectsForUser,
 } from "./academicStorage.ts";
 import {
   generatePpdbTemplateWorkbook,
@@ -1603,10 +1607,11 @@ function runSmokeTest() {
     assert.strictEqual(infClasses.length, 8, "Informatika harus mencakup 8 rombel kelas 7");
     assert.strictEqual(prakClasses.length, 2, "Prakarya harus mencakup 2 rombel kelas 8");
 
-    // 4. Pulihkan ke penugasan default
-    saveTeacherAssignmentsForTeacher("user-rizky", DEFAULT_TEACHER_ASSIGNMENTS);
+    // 4. Pulihkan ke penugasan default Pak Rizky
+    const defaultRizky = DEFAULT_TEACHER_ASSIGNMENTS.filter((a) => a.teacherId === "user-rizky");
+    saveTeacherAssignmentsForTeacher("user-rizky", defaultRizky);
     const restored = getTeacherAssignments("user-rizky");
-    assert.strictEqual(restored.length, DEFAULT_TEACHER_ASSIGNMENTS.length, "Penugasan awal berhasil dipulihkan");
+    assert.strictEqual(restored.length, defaultRizky.length, "Penugasan awal Pak Rizky berhasil dipulihkan (10 rombel)");
 
     console.log("✓ LULUS: Sistem Self-Enrollment & penugasan mengajar multi-mapel & multi-kelas terverifikasi 100% akurat.");
   }
@@ -1667,6 +1672,68 @@ function runSmokeTest() {
     assert.strictEqual(restoredStats.total, 600, "Statistik harus kembali ke 600 siswa otentik");
 
     console.log("✓ LULUS: Mesin PPDB XLSX, alokasi berimbang gender, kenaikan kelas paralel, dan kelulusan alumni terverifikasi 100% akurat.");
+  }
+
+  // --------------------------------------------------------------------------
+  // TEST 23: Distribusi Jam Mengajar SK KBM 2026/2027, Akun Kepala Sekolah & 29 Guru
+  // --------------------------------------------------------------------------
+  {
+    console.log("\n[TEST 23] Menjalankan verifikasi Akun Kepala Sekolah & Distribusi 29 Guru SK KBM 2026/2027...");
+
+    // 1. Verifikasi total pengguna terdaftar (Admin TU, Kepala Sekolah, dan 29 Guru = 31 Akun)
+    const allUsers = getStoredUsers();
+    assert.strictEqual(allUsers.length, 31, "Total akun terdaftar harus tepat 31 akun (1 Admin TU + 1 Kepala Sekolah + 29 Guru)");
+
+    // 2. Verifikasi Akun Kepala Sekolah (Dra. Juwariyah, M.Pd)
+    const ksUser = allUsers.find((u) => u.username === "juwariyah");
+    assert.ok(ksUser !== undefined, "Akun Kepala Sekolah juwariyah wajib terdaftar");
+    assert.strictEqual(ksUser?.role, "ADMIN", "Kepala Sekolah wajib memiliki hak akses ADMIN");
+    assert.strictEqual(ksUser?.fullName, "Dra. Juwariyah, M.Pd", "Nama resmi Kepala Sekolah harus tepat");
+    assert.strictEqual(ksUser?.nip, "196904041997022002", "NIP resmi Kepala Sekolah harus tepat");
+
+    // Login Kepala Sekolah
+    const ksLogin = loginUser("juwariyah", "admin123");
+    assert.strictEqual(ksLogin.success, true, "Login Kepala Sekolah dengan admin123 harus berhasil");
+    assert.strictEqual(ksLogin.user?.role, "ADMIN", "Role login Kepala Sekolah harus ADMIN");
+
+    // Akses kelas Kepala Sekolah (Supervisi seluruh 22 rombel sekolah)
+    const ksClasses = getEnrolledClassesForUser(ksLogin.user);
+    assert.strictEqual(ksClasses.length, 22, "Kepala Sekolah dengan akses ADMIN harus dapat mensupervisi seluruh 22 rombel");
+
+    // 3. Verifikasi Seluruh 29 Akun Guru dapat Login
+    const teacherUsers = allUsers.filter((u) => u.role === "GURU");
+    assert.strictEqual(teacherUsers.length, 29, "Harus ada tepat 29 akun guru aktif");
+
+    for (const teacher of teacherUsers) {
+      const loginRes = loginUser(teacher.username, "guru123");
+      assert.strictEqual(loginRes.success, true, `Guru ${teacher.fullName} (${teacher.username}) harus berhasil login dengan password guru123`);
+
+      const enrolledCls = getEnrolledClassesForUser(teacher);
+      assert.ok(enrolledCls.length > 0, `Guru ${teacher.fullName} harus memiliki minimal 1 rombel yang diampu`);
+      if (teacher.username !== "nika.musrifah") {
+        assert.ok(enrolledCls.length < 22, `Guru ${teacher.fullName} tidak boleh melihat semua 22 rombel sekolah (harus terisolasi)`);
+      } else {
+        assert.strictEqual(enrolledCls.length, 22, `Guru BK ${teacher.fullName} membimbing seluruh 22 rombel sekolah`);
+      }
+    }
+
+    // 4. Verifikasi Total Beban Mengajar Resmi (264 Penugasan = 22 Rombel x 12 Mapel)
+    assert.strictEqual(DEFAULT_TEACHER_ASSIGNMENTS.length, 264, "Total penugasan resmi harus tepat 264 penugasan");
+
+    // 5. Verifikasi Data Wali Kelas Resmi di 22 Rombel
+    assert.strictEqual(MOCK_CLASSES.length, 22, "Total rombel sekolah harus 22 kelas");
+    for (const cls of MOCK_CLASSES) {
+      assert.ok(cls.homeroomTeacherName && cls.homeroomTeacherName.trim().length > 0, `Kelas ${cls.name} wajib memiliki nama Wali Kelas resmi`);
+    }
+
+    // 6. Verifikasi Pak Muhamad Rizky Aprian, S.Kom
+    const rizkyUser = allUsers.find((u) => u.username === "rizky");
+    assert.ok(rizkyUser !== undefined, "Akun Pak Rizky harus terdaftar");
+    const rizkyClasses = getEnrolledClassesForUser(rizkyUser);
+    assert.strictEqual(rizkyClasses.length, 10, "Pak Rizky mengampu tepat 10 kelas (7A-7H dan 8A-8B)");
+
+    logoutUser();
+    console.log("✓ LULUS: Akun Kepala Sekolah (Akses Admin), 29 Akun Guru, 264 Penugasan SK KBM, dan Wali Kelas terverifikasi 100% akurat.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");

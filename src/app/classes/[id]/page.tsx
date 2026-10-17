@@ -249,7 +249,7 @@ export default function ClassDetailPage() {
             Kelas {currentClass.name}
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            Informatika · {currentClass.scheduleDay ?? "KBM"}, {currentClass.schedulePeriod ?? "Jam Ke 1–3"} ({currentClass.scheduleTime ?? "Sesuai Jadwal"} WIB) · {students.length} Siswa
+            {currentClass.subject || "Mata Pelajaran"} · {currentClass.scheduleDay ?? "KBM"}, {currentClass.schedulePeriod ?? "Jam Ke 1–3"} ({currentClass.scheduleTime ?? "Sesuai Jadwal"} WIB) · {students.length} Siswa{currentClass.homeroomTeacherName ? ` · Wali Kelas: ${currentClass.homeroomTeacherName}` : ""}
           </p>
         </div>
 

@@ -98,6 +98,7 @@ export const ClassSchema = z.object({
   scheduleTime: z.string().optional(),
   schedulePeriod: z.string().optional(),
   subject: z.string().default("Informatika"),
+  homeroomTeacherName: z.string().optional(),
 });
 
 export type Class = z.infer<typeof ClassSchema>;

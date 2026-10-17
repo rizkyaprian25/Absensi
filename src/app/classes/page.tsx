@@ -171,6 +171,14 @@ export default function ClassesPage() {
                       <Users className="w-3.5 h-3.5" />
                       {studentCount} Siswa
                     </span>
+                    {cls.homeroomTeacherName && (
+                      <>
+                        <span>·</span>
+                        <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                          Wali Kelas: {cls.homeroomTeacherName}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
