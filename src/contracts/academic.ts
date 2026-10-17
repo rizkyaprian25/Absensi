@@ -174,3 +174,47 @@ export const DEFAULT_USERS: AppUser[] = [
   },
 ];
 
+// ============================================================================
+// SKEMA IMPOR SISWA BARU PPDB (XLSX ENGINE)
+// ============================================================================
+
+export const StudentPpdbImportRowSchema = z.object({
+  nis: z.string().min(1, "NIS wajib diisi"),
+  nisn: z.string().min(10, "NISN minimal 10 digit").max(10, "NISN maksimal 10 digit").optional().nullable(),
+  fullName: z.string().min(1, "Nama lengkap siswa wajib diisi"),
+  gender: z.enum(["L", "P"]),
+  targetClass: z.string().optional().nullable(), // Contoh: "7A", "7B", atau null untuk auto-alokasi
+  birthPlace: z.string().optional().nullable(),
+  birthDate: z.string().optional().nullable(),
+  guardianName: z.string().optional().nullable(),
+  guardianPhone: z.string().optional().nullable(),
+});
+
+export type StudentPpdbImportRow = z.infer<typeof StudentPpdbImportRowSchema>;
+
+export const StudentPpdbImportResultSchema = z.object({
+  totalRows: z.number().int(),
+  validCount: z.number().int(),
+  errorCount: z.number().int(),
+  skippedCount: z.number().int(),
+  importedStudents: z.array(
+    z.object({
+      id: z.string(),
+      nis: z.string(),
+      fullName: z.string(),
+      classId: z.string(),
+      className: z.string(),
+    })
+  ),
+  errors: z.array(
+    z.object({
+      rowNumber: z.number().int(),
+      identifier: z.string(),
+      message: z.string(),
+    })
+  ),
+});
+
+export type StudentPpdbImportResult = z.infer<typeof StudentPpdbImportResultSchema>;
+
+
