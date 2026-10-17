@@ -395,3 +395,65 @@ export function toggleUserActiveByAdmin(userId: string): { success: boolean; err
   return { success: true };
 }
 
+/**
+ * Mengambil kata sandi seorang pengguna berdasarkan username
+ * Mengembalikan kata sandi jika akun terdaftar, atau null jika akun tidak ada
+ */
+export function getUserPassword(username: string): string | null {
+  const cleanUsername = username.toLowerCase().trim();
+  const users = getStoredUsers();
+  const userExists = users.some((u) => u.username.toLowerCase() === cleanUsername);
+  if (!userExists) {
+    return null;
+  }
+  const passwords = getStoredPasswords();
+  return passwords[cleanUsername] || "guru123";
+}
+
+/**
+ * Menghapus akun pengguna/guru oleh Administrator
+ * Dilengkapi proteksi keamanan untuk mencegah penghapusan akun Super Admin utama dan Kepala Sekolah
+ */
+export function deleteUserByAdmin(
+  userId: string,
+  currentUserId?: string
+): { success: boolean; error?: string } {
+  const users = getStoredUsers();
+  const targetUser = users.find((u) => u.id === userId);
+
+  if (!targetUser) {
+    return { success: false, error: "Akun pengguna tidak ditemukan." };
+  }
+
+  // Proteksi 1: Larang menghapus diri sendiri yang sedang aktif sesi login
+  if (currentUserId && targetUser.id === currentUserId) {
+    return { success: false, error: "Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif digunakan." };
+  }
+
+  // Proteksi 2: Larang menghapus Super Administrator utama
+  if (targetUser.username === "admin" || targetUser.id === "user-admin") {
+    return { success: false, error: "Akun Super Administrator utama dilindungi dan tidak dapat dihapus." };
+  }
+
+  // Proteksi 3: Larang menghapus Kepala Sekolah
+  if (targetUser.username === "juwariyah" || targetUser.id === "user-juwariyah") {
+    return { success: false, error: "Akun resmi Kepala Sekolah dilindungi dan tidak dapat dihapus." };
+  }
+
+  const updatedUsers = users.filter((u) => u.id !== userId);
+  const passwords = getStoredPasswords();
+  delete passwords[targetUser.username.toLowerCase()];
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(updatedUsers));
+      localStorage.setItem(STORAGE_KEY_PASSWORDS, JSON.stringify(passwords));
+    } catch (e) {
+      return { success: false, error: "Gagal menghapus akun pengguna dari penyimpanan lokal." };
+    }
+  }
+
+  return { success: true };
+}
+
+

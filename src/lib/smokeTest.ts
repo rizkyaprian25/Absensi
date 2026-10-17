@@ -145,6 +145,9 @@ import {
   changePassword,
   resetUserPasswordByAdmin,
   updateUserProfile,
+  createUserByAdmin,
+  getUserPassword,
+  deleteUserByAdmin,
 } from "./authStorage.ts";
 import {
   getStoredSubjects,
@@ -152,6 +155,7 @@ import {
   setTeacherEnrollmentMatrix,
   DEFAULT_TEACHER_ASSIGNMENTS,
   saveTeacherAssignmentsForTeacher,
+  removeTeacherAssignmentsForTeacher,
   getEnrolledClassesForUser,
   getEnrolledSubjectsForUser,
   getClassesForTeacherAndDay,
@@ -1836,6 +1840,78 @@ function runSmokeTest() {
     assert.strictEqual(totalWeeklySessions, 374, "Total seluruh sesi mingguan 29 guru harus tepat 374 sesi");
 
     console.log("✓ LULUS: 374 Sesi KBM aSc Timetables, distribusi 5 hari, jadwal Pak Rizky 10 kelas, dan matriks 29 guru terverifikasi 100% akurat.");
+  }
+
+  // 25. Pengujian Kredensial Transparan Admin dan Penghapusan Akun Guru Terproteksi
+  {
+    console.log("\n--- [TEST 25] Kredensial Transparan & Penghapusan Akun Guru Terproteksi ---");
+
+    // 1. Verifikasi Akses Transparan Kata Sandi Akun
+    const rizkyPass = getUserPassword("rizky");
+    assert.strictEqual(rizkyPass, "guru123", "Kata sandi Pak Rizky harus dapat dibaca admin secara transparan");
+
+    const adminPass = getUserPassword("admin");
+    assert.ok(adminPass && adminPass.length > 0, "Kata sandi Admin harus ada di penyimpanan");
+
+    const nonExistentPass = getUserPassword("guru_fiktif_12345");
+    assert.strictEqual(nonExistentPass, null, "Username yang tidak terdaftar harus mengembalikan null");
+
+    // 2. Verifikasi Pagar Pengaman Proteksi Penghapusan Akun Utama
+    const deleteAdminAttempt = deleteUserByAdmin("user-admin", "user-juwariyah");
+    assert.strictEqual(deleteAdminAttempt.success, false, "Penghapusan akun Super Administrator wajib ditolak");
+    assert.ok(deleteAdminAttempt.error?.includes("Super Administrator"), "Pesan error proteksi admin harus jelas");
+
+    const deleteHeadmasterAttempt = deleteUserByAdmin("user-juwariyah", "user-admin");
+    assert.strictEqual(deleteHeadmasterAttempt.success, false, "Penghapusan akun Kepala Sekolah wajib ditolak");
+    assert.ok(deleteHeadmasterAttempt.error?.includes("Kepala Sekolah"), "Pesan error proteksi kepala sekolah harus jelas");
+
+    const deleteSelfAttempt = deleteUserByAdmin("user-admin", "user-admin");
+    assert.strictEqual(deleteSelfAttempt.success, false, "Penghapusan akun diri sendiri yang sedang aktif login wajib ditolak");
+    assert.ok(deleteSelfAttempt.error?.includes("sedang aktif"), "Pesan error proteksi sesi aktif harus jelas");
+
+    // 3. Verifikasi Siklus Hidup Akun Guru: Buat -> Baca Sandi -> Atur Penugasan -> Hapus Bersih
+    const mockTeacherUsername = `guru_uji_${Date.now()}`;
+    const createRes = createUserByAdmin({
+      fullName: "Guru Uji Coba Simulasi",
+      username: mockTeacherUsername,
+      nip: "199001012026011999",
+      email: "guru.uji@smpn3cibungbulang.sch.id",
+      role: "GURU",
+      initialPassword: "PassW0rdUji123!",
+    });
+
+    assert.strictEqual(createRes.success, true, "Pembuatan akun guru uji coba harus berhasil");
+    const testUser = createRes.user!;
+    assert.ok(testUser && testUser.id, "Objek guru uji coba harus memiliki id unik");
+
+    // Verifikasi kata sandi awal tersimpan dan dapat dibaca
+    const retrievedPass = getUserPassword(mockTeacherUsername);
+    assert.strictEqual(retrievedPass, "PassW0rdUji123!", "Kata sandi guru baru harus persis sesuai yang diset");
+
+    // Simpan penugasan mengajar untuk guru uji coba menggunakan matriks enrollment
+    setTeacherEnrollmentMatrix(testUser.id, { "sub-inf": ["7A", "7B"] });
+
+    const assignmentsBeforeDelete = getTeacherAssignments(testUser.id);
+    assert.strictEqual(assignmentsBeforeDelete.length, 2, "Penugasan mengajar guru uji coba harus terdaftar (2 kelas)");
+
+    // Eksekusi penghapusan akun oleh Admin
+    const deleteRes = deleteUserByAdmin(testUser.id, "user-admin");
+    assert.strictEqual(deleteRes.success, true, "Penghapusan akun guru biasa oleh admin harus sukses");
+
+    // Bersihkan penugasan mengajar
+    removeTeacherAssignmentsForTeacher(testUser.id);
+
+    // Verifikasi pasca penghapusan
+    const usersAfterDelete = getStoredUsers();
+    assert.strictEqual(usersAfterDelete.some((u) => u.id === testUser.id), false, "Akun guru harus terhapus dari daftar pengguna");
+
+    const passAfterDelete = getUserPassword(mockTeacherUsername);
+    assert.strictEqual(passAfterDelete, null, "Kata sandi akun yang dihapus harus dibersihkan secara aman");
+
+    const assignmentsAfterDelete = getTeacherAssignments(testUser.id);
+    assert.strictEqual(assignmentsAfterDelete.length, 0, "Seluruh penugasan mengajar guru yang dihapus harus bersih 100%");
+
+    console.log("✓ LULUS: Kredensial username/password transparan dan proteksi penghapusan akun guru terverifikasi 100% aman.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");

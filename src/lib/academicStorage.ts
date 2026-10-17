@@ -255,6 +255,15 @@ export function saveTeacherAssignmentsForTeacher(
 }
 
 /**
+ * Menghapus seluruh penugasan mengajar untuk seorang guru (saat akun guru dihapus oleh Administrator)
+ */
+export function removeTeacherAssignmentsForTeacher(teacherId: string): void {
+  const all = getStoredTeacherAssignments();
+  const filtered = all.filter((a) => a.teacherId !== teacherId);
+  saveAllTeacherAssignments(filtered);
+}
+
+/**
  * Fungsi helper Self-Enrollment: Mengatur penugasan mapel & kelas untuk seorang guru
  * @param teacherId ID Guru
  * @param enrollments Peta Subject ID -> Array Class ID yang dipilih

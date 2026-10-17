@@ -16,6 +16,11 @@ import {
   Lock,
   UserCheck,
   AlertCircle,
+  Eye,
+  EyeOff,
+  Copy,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Toast } from "@/components/ui/Toast";
@@ -27,11 +32,14 @@ import {
   resetUserPasswordByAdmin,
   toggleUserActiveByAdmin,
   getStoredPasswords,
+  deleteUserByAdmin,
+  getUserPassword,
 } from "@/lib/authStorage";
 import {
   getStoredSubjects,
   getStoredTeacherAssignments,
   setTeacherEnrollmentMatrix,
+  removeTeacherAssignmentsForTeacher,
 } from "@/lib/academicStorage";
 
 /**
@@ -63,15 +71,100 @@ export default function AdminUsersPage() {
   const [resetTargetUser, setResetTargetUser] = useState<AppUser | null>(null);
   const [resetNewPass, setResetNewPass] = useState("guru123");
 
+  // State Manajemen Kata Sandi (Lihat / Sembunyikan & Salin Kredensial)
+  const [passwords, setPasswords] = useState<Record<string, string>>({});
+  const [showAllPasswords, setShowAllPasswords] = useState(false);
+  const [visiblePasswordUserIds, setVisiblePasswordUserIds] = useState<Set<string>>(new Set());
+
+  // State Modal Konfirmasi Hapus Guru
+  const [deleteTargetUser, setDeleteTargetUser] = useState<AppUser | null>(null);
+
   const refreshData = () => {
     setUsers(getStoredUsers());
     setSubjects(getStoredSubjects());
     setAssignments(getStoredTeacherAssignments());
+    setPasswords(getStoredPasswords());
   };
 
   useEffect(() => {
     refreshData();
   }, []);
+
+  // Toggle visibilitas kata sandi untuk satu guru tertentu
+  const togglePasswordVisibility = (userId: string) => {
+    setVisiblePasswordUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  };
+
+  // Toggle tampilkan seluruh kata sandi guru
+  const handleToggleShowAllPasswords = () => {
+    if (showAllPasswords) {
+      setShowAllPasswords(false);
+      setVisiblePasswordUserIds(new Set());
+      setToastMessage("Seluruh kata sandi disembunyikan.");
+    } else {
+      setShowAllPasswords(true);
+      const allIds = new Set(users.map((u) => u.id));
+      setVisiblePasswordUserIds(allIds);
+      setToastMessage("Seluruh kata sandi guru kini ditampilkan.");
+    }
+  };
+
+  const isPasswordVisible = (userId: string) => {
+    return showAllPasswords || visiblePasswordUserIds.has(userId);
+  };
+
+  // Salin kredensial login (Username & Password) untuk satu guru
+  const handleCopyCredentials = (user: AppUser) => {
+    const pass = passwords[user.username.toLowerCase()] || "guru123";
+    const text = `Akun Absensi SMPN 3 Cibungbulang\nNama: ${user.fullName}\nUsername: ${user.username}\nKata Sandi: ${pass}`;
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(text);
+      setToastMessage(`Kredensial login @${user.username} berhasil disalin ke clipboard.`);
+    }
+  };
+
+  // Salin seluruh daftar kredensial guru untuk dibagikan ke forum resmi
+  const handleCopyAllCredentials = () => {
+    const teachersList = users
+      .filter((u) => u.role === "GURU")
+      .map((u, i) => {
+        const pass = passwords[u.username.toLowerCase()] || "guru123";
+        return `${i + 1}. ${u.fullName}\n   Username: ${u.username}\n   Password: ${pass}`;
+      })
+      .join("\n\n");
+
+    const fullText = `DAFTAR AKUN LOGIN GURU SMP NEGERI 3 CIBUNGBULANG\nSemester Ganjil TP. 2026/2027\n\n${teachersList}`;
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(fullText);
+      setToastMessage("Seluruh kredensial (username & password) guru berhasil disalin.");
+    }
+  };
+
+  // Eksekusi Hapus Akun Guru
+  const handleExecuteDeleteUser = () => {
+    if (!deleteTargetUser) return;
+
+    const res = deleteUserByAdmin(deleteTargetUser.id, currentUser?.id);
+    if (!res.success) {
+      setToastMessage(res.error || "Gagal menghapus akun guru.");
+      return;
+    }
+
+    // Bersihkan penugasan mengajar guru yang dihapus
+    removeTeacherAssignmentsForTeacher(deleteTargetUser.id);
+
+    setToastMessage(`Akun guru ${deleteTargetUser.fullName} (@${deleteTargetUser.username}) berhasil dihapus.`);
+    setDeleteTargetUser(null);
+    refreshData();
+  };
 
   // Filter daftar pengguna berdasarkan pencarian
   const filteredUsers = useMemo(() => {
@@ -125,6 +218,7 @@ export default function AdminUsersPage() {
 
     setToastMessage(`Kata sandi untuk @${resetTargetUser.username} berhasil direset menjadi "${resetNewPass}".`);
     setResetTargetUser(null);
+    refreshData();
   };
 
   // Handle Aktif / Nonaktif Akun
@@ -220,14 +314,39 @@ export default function AdminUsersPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsAddUserOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--color-accent)] text-[var(--color-on-accent)] text-xs font-bold shadow-sm hover:opacity-90 transition-all self-start md:self-auto cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          Tambah Akun Guru
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          <button
+            type="button"
+            onClick={handleToggleShowAllPasswords}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] shadow-xs transition-all cursor-pointer"
+          >
+            {showAllPasswords ? (
+              <EyeOff className="w-4 h-4 text-amber-600" />
+            ) : (
+              <Eye className="w-4 h-4 text-[var(--text-secondary)]" />
+            )}
+            <span>{showAllPasswords ? "Sembunyikan Sandi" : "Lihat Semua Sandi"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCopyAllCredentials}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] shadow-xs transition-all cursor-pointer"
+            title="Salin rekap seluruh akun guru untuk dibagikan"
+          >
+            <Copy className="w-4 h-4 text-[var(--color-accent)]" />
+            <span>Salin Rekap Akun</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsAddUserOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--color-accent)] text-[var(--color-on-accent)] text-xs font-bold shadow-sm hover:opacity-90 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Tambah Akun Guru
+          </button>
+        </div>
       </div>
 
       {/* Bar Pencarian */}
@@ -290,8 +409,53 @@ export default function AdminUsersPage() {
                   </span>
                 </div>
 
-                <div className="mt-4 space-y-1.5 text-xs text-[var(--text-secondary)]">
-                  <div className="flex items-center justify-between">
+                <div className="mt-4 space-y-2 text-xs text-[var(--text-secondary)]">
+                  {/* Kotak Kredensial Login (Username & Password) */}
+                  <div className="p-2.5 rounded-xl bg-[var(--surface-recessed)] border border-[var(--border-hairline)] flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                        <KeyRound className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-[var(--text-tertiary)] block font-medium">
+                          Kredensial Login
+                        </span>
+                        <div className="flex items-center gap-1.5 font-mono text-xs flex-wrap">
+                          <span className="font-bold text-[var(--color-accent)]">@{user.username}</span>
+                          <span className="text-[var(--text-tertiary)]">·</span>
+                          <span className="font-bold text-[var(--text-primary)]">
+                            {isPasswordVisible(user.id)
+                              ? passwords[user.username.toLowerCase()] || "guru123"
+                              : "••••••••"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => togglePasswordVisibility(user.id)}
+                        title={isPasswordVisible(user.id) ? "Sembunyikan kata sandi" : "Lihat kata sandi"}
+                        className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)] transition-colors cursor-pointer"
+                      >
+                        {isPasswordVisible(user.id) ? (
+                          <EyeOff className="w-4 h-4 text-amber-600" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyCredentials(user)}
+                        title="Salin username & kata sandi"
+                        className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--color-accent)] hover:bg-[var(--surface-card)] transition-colors cursor-pointer"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-0.5">
                     <span>NIP:</span>
                     <span className="font-mono text-[var(--text-primary)]">{user.nip || "-"}</span>
                   </div>
@@ -338,9 +502,9 @@ export default function AdminUsersPage() {
                     type="button"
                     onClick={() => {
                       setResetTargetUser(user);
-                      setResetNewPass("guru123");
+                      setResetNewPass(passwords[user.username.toLowerCase()] || "guru123");
                     }}
-                    title="Reset kata sandi"
+                    title="Ubah / Reset kata sandi"
                     className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-amber-600 hover:bg-amber-500/10 transition-colors cursor-pointer"
                   >
                     <KeyRound className="w-4 h-4" />
@@ -354,6 +518,18 @@ export default function AdminUsersPage() {
                       className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--color-accent)] hover:bg-[var(--surface-recessed)] transition-colors cursor-pointer"
                     >
                       <School className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  {/* Tombol Hapus Akun Guru (Kecuali Super Admin & Kepala Sekolah) */}
+                  {user.username !== "admin" && user.username !== "juwariyah" && (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTargetUser(user)}
+                      title="Hapus akun guru ini"
+                      className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-rose-600 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
@@ -495,6 +671,13 @@ export default function AdminUsersPage() {
               Mereset kata sandi akun guru: <strong>{resetTargetUser.fullName}</strong> (@{resetTargetUser.username}).
             </p>
 
+            <div className="p-3 bg-[var(--surface-recessed)] rounded-xl border border-[var(--border-hairline)] text-xs space-y-1">
+              <span className="text-[var(--text-tertiary)] block text-[11px] font-medium">Kata Sandi Saat Ini:</span>
+              <span className="font-mono font-bold text-[var(--text-primary)] text-sm tracking-wider">
+                {passwords[resetTargetUser.username] || "(belum diset)"}
+              </span>
+            </div>
+
             <form onSubmit={handleExecuteResetPassword} className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1">
@@ -618,6 +801,73 @@ export default function AdminUsersPage() {
                 className="px-4 py-2 rounded-xl bg-[var(--color-accent)] text-white text-xs font-bold shadow-xs hover:opacity-90"
               >
                 Simpan Penugasan Guru
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus Akun Guru */}
+      {deleteTargetUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[var(--surface-card)] rounded-2xl border border-rose-500/30 shadow-2xl p-6 space-y-4 animate-scale-up">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-600 shrink-0">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-bold text-base text-[var(--text-primary)]">
+                  Hapus Akun Guru?
+                </h3>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Tindakan ini akan menghapus akun login dan seluruh penugasan mengajar guru secara permanen.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-[var(--surface-recessed)] rounded-xl border border-[var(--border-hairline)] text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-[var(--text-tertiary)]">Nama Guru:</span>
+                <span className="font-bold text-[var(--text-primary)]">{deleteTargetUser.fullName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[var(--text-tertiary)]">Username:</span>
+                <span className="font-mono font-semibold text-[var(--color-accent)]">@{deleteTargetUser.username}</span>
+              </div>
+              {deleteTargetUser.nip && (
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-tertiary)]">NIP:</span>
+                  <span className="font-mono text-[var(--text-secondary)]">{deleteTargetUser.nip}</span>
+                </div>
+              )}
+              <div className="flex justify-between pt-1 border-t border-[var(--border-hairline)]">
+                <span className="text-[var(--text-tertiary)]">Kata Sandi:</span>
+                <span className="font-mono font-bold text-[var(--text-primary)]">
+                  {passwords[deleteTargetUser.username] || "-"}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-700 dark:text-amber-400 space-y-1">
+              <p className="font-semibold">Catatan Keamanan & Integritas:</p>
+              <p>Riwayat presensi dan nilai siswa yang sebelumnya diinput oleh guru ini tetap tersimpan aman di database sekolah.</p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-hairline)]">
+              <button
+                type="button"
+                onClick={() => setDeleteTargetUser(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-recessed)] cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteDeleteUser}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Ya, Hapus Akun Guru
               </button>
             </div>
           </div>
