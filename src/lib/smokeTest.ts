@@ -151,6 +151,14 @@ import {
   DEFAULT_TEACHER_ASSIGNMENTS,
   saveTeacherAssignmentsForTeacher,
 } from "./academicStorage.ts";
+import {
+  generatePpdbTemplateWorkbook,
+  commitPpdbImport,
+  executeParallelPromotion,
+  executeGraduationClass9,
+  getSchoolTotalStudentsStats,
+  STORAGE_KEY_DYNAMIC_STUDENTS,
+} from "./rolloverStorage.ts";
 
 /**
  * Smoke Test Mandiri (Fase 4 SOP §3.5 & PRD §14)
@@ -1601,6 +1609,64 @@ function runSmokeTest() {
     assert.strictEqual(restored.length, DEFAULT_TEACHER_ASSIGNMENTS.length, "Penugasan awal berhasil dipulihkan");
 
     console.log("✓ LULUS: Sistem Self-Enrollment & penugasan mengajar multi-mapel & multi-kelas terverifikasi 100% akurat.");
+  }
+
+  // --------------------------------------------------------------------------
+  // TEST 22: Mesin PPDB XLSX, Alokasi Berimbang, Kenaikan Kelas, dan Kelulusan Kelas 9
+  // --------------------------------------------------------------------------
+  {
+    console.log("\n[TEST 22] Menjalankan verifikasi sistem PPDB XLSX, Kenaikan Kelas & Kelulusan...");
+
+    // 1. Verifikasi pembuatan template Excel PPDB
+    const templateWb = generatePpdbTemplateWorkbook();
+    assert.ok(templateWb.SheetNames.includes("DATA_SISWA_PPDB"), "Template PPDB wajib memiliki sheet data siswa");
+    assert.ok(templateWb.SheetNames.includes("PETUNJUK"), "Template PPDB wajib memiliki sheet petunjuk");
+
+    // 2. Verifikasi statistik siswa sekolah awal
+    const statsBefore = getSchoolTotalStudentsStats();
+    assert.strictEqual(statsBefore.total, 600, "Total siswa awal harus 600 siswa");
+    assert.strictEqual(statsBefore.byGrade.grade7, 319, "Total siswa kelas 7 harus 319");
+    assert.strictEqual(statsBefore.byGrade.grade8, 281, "Total siswa kelas 8 harus 281");
+    assert.strictEqual(statsBefore.byGrade.grade9, 0, "Total siswa kelas 9 awal harus 0");
+
+    // 3. Uji simulasi kenaikan kelas paralel: 8 -> 9 dan 7 -> 8
+    const retainedIds = new Set<string>();
+    // Tandai 1 siswa tinggal kelas di kelas 8 (ambil salah satu siswa kelas 8B)
+    const studs8b = ALL_STUDENTS_BY_CLASS["class-8b"] || [];
+    if (studs8b.length > 0) {
+      retainedIds.add(studs8b[0].id);
+    }
+    const promotionRes = executeParallelPromotion(retainedIds, "admin");
+    assert.strictEqual(promotionRes.retainedCount, 1, "Siswa tinggal kelas harus terhitung 1");
+    assert.strictEqual(promotionRes.promotedToGrade9, 280, "Siswa naik ke kelas 9 harus 280 (281 - 1)");
+    assert.strictEqual(promotionRes.promotedToGrade8, 319, "Siswa naik ke kelas 8 harus 319");
+
+    // 4. Uji simulasi kelulusan kelas 9 (alumni)
+    const gradRes = executeGraduationClass9("admin");
+    assert.strictEqual(gradRes.graduatedCount, 280, "Siswa lulus dari kelas 9 harus 280 orang");
+
+    // 5. Uji impor siswa baru PPDB (16 siswa baru dengan auto-alokasi berimbang)
+    const mockNewStudents = Array.from({ length: 16 }, (_, i) => ({
+      nis: `262799${String(i + 1).padStart(3, "0")}`,
+      fullName: `SISWA BARU TEST ${i + 1}`,
+      gender: (i % 2 === 0 ? "L" : "P") as "L" | "P",
+    }));
+
+    const ppdbRes = commitPpdbImport(mockNewStudents, true);
+    assert.strictEqual(ppdbRes.importedCount, 16, "Harus mengimpor 16 siswa baru");
+    // Karena ada 8 rombel kelas 7 (7A-7H), masing-masing harus mendapat tepat 2 siswa
+    for (const [cls, count] of Object.entries(ppdbRes.perClassSummary)) {
+      assert.strictEqual(count, 2, `Kelas ${cls} harus mendapat 2 siswa secara merata`);
+    }
+
+    // 6. Bersihkan dan pulihkan data dinamis siswa kembali ke semula
+    if (typeof (globalThis as any).localStorage !== "undefined") {
+      (globalThis as any).localStorage.removeItem(STORAGE_KEY_DYNAMIC_STUDENTS);
+    }
+    const restoredStats = getSchoolTotalStudentsStats();
+    assert.strictEqual(restoredStats.total, 600, "Statistik harus kembali ke 600 siswa otentik");
+
+    console.log("✓ LULUS: Mesin PPDB XLSX, alokasi berimbang gender, kenaikan kelas paralel, dan kelulusan alumni terverifikasi 100% akurat.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");

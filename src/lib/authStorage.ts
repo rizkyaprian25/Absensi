@@ -264,3 +264,85 @@ export function updateUserProfile(
 
   return { success: true, user: updated };
 }
+
+/**
+ * Membuat akun guru baru oleh Administrator
+ */
+export function createUserByAdmin(userData: {
+  username: string;
+  fullName: string;
+  nip?: string;
+  email?: string;
+  role?: "ADMIN" | "GURU";
+  initialPassword?: string;
+}): { success: boolean; user?: AppUser; error?: string } {
+  const cleanUsername = userData.username.trim().toLowerCase();
+  const cleanFullName = userData.fullName.trim();
+
+  if (!cleanUsername || cleanUsername.length < 3) {
+    return { success: false, error: "Username minimal 3 karakter." };
+  }
+  if (!cleanFullName) {
+    return { success: false, error: "Nama lengkap guru wajib diisi." };
+  }
+
+  const users = getStoredUsers();
+  if (users.some((u) => u.username.toLowerCase() === cleanUsername)) {
+    return { success: false, error: `Username @${cleanUsername} sudah digunakan.` };
+  }
+
+  const newUser: AppUser = {
+    id: `user-${Date.now()}`,
+    username: cleanUsername,
+    fullName: cleanFullName,
+    nip: userData.nip?.trim() || null,
+    email: userData.email?.trim() || null,
+    role: userData.role || "GURU",
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  };
+
+  const updatedUsers = [...users, newUser];
+  const passwords = getStoredPasswords();
+  passwords[cleanUsername] = userData.initialPassword?.trim() || "guru123";
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(updatedUsers));
+      localStorage.setItem(STORAGE_KEY_PASSWORDS, JSON.stringify(passwords));
+    } catch (e) {
+      return { success: false, error: "Gagal menyimpan akun guru baru ke penyimpanan lokal." };
+    }
+  }
+
+  return { success: true, user: newUser };
+}
+
+/**
+ * Mengubah status aktif/nonaktif akun guru oleh Administrator
+ */
+export function toggleUserActiveByAdmin(userId: string): { success: boolean; error?: string } {
+  const users = getStoredUsers();
+  const index = users.findIndex((u) => u.id === userId);
+  if (index === -1) {
+    return { success: false, error: "Pengguna tidak ditemukan." };
+  }
+
+  // Lindungi akun admin utama agar tidak bisa dinonaktifkan sendiri
+  if (users[index].username === "admin") {
+    return { success: false, error: "Akun Super Administrator utama tidak dapat dinonaktifkan." };
+  }
+
+  users[index].isActive = !users[index].isActive;
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
+    } catch (e) {
+      return { success: false, error: "Gagal memperbarui status keaktifan akun." };
+    }
+  }
+
+  return { success: true };
+}
+

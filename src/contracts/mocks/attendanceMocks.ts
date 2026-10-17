@@ -335,9 +335,22 @@ export { ALL_STUDENTS_BY_CLASS };
 export const MOCK_STUDENTS_8B: Student[] = STUDENTS_CLASS_8B;
 
 /**
- * Mendapatkan daftar siswa otentik untuk suatu rombongan belajar (7A-7H, 8A-8B)
+ * Mendapatkan daftar siswa untuk suatu rombongan belajar (Mendukung data otentik & hasil PPDB/Promosi dinamis)
  */
 export function getStudentsForClass(classId: string): Student[] {
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem("absensi_dynamic_students_v1");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed[classId])) {
+          return parsed[classId];
+        }
+      }
+    } catch {
+      // Fallback aman ke data otentik
+    }
+  }
   return ALL_STUDENTS_BY_CLASS[classId] ?? STUDENTS_CLASS_8B;
 }
 

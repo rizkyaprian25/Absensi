@@ -186,3 +186,24 @@ export function getEnrolledClassesForUser(
   return MOCK_CLASSES.filter((c) => assignedClassIds.has(c.id));
 }
 
+/**
+ * Mengambil daftar mata pelajaran yang di-enroll oleh guru yang sedang aktif
+ * - Jika peran ADMIN: Mengembalikan seluruh master mata pelajaran
+ * - Jika peran GURU: Mengembalikan mata pelajaran unik yang diampu guru
+ */
+export function getEnrolledSubjectsForUser(user: AppUser | null): Subject[] {
+  const allSubjects = getStoredSubjects();
+  if (!user || user.role === "ADMIN") {
+    return allSubjects;
+  }
+
+  let assignments = getTeacherAssignments(user.id);
+  if (assignments.length === 0 && (user.username === "rizky" || user.id === "user-rizky")) {
+    assignments = DEFAULT_TEACHER_ASSIGNMENTS;
+  }
+
+  const enrolledSubjectIds = new Set(assignments.map((a) => a.subjectId));
+  const filtered = allSubjects.filter((s) => enrolledSubjectIds.has(s.id));
+  return filtered.length > 0 ? filtered : [allSubjects[0]];
+}
+

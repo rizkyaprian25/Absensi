@@ -15,6 +15,8 @@ import {
   Shield,
   LogOut,
   LayoutDashboard,
+  GraduationCap,
+  School,
 } from "lucide-react";
 import {
   recoverFromIndexedDBIfLocalStorageEmpty,
@@ -38,10 +40,13 @@ const GURU_NAV_ITEMS: NavItem[] = [
   { href: "/profile", label: "Profil", icon: User },
 ];
 
-/** Menu Navigasi Admin: Dasbor Eksekutif, Hari Ini, Kelas, Nilai, Rekap, Pengaturan */
+/** Menu Navigasi Admin: Dasbor Eksekutif, Manajemen Guru, Kenaikan & PPDB, Supervisi KBM, Pengaturan */
 const ADMIN_NAV_ITEMS: NavItem[] = [
+  { href: "/admin", label: "Dasbor Admin", icon: LayoutDashboard },
+  { href: "/admin/users", label: "Kelola Guru", icon: Users },
+  { href: "/admin/rollover", label: "Kenaikan & PPDB", icon: GraduationCap },
   { href: "/", label: "Hari Ini", icon: Calendar },
-  { href: "/classes", label: "Kelas", icon: Users },
+  { href: "/classes", label: "Kelas", icon: School },
   { href: "/grades", label: "Nilai", icon: Award },
   { href: "/reports", label: "Rekap", icon: BarChart3 },
   { href: "/settings", label: "Pengaturan", icon: Settings },

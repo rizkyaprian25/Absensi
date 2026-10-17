@@ -32,7 +32,7 @@ import {
   getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
 import { useAuth } from "@/context/AuthContext";
-import { getEnrolledClassesForUser } from "@/lib/academicStorage";
+import { getEnrolledClassesForUser, getEnrolledSubjectsForUser } from "@/lib/academicStorage";
 
 import type {
   Class,
@@ -369,6 +369,19 @@ export default function ReportsPage() {
   const { currentUser } = useAuth();
   const enrolledClasses = useMemo(() => getEnrolledClassesForUser(currentUser), [currentUser]);
   const [selectedClassId, setSelectedClassId] = useState("class-7a");
+
+  const enrolledSubjects = useMemo(() => getEnrolledSubjectsForUser(currentUser), [currentUser]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState("sub-inf");
+
+  useEffect(() => {
+    if (enrolledSubjects.length > 0 && !enrolledSubjects.some((s) => s.id === selectedSubjectId)) {
+      setSelectedSubjectId(enrolledSubjects[0].id);
+    }
+  }, [enrolledSubjects, selectedSubjectId]);
+
+  const currentSubject = enrolledSubjects.find((s) => s.id === selectedSubjectId) ?? enrolledSubjects[0];
+  const teacherFullName = currentUser?.fullName || "Muhamad Rizky Aprian, S.Kom";
+  const teacherNip = currentUser?.nip || "19940825 202221 1 004";
 
   useEffect(() => {
     if (enrolledClasses.length > 0 && !enrolledClasses.some((c) => c.id === selectedClassId)) {
@@ -741,9 +754,22 @@ export default function ReportsPage() {
               ))}
             </select>
 
+            {enrolledSubjects.length > 1 && (
+              <select
+                value={selectedSubjectId}
+                onChange={(e) => setSelectedSubjectId(e.target.value)}
+                className="text-xs px-2.5 py-1.5 rounded-[8px] bg-[var(--surface-card)] text-purple-600 font-bold border border-[var(--border-hairline)] shadow-xs focus:outline-none focus:ring-1 focus:ring-purple-600 cursor-pointer"
+              >
+                {enrolledSubjects.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    Mapel: {s.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
-            Informatika · SMP Negeri 3 Cibungbulang · Muhamad Rizky Aprian, S.Kom
+            {currentSubject?.name || "Informatika"} · SMP Negeri 3 Cibungbulang · {teacherFullName}
           </p>
         </div>
 
@@ -2435,10 +2461,14 @@ export default function ReportsPage() {
         </div>
         <div className="text-right">
           <p>Cibungbulang, {formatIndonesianDate(new Date().toISOString().slice(0, 10))}</p>
-          <p className="font-semibold">Guru Mata Pelajaran Informatika,</p>
-          <div className="h-16"></div>
-          <p className="font-bold underline">Muhamad Rizky Aprian, S.Kom</p>
-          <p>NIP. 19940825 202221 1 004</p>
+          <p className="font-semibold">Guru Mata Pelajaran {currentSubject?.name || "Informatika"},</p>
+          <div className="h-16 flex items-center justify-end">
+            {currentUser?.signatureUrl ? (
+              <img src={currentUser.signatureUrl} alt="Tanda Tangan Guru" className="h-14 object-contain" />
+            ) : null}
+          </div>
+          <p className="font-bold underline">{teacherFullName}</p>
+          <p>NIP. {teacherNip}</p>
         </div>
       </div>
 

@@ -50,7 +50,7 @@ import {
   getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
 import { useAuth } from "@/context/AuthContext";
-import { getEnrolledClassesForUser } from "@/lib/academicStorage";
+import { getEnrolledClassesForUser, getEnrolledSubjectsForUser } from "@/lib/academicStorage";
 
 import type { Student } from "@/contracts/attendance";
 import type {
@@ -122,6 +122,17 @@ function GradesPageContent() {
   // 1. State Pilihan Kelas
   const initialClassId = searchParams.get("classId") || (enrolledClasses[0]?.id || "class-7a");
   const [selectedClassId, setSelectedClassId] = useState<string>(initialClassId);
+
+  const enrolledSubjects = useMemo(() => getEnrolledSubjectsForUser(currentUser), [currentUser]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState("sub-inf");
+
+  useEffect(() => {
+    if (enrolledSubjects.length > 0 && !enrolledSubjects.some((s) => s.id === selectedSubjectId)) {
+      setSelectedSubjectId(enrolledSubjects[0].id);
+    }
+  }, [enrolledSubjects, selectedSubjectId]);
+
+  const currentSubject = enrolledSubjects.find((s) => s.id === selectedSubjectId) ?? enrolledSubjects[0];
 
   // Pastikan kelas terpilih selalu berada di dalam daftar rombel yang di-enroll
   useEffect(() => {
@@ -1080,6 +1091,29 @@ function GradesPageContent() {
           </button>
         </div>
       </div>
+
+      {/* Pengalih Mata Pelajaran (Tampil jika guru mengampu > 1 mata pelajaran) */}
+      {enrolledSubjects.length > 1 && (
+        <div className="flex items-center gap-2 p-2 bg-[var(--surface-card)] rounded-xl border border-[var(--border-hairline)] shadow-xs">
+          <span className="text-xs font-semibold text-[var(--text-secondary)]">Mata Pelajaran:</span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {enrolledSubjects.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setSelectedSubjectId(s.id)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  selectedSubjectId === s.id
+                    ? "bg-purple-600 text-white shadow-xs"
+                    : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] border border-[var(--border-hairline)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Pemilih Kelas (Rombel Switcher 7A-7H, 8A-8B) */}
       <div className="flex flex-col gap-2">
