@@ -25,7 +25,12 @@ import {
   getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
 import { useAuth } from "@/context/AuthContext";
-import { getEnrolledClassesForUser } from "@/lib/academicStorage";
+import {
+  getEnrolledClassesForUser,
+  getClassesForTeacherAndDay,
+  getEnrolledSubjectsForUser,
+} from "@/lib/academicStorage";
+import WeeklyScheduleViewerModal from "@/components/schedule/WeeklyScheduleViewerModal";
 
 import {
   ScheduleDay,
@@ -74,6 +79,9 @@ export default function TodayDashboardPage() {
   const [holidayCategoryInput, setHolidayCategoryInput] = useState<HolidayCategory>("SEKOLAH");
   const [holidayDescInput, setHolidayDescInput] = useState("");
 
+  // State Modal Matriks Jadwal Mingguan aSc Timetables
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+
   // Tanggal hari ini ISO
   const todayIso = useMemo(() => {
     const d = new Date();
@@ -98,10 +106,17 @@ export default function TodayDashboardPage() {
   const { currentUser } = useAuth();
   const enrolledClasses = useMemo(() => getEnrolledClassesForUser(currentUser), [currentUser]);
 
-  // Filter kelas berdasarkan hari yang dipilih dari rombel yang di-enroll
+  // Mata pelajaran yang diampu oleh pengguna yang sedang aktif
+  const userSubjects = useMemo(() => getEnrolledSubjectsForUser(currentUser), [currentUser]);
+  const displaySubject = useMemo(() => {
+    if (userSubjects.length === 0) return MOCK_SUBJECT;
+    return userSubjects.map((s) => s.name).join(", ");
+  }, [userSubjects]);
+
+  // Sesi KBM resmi untuk guru dan hari terpilih sesuai aSc Timetables (374 slot resmi)
   const classesForSelectedDay = useMemo(() => {
-    return enrolledClasses.filter((c) => c.scheduleDay === selectedDay);
-  }, [enrolledClasses, selectedDay]);
+    return getClassesForTeacherAndDay(currentUser, selectedDay);
+  }, [currentUser, selectedDay]);
 
 
   // Tanggal pekan aktif untuk hari terpilih (YYYY-MM-DD)
@@ -192,7 +207,7 @@ export default function TodayDashboardPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-sm text-[var(--text-secondary)] font-medium">
-              Selamat datang, <strong className="text-[var(--text-primary)]">Pak Rizky</strong>
+              Selamat datang, <strong className="text-[var(--text-primary)]">{currentUser?.fullName || "Pak Rizky"}</strong>
             </span>
           </div>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[var(--surface-card)] border border-[var(--border-hairline)] text-[var(--status-hadir-fg)] shadow-xs">
@@ -212,7 +227,7 @@ export default function TodayDashboardPage() {
             </span>
             <span>·</span>
             <span className="font-semibold text-[var(--color-accent)]">
-              {MOCK_SUBJECT}
+              {displaySubject}
             </span>
             <span>·</span>
             <span>Semester Ganjil 2026/2027</span>
@@ -229,6 +244,7 @@ export default function TodayDashboardPage() {
           const dayItem = findHolidayByDate(dayDate, holidays);
           const isDayRealHoliday = Boolean(dayItem && isRealHoliday(dayItem.category));
           const daySpecialEvent = dayItem && isActiveSchoolEvent(dayItem.category) ? dayItem : null;
+          const daySessionsCount = getClassesForTeacherAndDay(currentUser, day).length;
 
           return (
             <button
@@ -285,7 +301,9 @@ export default function TodayDashboardPage() {
                   ? daySpecialEvent.category === "KOKURIKULER"
                     ? "Projek P5"
                     : `Pekan ${daySpecialEvent.category}`
-                  : "2 Sesi KBM"}
+                  : daySessionsCount > 0
+                  ? `${daySessionsCount} Sesi KBM`
+                  : "Tidak Ada KBM"}
               </span>
             </button>
           );
@@ -325,8 +343,16 @@ export default function TodayDashboardPage() {
             </div>
           </div>
 
-          {/* Tombol Aksi Cepat: Masuk <-> Libur */}
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+          {/* Tombol Aksi Cepat: Masuk <-> Libur & Matriks Jadwal Mingguan */}
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsScheduleModalOpen(true)}
+              className="min-h-[40px] px-3.5 py-1.5 rounded-[10px] bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--color-accent)] flex items-center gap-1.5 shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <Calendar className="w-4 h-4" />
+              <span>Matriks Jadwal aSc</span>
+            </button>
             {isCurrentDayRealHoliday ? (
               <button
                 type="button"
@@ -434,11 +460,22 @@ export default function TodayDashboardPage() {
 
         {/* Daftar Kartu Kelas Sesuai Jadwal */}
         <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] divide-y divide-[var(--border-hairline)] overflow-hidden shadow-xs">
-          {classesForSelectedDay.map((cls) => {
-            const studentCount = getStudentsForClass(cls.id).length;
-            const classSession = sessions.find(
-              (s) => s.classId === cls.id && s.sessionDate === selectedDate
-            );
+          {classesForSelectedDay.length === 0 ? (
+            <div className="p-8 text-center flex flex-col items-center justify-center gap-2">
+              <Calendar className="w-10 h-10 text-[var(--text-tertiary)] opacity-60" />
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
+                Tidak Ada Jadwal Mengajar di Hari {selectedDay}
+              </p>
+              <p className="text-xs text-[var(--text-secondary)] max-w-sm">
+                Berdasarkan jadwal resmi aSc Timetables, Anda tidak memiliki jam mengajar tatap muka pada hari {selectedDay}.
+              </p>
+            </div>
+          ) : (
+            classesForSelectedDay.map((cls) => {
+              const studentCount = getStudentsForClass(cls.id).length;
+              const classSession = sessions.find(
+                (s) => s.classId === cls.id && s.sessionDate === selectedDate
+              );
 
             return (
               <div
@@ -502,7 +539,7 @@ export default function TodayDashboardPage() {
                 </Link>
               </div>
             );
-          })}
+          }))}
         </div>
       </section>
 
@@ -750,6 +787,13 @@ export default function TodayDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Matriks Jadwal Mingguan aSc Timetables */}
+      <WeeklyScheduleViewerModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+        currentUser={currentUser}
+      />
     </div>
   );
 }

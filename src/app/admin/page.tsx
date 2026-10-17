@@ -22,12 +22,19 @@ import {
   AlertTriangle,
   MessageCircle,
   RefreshCw,
+  Search,
+  Filter,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Toast } from "@/components/ui/Toast";
 import { MOCK_CLASSES } from "@/contracts/mocks/attendanceMocks";
 import { getStoredUsers } from "@/lib/authStorage";
-import { getStoredSubjects, getStoredTeacherAssignments } from "@/lib/academicStorage";
+import {
+  getStoredSubjects,
+  getStoredTeacherAssignments,
+  getScheduleSlotsForDay,
+} from "@/lib/academicStorage";
+import WeeklyScheduleViewerModal from "@/components/schedule/WeeklyScheduleViewerModal";
 import { getSchoolTotalStudentsStats } from "@/lib/rolloverStorage";
 import { getSavedSessions } from "@/lib/attendanceStorage";
 import type { ScheduleDay, AttendanceSession } from "@/contracts/attendance";
@@ -246,6 +253,11 @@ export default function AdminDashboardPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [lastBackupTime, setLastBackupTime] = useState<string | null>(null);
 
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [levelFilter, setLevelFilter] = useState<"ALL" | "7" | "8" | "9">("ALL");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+
   useEffect(() => {
     setMounted(true);
     if (typeof window !== "undefined") {
@@ -261,53 +273,59 @@ export default function AdminDashboardPage() {
   const assignments = useMemo(() => getStoredTeacherAssignments(), [mounted]);
   const savedSessions = useMemo(() => (mounted ? getSavedSessions() : []), [mounted]);
 
-  // 2. Monitoring Live KBM untuk Hari yang Dipilih
+  // 2. Monitoring Live KBM untuk Hari yang Dipilih (Menggunakan 374 Slot Jadwal Resmi aSc Timetables)
   const scheduleDays: ScheduleDay[] = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"];
 
-  const classesToday = useMemo(() => {
-    return MOCK_CLASSES.filter((c) => c.scheduleDay === selectedDay);
+  const slotsToday = useMemo(() => {
+    return getScheduleSlotsForDay(selectedDay);
   }, [selectedDay]);
 
   const isSelectedDayActualToday = currentDay !== null && selectedDay === currentDay;
 
-  // Cari sesi absensi dan evaluasi waktu keterlambatan
+  // Cari sesi absensi dan evaluasi waktu keterlambatan untuk setiap slot resmi aSc Timetables
   const monitorRows = useMemo(() => {
-    return classesToday.map((cls) => {
-      // Cari penugasan guru untuk kelas ini
-      const asgn = assignments.find((a) => a.classId === cls.id);
-      const teacher = asgn ? users.find((u) => u.id === asgn.teacherId) : null;
-      const subject = asgn ? subjects.find((s) => s.id === asgn.subjectId) : null;
+    return slotsToday.map((slot) => {
+      const teacher = users.find((u) => u.id === slot.teacherId);
+      const teacherName = teacher?.fullName || slot.teacherName;
 
-      // Cari apakah kelas ini sudah memiliki sesi absensi tersimpan (ambil sesi paling mutakhir)
-      const classSessions = savedSessions.filter((s) => s.classId === cls.id);
+      // Cari apakah kelas ini memiliki sesi absensi yang sesuai untuk tanggal/mapel/guru ini
+      const matchingSessions = savedSessions.filter((s) => {
+        if (s.classId !== slot.classId) return false;
+        const subMatch = s.subject && s.subject.toLowerCase() === slot.subjectName.toLowerCase();
+        const teacherMatch =
+          s.teacherName &&
+          (s.teacherName.toLowerCase().includes(slot.teacherName.toLowerCase()) ||
+            slot.teacherName.toLowerCase().includes(s.teacherName.toLowerCase()));
+        return subMatch || teacherMatch;
+      });
+
       const session =
-        classSessions.length > 0
-          ? [...classSessions].sort(
+        matchingSessions.length > 0
+          ? [...matchingSessions].sort(
               (a, b) =>
                 new Date(b.createdAt || b.sessionDate).getTime() -
                 new Date(a.createdAt || a.sessionDate).getTime()
             )[0]
           : null;
 
-      const hasAssignedTeacher = !!teacher || !!session?.teacherName;
-      const teacherName = session?.teacherName || teacher?.fullName || "Belum Ditugaskan";
-      const subjectName = session?.subject || subject?.name || cls.subject || "Belum Ditentukan";
-      const scheduleTime = cls.scheduleTime || "08:00 – 09:45";
-
       const punctuality = evaluateTeacherPunctuality(
-        scheduleTime,
+        slot.time,
         session,
         isSelectedDayActualToday,
-        hasAssignedTeacher
+        true
       );
 
       return {
-        cls,
+        id: slot.id,
+        slot,
+        classId: slot.classId,
+        className: slot.className,
         teacher,
         teacherName,
-        subjectName,
-        scheduleTime,
-        schedulePeriod: cls.schedulePeriod || "Jam Ke 1–3",
+        teacherPhone: teacher?.phone,
+        subjectName: slot.subjectName,
+        scheduleTime: slot.time,
+        schedulePeriod: slot.period,
         isAbsenceCompleted: !!session,
         topic: session?.topic || null,
         sessionDate: session?.sessionDate || null,
@@ -315,7 +333,32 @@ export default function AdminDashboardPage() {
         punctuality,
       };
     });
-  }, [classesToday, assignments, users, subjects, savedSessions, isSelectedDayActualToday]);
+  }, [slotsToday, users, savedSessions, isSelectedDayActualToday]);
+
+  // Filter baris monitor sesuai pencarian, tingkat kelas, dan status kedisiplinan
+  const filteredMonitorRows = useMemo(() => {
+    return monitorRows.filter((row) => {
+      // Filter Tingkat Kelas (7, 8, 9)
+      if (levelFilter === "7" && !row.className.startsWith("7")) return false;
+      if (levelFilter === "8" && !row.className.startsWith("8")) return false;
+      if (levelFilter === "9" && !row.className.startsWith("9")) return false;
+
+      // Filter Status Presensi
+      if (statusFilter !== "ALL" && row.punctuality.status !== statusFilter) return false;
+
+      // Filter Pencarian (Guru, Kelas, Mapel, Materi)
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchTeacher = row.teacherName.toLowerCase().includes(q);
+        const matchClass = row.className.toLowerCase().includes(q);
+        const matchSubject = row.subjectName.toLowerCase().includes(q);
+        const matchTopic = row.topic?.toLowerCase().includes(q) ?? false;
+        if (!matchTeacher && !matchClass && !matchSubject && !matchTopic) return false;
+      }
+
+      return true;
+    });
+  }, [monitorRows, levelFilter, statusFilter, searchQuery]);
 
   // Statistik Disiplin KBM
   const completedCount = monitorRows.filter((r) => r.isAbsenceCompleted).length;
@@ -515,13 +558,13 @@ export default function AdminDashboardPage() {
               {completedCount}
             </span>
             <span className="text-xs text-[var(--text-secondary)] ml-1.5 font-medium">
-              / {totalClassesToday} rombel
+              / {totalClassesToday} sesi KBM
             </span>
           </div>
           <div className="mt-2 text-[11px] text-[var(--text-secondary)]">
             {completedCount === totalClassesToday && totalClassesToday > 0
               ? "Semua tuntas diabsen"
-              : `${totalClassesToday - completedCount} kelas belum diabsen`}
+              : `${totalClassesToday - completedCount} sesi belum diabsen`}
           </div>
         </div>
       </div>
@@ -601,8 +644,16 @@ export default function AdminDashboardPage() {
             </p>
           </div>
 
-          {/* Pemilih Hari Jadwal */}
+          {/* Pemilih Hari Jadwal & Matriks aSc */}
           <div className="flex flex-wrap items-center gap-2 self-start">
+            <button
+              type="button"
+              onClick={() => setIsScheduleModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] border border-[var(--border-hairline)] text-xs font-bold text-[var(--color-accent)] flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+            >
+              <Calendar className="w-4 h-4" />
+              <span>Matriks aSc (29 Guru)</span>
+            </button>
             <div className="flex items-center gap-1 bg-[var(--surface-recessed)] p-1 rounded-xl border border-[var(--border-hairline)]">
               {scheduleDays.map((day) => (
                 <button
@@ -634,7 +685,7 @@ export default function AdminDashboardPage() {
                 Tepat Waktu / Awal
               </span>
               <span className="text-2xl font-black text-emerald-700 dark:text-emerald-300">
-                {onTimeCount} kelas
+                {onTimeCount} sesi
               </span>
             </div>
             <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400 opacity-80" />
@@ -646,7 +697,7 @@ export default function AdminDashboardPage() {
                 Presensi Susulan
               </span>
               <span className="text-2xl font-black text-sky-700 dark:text-sky-300">
-                {backfillCount} kelas
+                {backfillCount} sesi
               </span>
             </div>
             <Clock className="w-8 h-8 text-sky-600 dark:text-sky-400 opacity-80" />
@@ -658,7 +709,7 @@ export default function AdminDashboardPage() {
                 Terlambat Mengabsen
               </span>
               <span className="text-2xl font-black text-amber-700 dark:text-amber-300">
-                {lateCount} kelas
+                {lateCount} sesi
               </span>
             </div>
             <Timer className="w-8 h-8 text-amber-600 dark:text-amber-400 opacity-80" />
@@ -670,10 +721,64 @@ export default function AdminDashboardPage() {
                 Melewati Jadwal Masuk
               </span>
               <span className="text-2xl font-black text-rose-700 dark:text-rose-300">
-                {overdueCount} kelas
+                {overdueCount} sesi
               </span>
             </div>
             <AlertTriangle className="w-8 h-8 text-rose-600 dark:text-rose-400 opacity-80" />
+          </div>
+        </div>
+
+        {/* Toolbar Filter & Pencarian Live Monitor */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
+          {/* Filter Tingkat Kelas (Semua, 7, 8, 9) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            <span className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1 mr-1 shrink-0">
+              <Filter className="w-3.5 h-3.5" />
+              Tingkat:
+            </span>
+            {(["ALL", "7", "8", "9"] as const).map((lvl) => (
+              <button
+                key={lvl}
+                type="button"
+                onClick={() => setLevelFilter(lvl)}
+                className={`px-2.5 py-1 rounded-[8px] text-xs font-bold transition-all cursor-pointer ${
+                  levelFilter === lvl
+                    ? "bg-[var(--color-accent)] text-white shadow-xs"
+                    : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                {lvl === "ALL" ? `Semua (${monitorRows.length})` : `Kelas ${lvl}`}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            {/* Filter Status Kedisiplinan */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="min-h-[36px] px-3 py-1 rounded-[8px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-bold text-[var(--text-primary)] focus:outline-none cursor-pointer"
+            >
+              <option value="ALL">Semua Status Kedisiplinan</option>
+              <option value="OVERDUE">Melewati Jadwal Masuk</option>
+              <option value="LATE">Terlambat Mengabsen</option>
+              <option value="ON_TIME">Tepat Waktu / Awal</option>
+              <option value="BACKFILL">Presensi Susulan</option>
+              <option value="UPCOMING">Sedang / Menunggu Jam</option>
+              <option value="NOT_RECORDED">Belum Diabsen</option>
+            </select>
+
+            {/* Input Pencarian */}
+            <div className="relative min-w-[220px]">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari guru, kelas, mapel..."
+                className="w-full min-h-[36px] pl-8 pr-3 rounded-[8px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+              />
+            </div>
           </div>
         </div>
 
@@ -693,26 +798,28 @@ export default function AdminDashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-hairline)]">
-              {monitorRows.length === 0 ? (
+              {filteredMonitorRows.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-8 text-center text-[var(--text-secondary)]">
-                    Tidak ada jadwal KBM pada hari {selectedDay}.
+                    {monitorRows.length === 0
+                      ? `Tidak ada jadwal KBM pada hari ${selectedDay}.`
+                      : "Tidak ada sesi KBM yang sesuai dengan kriteria pencarian atau filter."}
                   </td>
                 </tr>
               ) : (
-                monitorRows.map((row) => {
+                filteredMonitorRows.map((row) => {
                   const isLateOrOverdue =
                     row.punctuality.status === "LATE" || row.punctuality.status === "OVERDUE";
                   const waLink = buildWhatsAppReminderLink(
-                    row.teacher?.phone,
+                    row.teacherPhone,
                     row.teacherName,
-                    row.cls.name,
+                    row.className,
                     row.scheduleTime
                   );
 
                   return (
                     <tr
-                      key={row.cls.id}
+                      key={row.id}
                       className={`hover:bg-[var(--surface-recessed)]/50 transition-colors ${
                         row.punctuality.status === "OVERDUE"
                           ? "bg-rose-500/5"
@@ -722,7 +829,7 @@ export default function AdminDashboardPage() {
                       }`}
                     >
                       <td className="py-3 px-3 font-bold font-mono text-[var(--text-primary)]">
-                        Kelas {row.cls.name}
+                        Kelas {row.className}
                       </td>
                       <td className="py-3 px-3 text-[var(--text-secondary)] font-mono">
                         <span className="font-bold text-[var(--text-primary)]">{row.scheduleTime}</span>
@@ -743,24 +850,15 @@ export default function AdminDashboardPage() {
                               @{row.teacher.username}
                             </span>
                           </>
-                        ) : row.session?.teacherName ? (
+                        ) : (
                           <>
                             <span className="font-semibold text-[var(--text-primary)] block">
-                              {row.session.teacherName}
+                              {row.teacherName}
                             </span>
-                            <span className="text-[10px] text-sky-600 dark:text-sky-400 font-medium block">
-                              Penginput Sesi Presensi
+                            <span className="text-[10px] text-[var(--text-tertiary)] font-mono">
+                              aSc Timetables
                             </span>
                           </>
-                        ) : (
-                          <div>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-stone-500/10 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-800">
-                              Belum Ditugaskan
-                            </span>
-                            <span className="text-[10px] text-[var(--text-tertiary)] block mt-0.5">
-                              Belum ada guru pengampu
-                            </span>
-                          </div>
                         )}
                       </td>
                       <td className="py-3 px-3 text-center font-mono">
@@ -806,7 +904,7 @@ export default function AdminDashboardPage() {
                             <span>Tugaskan</span>
                           </Link>
                         ) : isLateOrOverdue ? (
-                          row.teacher?.phone ? (
+                          row.teacherPhone ? (
                             <a
                               href={waLink}
                               target="_blank"
@@ -845,6 +943,13 @@ export default function AdminDashboardPage() {
           </table>
         </div>
       </div>
+
+      {/* Modal Matriks Jadwal Mingguan aSc Timetables (29 Guru & 22 Rombel) */}
+      <WeeklyScheduleViewerModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+        currentUser={currentUser}
+      />
     </div>
   );
 }

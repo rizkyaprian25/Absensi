@@ -1,7 +1,13 @@
 import type { Subject, TeacherAssignment, AppUser } from "../contracts/academic.ts";
 import { DEFAULT_SUBJECTS } from "../contracts/academic.ts";
-import type { Class } from "../contracts/attendance.ts";
+import type { Class, ScheduleDay } from "../contracts/attendance.ts";
 import { MOCK_CLASSES } from "../contracts/mocks/attendanceMocks.ts";
+import type { TeacherScheduleSlot, TeacherWeeklySchedule } from "../contracts/schedule.ts";
+import { OFFICIAL_SCHEDULE_SLOTS } from "../contracts/mocks/scheduleMocks.ts";
+import { getStoredUsers } from "./authStorage.ts";
+
+export { OFFICIAL_SCHEDULE_SLOTS };
+export type { TeacherScheduleSlot, TeacherWeeklySchedule };
 
 // ============================================================================
 // KUNCI PENYIMPANAN DATA AKADEMIK (LOCALSTORAGE SSOT)
@@ -9,9 +15,6 @@ import { MOCK_CLASSES } from "../contracts/mocks/attendanceMocks.ts";
 
 export const STORAGE_KEY_SUBJECTS = "absensi_subjects_v1";
 export const STORAGE_KEY_TEACHER_ASSIGNMENTS = "absensi_teacher_assignments_v1";
-
-/**
- * Penugasan awal bawaan untuk Bapak Muhamad Rizky Aprian, S.Kom
 /**
  * Matriks Distribusi Resmi Pembagian Tugas Jam Mengajar Guru
  * SMP Negeri 3 Cibungbulang TP 2026/2027 (Surat Keputusan Kepala Sekolah)
@@ -113,16 +116,26 @@ const OFFICIAL_TEACHING_DISTRIBUTION: { teacherId: string; subjectId: string; cl
 ];
 
 export const DEFAULT_TEACHER_ASSIGNMENTS: TeacherAssignment[] = OFFICIAL_TEACHING_DISTRIBUTION.flatMap((d) =>
-  d.classes.map((c) => ({
-    id: `asgn-${d.teacherId.replace("user-", "")}-${d.subjectId.replace("sub-", "")}-${c}`,
-    teacherId: d.teacherId,
-    subjectId: d.subjectId,
-    classId: `class-${c}`,
-    academicYear: "2026/2027",
-    semester: 1,
-    isActive: true,
-    createdAt: "2026-07-15T00:00:00Z",
-  }))
+  d.classes.map((c) => {
+    const classId = `class-${c}`;
+    const matchingSlots = OFFICIAL_SCHEDULE_SLOTS.filter(
+      (s) => s.teacherId === d.teacherId && s.classId === classId
+    );
+    const firstSlot = matchingSlots[0];
+    return {
+      id: `asgn-${d.teacherId.replace("user-", "")}-${d.subjectId.replace("sub-", "")}-${c}`,
+      teacherId: d.teacherId,
+      subjectId: d.subjectId,
+      classId,
+      academicYear: "2026/2027",
+      semester: 1,
+      scheduleDay: firstSlot?.day || null,
+      schedulePeriod: firstSlot?.period || null,
+      scheduleTime: firstSlot?.time || null,
+      isActive: true,
+      createdAt: "2026-07-15T00:00:00Z",
+    };
+  })
 );
 
 /**
@@ -305,8 +318,146 @@ export function getEnrolledClassesForUser(
     assignments = assignments.filter((a) => a.subjectId === subjectId);
   }
 
-  const assignedClassIds = new Set(assignments.map((a) => a.classId));
-  return MOCK_CLASSES.filter((c) => assignedClassIds.has(c.id));
+  const allSubjects = getStoredSubjects();
+  return assignments.map((asgn) => {
+    const baseClass = MOCK_CLASSES.find((c) => c.id === asgn.classId);
+    const subject = allSubjects.find((s) => s.id === asgn.subjectId);
+    const slots = OFFICIAL_SCHEDULE_SLOTS.filter(
+      (s) => s.teacherId === asgn.teacherId && s.classId === asgn.classId
+    );
+
+    let displayDay = asgn.scheduleDay || slots[0]?.day || baseClass?.scheduleDay;
+    let displayTime = asgn.scheduleTime || slots[0]?.time || baseClass?.scheduleTime;
+    let displayPeriod = asgn.schedulePeriod || slots[0]?.period || baseClass?.schedulePeriod;
+
+    if (slots.length > 1) {
+      displayDay = slots.map((s) => s.day).join(" & ") as any;
+      displayTime = slots.map((s) => `${s.day}: ${s.time}`).join(" · ");
+      displayPeriod = slots.map((s) => `${s.day}: ${s.period}`).join(" · ");
+    }
+
+    return {
+      ...(baseClass || {
+        id: asgn.classId,
+        teacherId: asgn.teacherId,
+        name: asgn.classId.replace("class-", "").toUpperCase(),
+        academicYear: asgn.academicYear,
+        semester: asgn.semester,
+        createdAt: asgn.createdAt,
+      }),
+      teacherId: asgn.teacherId,
+      subject: subject?.name || slots[0]?.subjectName || baseClass?.subject || "Mata Pelajaran",
+      scheduleDay: displayDay,
+      scheduleTime: displayTime,
+      schedulePeriod: displayPeriod,
+      homeroomTeacherName: baseClass?.homeroomTeacherName,
+    };
+  });
+}
+
+/**
+ * Mengambil daftar rombel pelajaran spesifik untuk guru dan hari yang dipilih
+ * Menggunakan data jadwal aSc Timetables resmi (374 sesi KBM)
+ * - Jika Admin: Mengembalikan seluruh kelas yang ada KBM di hari tersebut
+ * - Jika Guru: Mengembalikan rombel yang diampu guru pada hari tersebut lengkap dengan jam dan periodenya
+ */
+export function getClassesForTeacherAndDay(
+  user: AppUser | null,
+  day: ScheduleDay
+): Class[] {
+  const isUserAdmin = user?.role === "ADMIN";
+  const teacherId = user?.id ?? "user-rizky";
+
+  // Ambil slot jadwal resmi untuk hari tersebut
+  const daySlots = OFFICIAL_SCHEDULE_SLOTS.filter((s) => {
+    if (s.day !== day) return false;
+    if (isUserAdmin) return true;
+    return s.teacherId === teacherId;
+  });
+
+  return daySlots.map((slot) => {
+    const baseClass = MOCK_CLASSES.find((c) => c.id === slot.classId);
+    return {
+      ...(baseClass || {
+        id: slot.classId,
+        teacherId: slot.teacherId,
+        name: slot.className,
+        academicYear: "2026/2027",
+        semester: 1,
+        createdAt: "2026-07-15T00:00:00Z",
+      }),
+      teacherId: slot.teacherId,
+      subject: slot.subjectName,
+      scheduleDay: slot.day,
+      schedulePeriod: slot.period,
+      scheduleTime: slot.time,
+      homeroomTeacherName: baseClass?.homeroomTeacherName,
+    };
+  });
+}
+
+/**
+ * Mengambil seluruh slot jadwal aSc Timetables (374 sesi KBM mingguan)
+ * Jika teacherId diberikan, hanya mengembalikan slot milik guru tersebut
+ */
+export function getTeacherScheduleSlots(teacherId?: string): TeacherScheduleSlot[] {
+  if (!teacherId || teacherId === "user-admin" || teacherId === "user-juwariyah") {
+    return OFFICIAL_SCHEDULE_SLOTS;
+  }
+  return OFFICIAL_SCHEDULE_SLOTS.filter((s) => s.teacherId === teacherId);
+}
+
+/**
+ * Mengambil slot jadwal untuk hari tertentu (Senin - Jumat)
+ * Mendukung filter spesifik per guru
+ */
+export function getScheduleSlotsForDay(
+  day: ScheduleDay,
+  teacherId?: string
+): TeacherScheduleSlot[] {
+  return OFFICIAL_SCHEDULE_SLOTS.filter((s) => {
+    if (s.day !== day) return false;
+    if (!teacherId || teacherId === "user-admin" || teacherId === "user-juwariyah") return true;
+    return s.teacherId === teacherId;
+  });
+}
+
+/**
+ * Mengambil matriks jadwal mingguan seorang guru (Senin s.d. Jumat)
+ */
+export function getTeacherWeeklySchedule(teacherId: string): TeacherWeeklySchedule {
+  const users = getStoredUsers();
+  const teacher = users.find((u) => u.id === teacherId);
+  const teacherSlots = OFFICIAL_SCHEDULE_SLOTS.filter((s) => s.teacherId === teacherId);
+
+  const byDay: Record<ScheduleDay, TeacherScheduleSlot[]> = {
+    Senin: [],
+    Selasa: [],
+    Rabu: [],
+    Kamis: [],
+    Jumat: [],
+  };
+
+  teacherSlots.forEach((slot) => {
+    if (byDay[slot.day]) {
+      byDay[slot.day].push(slot);
+    }
+  });
+
+  return {
+    teacherId,
+    teacherName: teacher?.fullName || "Guru Pengampu",
+    totalSessions: teacherSlots.length,
+    byDay,
+  };
+}
+
+/**
+ * Mengambil seluruh matriks jadwal mingguan 29 guru sekolah
+ */
+export function getAllTeachersWeeklySchedules(): TeacherWeeklySchedule[] {
+  const users = getStoredUsers().filter((u) => u.role === "GURU");
+  return users.map((u) => getTeacherWeeklySchedule(u.id));
 }
 
 /**

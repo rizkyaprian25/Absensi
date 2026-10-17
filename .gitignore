@@ -44,4 +44,7 @@ Kelas/
 *.xlsx
 *.xls
 *.csv
+*.py
+scripts/*.json
+
 

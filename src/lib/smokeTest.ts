@@ -154,7 +154,13 @@ import {
   saveTeacherAssignmentsForTeacher,
   getEnrolledClassesForUser,
   getEnrolledSubjectsForUser,
+  getClassesForTeacherAndDay,
+  getTeacherScheduleSlots,
+  getScheduleSlotsForDay,
+  getTeacherWeeklySchedule,
+  getAllTeachersWeeklySchedules,
 } from "./academicStorage.ts";
+import { OFFICIAL_SCHEDULE_SLOTS } from "../contracts/mocks/scheduleMocks.ts";
 import {
   generatePpdbTemplateWorkbook,
   commitPpdbImport,
@@ -1734,6 +1740,102 @@ function runSmokeTest() {
 
     logoutUser();
     console.log("✓ LULUS: Akun Kepala Sekolah (Akses Admin), 29 Akun Guru, 264 Penugasan SK KBM, dan Wali Kelas terverifikasi 100% akurat.");
+  }
+
+  // --------------------------------------------------------------------------
+  // TEST 24: Integrasi Jadwal Pelajaran Resmi aSc Timetables (374 Slot Sesi KBM)
+  // --------------------------------------------------------------------------
+  {
+    console.log("\n[TEST 24] Menjalankan verifikasi Matriks Jadwal Resmi aSc Timetables (374 Sesi KBM)...");
+
+    // 1. Verifikasi Total Slot Jadwal Mingguan Sekolah (Tepat 374 Sesi Pertemuan)
+    assert.strictEqual(
+      OFFICIAL_SCHEDULE_SLOTS.length,
+      374,
+      "Total slot jadwal resmi aSc Timetables harus tepat 374 sesi pertemuan kelas"
+    );
+
+    // 2. Verifikasi Distribusi Sesi KBM per Hari (Senin - Jumat)
+    const countSenin = OFFICIAL_SCHEDULE_SLOTS.filter((s) => s.day === "Senin").length;
+    const countSelasa = OFFICIAL_SCHEDULE_SLOTS.filter((s) => s.day === "Selasa").length;
+    const countRabu = OFFICIAL_SCHEDULE_SLOTS.filter((s) => s.day === "Rabu").length;
+    const countKamis = OFFICIAL_SCHEDULE_SLOTS.filter((s) => s.day === "Kamis").length;
+    const countJumat = OFFICIAL_SCHEDULE_SLOTS.filter((s) => s.day === "Jumat").length;
+
+    assert.strictEqual(countSenin, 79, "Hari Senin harus memiliki tepat 79 sesi KBM");
+    assert.strictEqual(countSelasa, 78, "Hari Selasa harus memiliki tepat 78 sesi KBM");
+    assert.strictEqual(countRabu, 81, "Hari Rabu harus memiliki tepat 81 sesi KBM");
+    assert.strictEqual(countKamis, 82, "Hari Kamis harus memiliki tepat 82 sesi KBM");
+    assert.strictEqual(countJumat, 54, "Hari Jumat harus memiliki tepat 54 sesi KBM");
+    assert.strictEqual(
+      countSenin + countSelasa + countRabu + countKamis + countJumat,
+      374,
+      "Akumulasi 5 hari sekolah harus tepat 374 sesi"
+    );
+
+    // 3. Verifikasi Konsistensi Setiap Rombel (22 Rombel x 17 Sesi = 374)
+    const classSessionCounts: Record<string, number> = {};
+    OFFICIAL_SCHEDULE_SLOTS.forEach((slot) => {
+      classSessionCounts[slot.className] = (classSessionCounts[slot.className] || 0) + 1;
+      assert.ok(slot.id && slot.id.length > 0, "ID slot wajib ada");
+      assert.ok(slot.teacherId && slot.teacherId.length > 0, "teacherId wajib terisi");
+      assert.ok(slot.teacherName && slot.teacherName.length > 0, "teacherName wajib terisi");
+      assert.ok(slot.subjectName && slot.subjectName.length > 0, "subjectName wajib terisi");
+      assert.ok(slot.time && slot.time.includes("–"), "Format jam slot wajib memuat rentang waktu baku");
+      assert.ok(slot.period && slot.period.includes("Jam Ke"), "Periode wajib memuat Jam Ke");
+    });
+
+    assert.strictEqual(Object.keys(classSessionCounts).length, 22, "Harus mencakup seluruh 22 rombel sekolah");
+    for (const [cls, count] of Object.entries(classSessionCounts)) {
+      assert.strictEqual(count, 17, `Kelas ${cls} harus memiliki tepat 17 sesi KBM per minggu`);
+    }
+
+    // 4. Verifikasi Jadwal Spesifik Pak Rizky (Informatika)
+    const rizkySlots = getTeacherScheduleSlots("user-rizky");
+    assert.strictEqual(rizkySlots.length, 10, "Pak Rizky harus memiliki tepat 10 slot mengajar (7A-7H & 8A-8B)");
+    const rizkyUserObj = { id: "user-rizky", role: "GURU" as const, username: "rizky", fullName: "Muhamad Rizky Aprian, S.Kom", nip: "", phone: "", isActive: true, createdAt: "" };
+
+    const rizkySenin = getClassesForTeacherAndDay(rizkyUserObj, "Senin");
+    assert.strictEqual(rizkySenin.length, 2, "Pak Rizky mengajar 2 kelas di hari Senin");
+    assert.deepStrictEqual(rizkySenin.map((c) => c.name).sort(), ["7A", "7D"].sort(), "Senin: 7A dan 7D");
+
+    const rizkySelasa = getClassesForTeacherAndDay(rizkyUserObj, "Selasa");
+    assert.strictEqual(rizkySelasa.length, 2, "Pak Rizky mengajar 2 kelas di hari Selasa");
+    assert.deepStrictEqual(rizkySelasa.map((c) => c.name).sort(), ["7B", "8B"].sort(), "Selasa: 7B dan 8B");
+
+    const rizkyRabu = getClassesForTeacherAndDay(rizkyUserObj, "Rabu");
+    assert.strictEqual(rizkyRabu.length, 2, "Pak Rizky mengajar 2 kelas di hari Rabu");
+    assert.deepStrictEqual(rizkyRabu.map((c) => c.name).sort(), ["7E", "7F"].sort(), "Rabu: 7E dan 7F");
+
+    const rizkyKamis = getClassesForTeacherAndDay(rizkyUserObj, "Kamis");
+    assert.strictEqual(rizkyKamis.length, 2, "Pak Rizky mengajar 2 kelas di hari Kamis");
+    assert.deepStrictEqual(rizkyKamis.map((c) => c.name).sort(), ["7H", "8A"].sort(), "Kamis: 7H dan 8A");
+
+    const rizkyJumat = getClassesForTeacherAndDay(rizkyUserObj, "Jumat");
+    assert.strictEqual(rizkyJumat.length, 2, "Pak Rizky mengajar 2 kelas di hari Jumat");
+    assert.deepStrictEqual(rizkyJumat.map((c) => c.name).sort(), ["7C", "7G"].sort(), "Jumat: 7C dan 7G");
+
+    // 5. Verifikasi Supervisi KBM Hari Ini untuk Akses Administrator
+    const adminUserObj = { id: "user-admin", role: "ADMIN" as const, username: "admin", fullName: "Administrator", nip: "", phone: "", isActive: true, createdAt: "" };
+    const adminSenin = getClassesForTeacherAndDay(adminUserObj, "Senin");
+    assert.strictEqual(adminSenin.length, 79, "Admin dapat mensupervisi seluruh 79 sesi KBM di hari Senin");
+
+    // 6. Verifikasi Generator Jadwal Mingguan Per Guru
+    const rizkyWeekly = getTeacherWeeklySchedule("user-rizky");
+    assert.strictEqual(rizkyWeekly.totalSessions, 10);
+    assert.strictEqual(rizkyWeekly.byDay.Senin.length, 2);
+    assert.strictEqual(rizkyWeekly.byDay.Selasa.length, 2);
+    assert.strictEqual(rizkyWeekly.byDay.Rabu.length, 2);
+    assert.strictEqual(rizkyWeekly.byDay.Kamis.length, 2);
+    assert.strictEqual(rizkyWeekly.byDay.Jumat.length, 2);
+
+    // 7. Verifikasi Seluruh 29 Guru Memiliki Matriks Jadwal Mingguan
+    const allWeekly = getAllTeachersWeeklySchedules();
+    assert.strictEqual(allWeekly.length, 29, "Harus menghasilkan 29 matriks jadwal mingguan guru");
+    const totalWeeklySessions = allWeekly.reduce((acc, curr) => acc + curr.totalSessions, 0);
+    assert.strictEqual(totalWeeklySessions, 374, "Total seluruh sesi mingguan 29 guru harus tepat 374 sesi");
+
+    console.log("✓ LULUS: 374 Sesi KBM aSc Timetables, distribusi 5 hari, jadwal Pak Rizky 10 kelas, dan matriks 29 guru terverifikasi 100% akurat.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");
