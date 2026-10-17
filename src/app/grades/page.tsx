@@ -50,6 +50,7 @@ import {
   getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
 import { useAuth } from "@/context/AuthContext";
+import { useConfirm } from "@/context/ConfirmContext";
 import { getEnrolledClassesForUser, getEnrolledSubjectsForUser } from "@/lib/academicStorage";
 
 import type { Student } from "@/contracts/attendance";
@@ -119,6 +120,7 @@ function GradesPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { currentUser } = useAuth();
+  const { confirm, alert } = useConfirm();
   const enrolledClasses = useMemo(() => getEnrolledClassesForUser(currentUser), [currentUser]);
 
   // 1. State Pilihan Kelas
@@ -339,10 +341,15 @@ function GradesPageContent() {
   };
 
   // Kembalikan urutan asesmen sesuai urutan tanggal
-  const handleResetAssessmentOrder = () => {
-    const isConfirm = window.confirm(
-      "Kembalikan urutan seluruh penilaian kelas ini ke urutan kronologis berdasarkan tanggal pelaksanaan?"
-    );
+  const handleResetAssessmentOrder = async () => {
+    const isConfirm = await confirm({
+      title: "Kembalikan Urutan Penilaian",
+      message: "Kembalikan urutan seluruh penilaian kelas ini ke urutan kronologis berdasarkan tanggal pelaksanaan?",
+      confirmText: "Ya, Kembalikan Urutan",
+      cancelText: "Batal",
+      variant: "primary",
+      icon: "info",
+    });
     if (!isConfirm) return;
     const sortedByDate = [...classAssessments].sort((a, b) => a.date.localeCompare(b.date));
     saveAssessmentOrderForClass(selectedClassId, sortedByDate.map((a) => a.id));
@@ -566,11 +573,19 @@ function GradesPageContent() {
   };
 
   // Hapus Penilaian
-  const handleDeleteAssessment = (id: string, title: string) => {
-    if (confirm(`Yakin ingin menghapus penilaian "${title}"? Seluruh nilai siswa pada penilaian ini akan ikut terhapus.`)) {
-      deleteAssessment(id);
-      refreshData();
-    }
+  const handleDeleteAssessment = async (id: string, title: string) => {
+    const isConfirmed = await confirm({
+      title: "Hapus Penilaian",
+      message: `Yakin ingin menghapus penilaian "${title}"? Seluruh nilai siswa pada penilaian ini akan ikut terhapus.`,
+      confirmText: "Ya, Hapus",
+      cancelText: "Batal",
+      variant: "danger",
+      icon: "trash",
+    });
+    if (!isConfirmed) return;
+
+    deleteAssessment(id);
+    refreshData();
   };
 
   // Mulai Edit Nilai Inline Cell
@@ -974,10 +989,15 @@ function GradesPageContent() {
   }, [studentSummaries, classAssessments]);
 
   // Konfirmasi & Kosongkan Penilaian Kelas Terpilih
-  const handleClearAssessments = () => {
-    const isConfirm = window.confirm(
-      `Apakah Anda yakin ingin mengosongkan seluruh penilaian dan nilai untuk Kelas ${currentClass.name}? Semua tugas, ulangan, dan nilai yang dibuat pada kelas ini akan dihapus bersih.`
-    );
+  const handleClearAssessments = async () => {
+    const isConfirm = await confirm({
+      title: "Kosongkan Penilaian Kelas",
+      message: `Apakah Anda yakin ingin mengosongkan seluruh penilaian dan nilai untuk Kelas ${currentClass.name}? Semua tugas, ulangan, dan nilai yang dibuat pada kelas ini akan dihapus bersih.`,
+      confirmText: "Ya, Kosongkan",
+      cancelText: "Batal",
+      variant: "danger",
+      icon: "trash",
+    });
     if (!isConfirm) return;
 
     clearAssessmentsForClass(selectedClassId);

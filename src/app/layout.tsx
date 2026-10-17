@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/shell/AppShell";
 import { AuthProvider } from "@/context/AuthContext";
+import { ConfirmProvider } from "@/context/ConfirmContext";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -60,7 +61,9 @@ export default function RootLayout({
       </head>
       <body className="antialiased selection:bg-[#163A29] selection:text-[#7FD9AC]">
         <AuthProvider>
-          <AppShell>{children}</AppShell>
+          <ConfirmProvider>
+            <AppShell>{children}</AppShell>
+          </ConfirmProvider>
         </AuthProvider>
       </body>
     </html>

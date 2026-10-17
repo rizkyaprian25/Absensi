@@ -23,6 +23,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useConfirm } from "@/context/ConfirmContext";
 import { Toast } from "@/components/ui/Toast";
 import type { AppUser, Subject } from "@/contracts/academic";
 import { MOCK_CLASSES } from "@/contracts/mocks/attendanceMocks";
@@ -48,6 +49,7 @@ import {
  */
 export default function AdminUsersPage() {
   const { currentUser, isAdmin } = useAuth();
+  const { confirm } = useConfirm();
   const [users, setUsers] = useState<AppUser[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [assignments, setAssignments] = useState<ReturnType<typeof getStoredTeacherAssignments>>([]);
@@ -222,17 +224,26 @@ export default function AdminUsersPage() {
   };
 
   // Handle Aktif / Nonaktif Akun
-  const handleToggleActive = (user: AppUser) => {
+  const handleToggleActive = async (user: AppUser) => {
     const action = user.isActive ? "menonaktifkan" : "mengaktifkan";
-    if (confirm(`Apakah Anda yakin ingin ${action} akun @${user.username}?`)) {
-      const res = toggleUserActiveByAdmin(user.id);
-      if (!res.success) {
-        setToastMessage(res.error || "Gagal memperbarui status akun.");
-        return;
-      }
-      setToastMessage(`Akun @${user.username} berhasil ${user.isActive ? "dinonaktifkan" : "diaktifkan kembali"}.`);
-      refreshData();
+    const isConfirmed = await confirm({
+      title: `${user.isActive ? "Nonaktifkan" : "Aktifkan"} Akun Guru`,
+      message: `Apakah Anda yakin ingin ${action} akun @${user.username} (${user.fullName})?`,
+      confirmText: user.isActive ? "Ya, Nonaktifkan" : "Ya, Aktifkan",
+      cancelText: "Batal",
+      variant: user.isActive ? "warning" : "success",
+      icon: user.isActive ? "warning" : "success",
+    });
+
+    if (!isConfirmed) return;
+
+    const res = toggleUserActiveByAdmin(user.id);
+    if (!res.success) {
+      setToastMessage(res.error || "Gagal memperbarui status akun.");
+      return;
     }
+    setToastMessage(`Akun @${user.username} berhasil ${user.isActive ? "dinonaktifkan" : "diaktifkan kembali"}.`);
+    refreshData();
   };
 
   // Buka Modal Penugasan Mengajar untuk Guru

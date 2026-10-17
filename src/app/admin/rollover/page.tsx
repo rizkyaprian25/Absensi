@@ -20,6 +20,7 @@ import {
   Archive,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useConfirm } from "@/context/ConfirmContext";
 import { Toast } from "@/components/ui/Toast";
 import {
   downloadPpdbTemplate,
@@ -43,6 +44,7 @@ type RolloverTab = "ppdb" | "promotion" | "graduation";
  */
 export default function AdminRolloverPage() {
   const { currentUser, isAdmin } = useAuth();
+  const { confirm, alert } = useConfirm();
   const [activeTab, setActiveTab] = useState<RolloverTab>("ppdb");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -102,7 +104,11 @@ export default function AdminRolloverPage() {
         setToastMessage(`Berhasil membaca ${result.validRows.length} data calon siswa baru.`);
       }
     } catch (err: any) {
-      alert(`Gagal membaca berkas Excel: ${err.message}`);
+      await alert({
+        title: "Gagal Membaca Berkas Excel",
+        message: `Terjadi kendala saat membaca data: ${err.message}`,
+        variant: "danger",
+      });
     } finally {
       setIsParsing(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -110,16 +116,19 @@ export default function AdminRolloverPage() {
   };
 
   // 2. Simpan Impor PPDB Masuk ke Database
-  const handleCommitPpdb = () => {
+  const handleCommitPpdb = async () => {
     if (!parsedResult || parsedResult.validRows.length === 0) return;
 
-    if (
-      !confirm(
-        `Apakah Anda yakin ingin mengimpor ${parsedResult.validRows.length} siswa baru ke kelas 7? Data akan langsung terdaftar di sistem presensi.`
-      )
-    ) {
-      return;
-    }
+    const isConfirmed = await confirm({
+      title: "Konfirmasi Impor Siswa Baru",
+      message: `Apakah Anda yakin ingin mengimpor ${parsedResult.validRows.length} siswa baru ke Kelas 7? Data akan langsung terdaftar di sistem presensi.`,
+      confirmText: "Ya, Impor Siswa",
+      cancelText: "Batal",
+      variant: "primary",
+      icon: "success",
+    });
+
+    if (!isConfirmed) return;
 
     setIsCommitting(true);
     try {
@@ -132,7 +141,11 @@ export default function AdminRolloverPage() {
         refreshLocalData();
       }
     } catch (err: any) {
-      alert(`Terjadi kesalahan saat menyimpan data: ${err.message}`);
+      await alert({
+        title: "Gagal Menyimpan Data",
+        message: `Terjadi kesalahan saat menyimpan data: ${err.message}`,
+        variant: "danger",
+      });
     } finally {
       setIsCommitting(false);
     }
@@ -150,14 +163,23 @@ export default function AdminRolloverPage() {
   };
 
   // 4. Eksekusi Kenaikan Kelas Paralel
-  const handleExecutePromotion = () => {
+  const handleExecutePromotion = async () => {
     const retainedCount = retainedStudentIds.size;
     const confirmMsg =
       retainedCount > 0
-        ? `Konfirmasi Kenaikan Kelas:\n• Kelas 8 naik ke Kelas 9\n• Kelas 7 naik ke Kelas 8\n• ${retainedCount} siswa ditandai tinggal kelas.\n\nLanjutkan proses kenaikan kelas?`
-        : `Konfirmasi Kenaikan Kelas:\n• Seluruh Kelas 8 naik ke Kelas 9\n• Seluruh Kelas 7 naik ke Kelas 8\n(Tidak ada siswa yang tinggal kelas).\n\nLanjutkan proses kenaikan kelas?`;
+        ? `Kelas 8 akan naik ke Kelas 9, Kelas 7 akan naik ke Kelas 8, dan ${retainedCount} siswa ditandai tinggal kelas. Lanjutkan proses kenaikan kelas?`
+        : `Seluruh Kelas 8 akan naik ke Kelas 9 dan seluruh Kelas 7 akan naik ke Kelas 8 (tidak ada siswa yang tinggal kelas). Lanjutkan proses kenaikan kelas?`;
 
-    if (!confirm(confirmMsg)) return;
+    const isConfirmed = await confirm({
+      title: "Konfirmasi Kenaikan Kelas Paralel",
+      message: confirmMsg,
+      confirmText: "Ya, Proses Kenaikan",
+      cancelText: "Batal",
+      variant: "warning",
+      icon: "warning",
+    });
+
+    if (!isConfirmed) return;
 
     setIsPromoting(true);
     try {
@@ -172,14 +194,18 @@ export default function AdminRolloverPage() {
         refreshLocalData();
       }
     } catch (err: any) {
-      alert(`Gagal memproses kenaikan kelas: ${err.message}`);
+      await alert({
+        title: "Gagal Memproses Kenaikan",
+        message: `Terjadi kendala saat memproses kenaikan kelas: ${err.message}`,
+        variant: "danger",
+      });
     } finally {
       setIsPromoting(false);
     }
   };
 
   // 5. Eksekusi Kelulusan Kelas 9
-  const handleExecuteGraduation = () => {
+  const handleExecuteGraduation = async () => {
     // Hitung berapa siswa kelas 9 aktif
     const class9Ids = ["class-9a", "class-9b", "class-9c", "class-9d", "class-9e", "class-9f", "class-9g"];
     let class9Total = 0;
@@ -188,17 +214,24 @@ export default function AdminRolloverPage() {
     }
 
     if (class9Total === 0) {
-      alert("Saat ini belum ada data siswa aktif di Kelas 9 (9A-9G). Jika belum dilakukan kenaikan kelas, jalankan kenaikan kelas terlebih dahulu.");
+      await alert({
+        title: "Data Siswa Kelas 9 Kosong",
+        message: "Saat ini belum ada data siswa aktif di Kelas 9 (9A-9G). Jika belum dilakukan kenaikan kelas, jalankan kenaikan kelas terlebih dahulu.",
+        variant: "warning",
+      });
       return;
     }
 
-    if (
-      !confirm(
-        `PERINGATAN KELULUSAN KELAS 9:\nSebanyak ${class9Total} siswa Kelas 9 (9A s.d. 9G) akan diluluskan menjadi Alumni resmi.\n\nRombel Kelas 9 akan dikosongkan agar siap menerima kenaikan dari Kelas 8.\nRiwayat presensi dan nilai lampau tetap aman tersimpan.\n\nLanjutkan kelulusan angkatan?`
-      )
-    ) {
-      return;
-    }
+    const isConfirmed = await confirm({
+      title: "Peringatan Kelulusan Kelas 9",
+      message: `Sebanyak ${class9Total} siswa Kelas 9 (9A s.d. 9G) akan diluluskan menjadi Alumni resmi. Rombel Kelas 9 akan dikosongkan agar siap menerima kenaikan dari Kelas 8. Seluruh riwayat presensi dan nilai lampau tetap aman tersimpan. Lanjutkan kelulusan angkatan?`,
+      confirmText: "Ya, Luluskan Angkatan",
+      cancelText: "Batal",
+      variant: "danger",
+      icon: "warning",
+    });
+
+    if (!isConfirmed) return;
 
     setIsGraduating(true);
     try {
@@ -208,7 +241,11 @@ export default function AdminRolloverPage() {
         refreshLocalData();
       }
     } catch (err: any) {
-      alert(`Gagal memproses kelulusan: ${err.message}`);
+      await alert({
+        title: "Gagal Memproses Kelulusan",
+        message: `Terjadi kendala saat memproses kelulusan: ${err.message}`,
+        variant: "danger",
+      });
     } finally {
       setIsGraduating(false);
     }

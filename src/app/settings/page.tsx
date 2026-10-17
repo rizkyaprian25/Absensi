@@ -33,6 +33,7 @@ import {
   Server,
 } from "lucide-react";
 import { Toast } from "@/components/ui/Toast";
+import { useConfirm } from "@/context/ConfirmContext";
 import {
   checkSupabaseHealth,
   isSupabaseConfigured,
@@ -75,6 +76,7 @@ import {
  * Halaman Pengaturan, Profil Guru, Manajemen Kalender, dan Pusat Keamanan Cadangan Data
  */
 export default function SettingsPage() {
+  const { confirm, alert } = useConfirm();
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -194,9 +196,14 @@ export default function SettingsPage() {
   };
 
   const handlePullFromCloud = async () => {
-    const isConfirmed = window.confirm(
-      "Apakah Anda yakin ingin menarik data dari Supabase Cloud?\\n\\nData lokal Anda saat ini akan secara otomatis disimpan ke titik snapshot sebelum digantikan dengan data dari cloud."
-    );
+    const isConfirmed = await confirm({
+      title: "Tarik Data dari Cloud",
+      message: "Apakah Anda yakin ingin menarik data dari Supabase Cloud? Data lokal Anda saat ini akan secara otomatis disimpan ke titik snapshot sebelum digantikan dengan data dari cloud.",
+      confirmText: "Ya, Tarik Data",
+      cancelText: "Batal",
+      variant: "primary",
+      icon: "info",
+    });
     if (!isConfirmed) return;
 
     setIsSyncingCloud(true);
@@ -347,11 +354,16 @@ export default function SettingsPage() {
   };
 
   // Pulihkan dari Snapshot Tertentu
-  const handleRestoreFromSnapshot = (snapshotId: string, triggerLabel: string) => {
-    const confirmed = window.confirm(
-      `Apakah Anda yakin ingin memulihkan sistem ke titik snapshot:\n"${triggerLabel}"?\n\nSistem akan otomatis mencadangkan data saat ini terlebih dahulu untuk keamanan.`
-    );
-    if (!confirmed) return;
+  const handleRestoreFromSnapshot = async (snapshotId: string, triggerLabel: string) => {
+    const isConfirmed = await confirm({
+      title: "Pulihkan Titik Snapshot",
+      message: `Apakah Anda yakin ingin memulihkan sistem ke titik snapshot: "${triggerLabel}"? Sistem akan otomatis mencadangkan data saat ini terlebih dahulu untuk keamanan.`,
+      confirmText: "Ya, Pulihkan",
+      cancelText: "Batal",
+      variant: "warning",
+      icon: "warning",
+    });
+    if (!isConfirmed) return;
 
     const success = restoreFromSnapshot(snapshotId);
     if (success) {
@@ -360,14 +372,25 @@ export default function SettingsPage() {
       setToastMessage("Sistem berhasil dipulihkan ke titik snapshot terpilih!");
       setTimeout(() => setToastMessage(null), 3000);
     } else {
-      alert("Gagal memulihkan snapshot.");
+      await alert({
+        title: "Gagal Memulihkan",
+        message: "Gagal memulihkan snapshot ke sistem lokal.",
+        variant: "danger",
+      });
     }
   };
 
   // Hapus Satu Snapshot dari Riwayat
-  const handleDeleteSnapshot = (snapshotId: string) => {
-    const confirmed = window.confirm("Hapus arsip snapshot ini dari riwayat lokal?");
-    if (!confirmed) return;
+  const handleDeleteSnapshot = async (snapshotId: string) => {
+    const isConfirmed = await confirm({
+      title: "Hapus Arsip Snapshot",
+      message: "Apakah Anda yakin ingin menghapus arsip snapshot ini dari riwayat lokal? Tindakan ini tidak dapat dibatalkan.",
+      confirmText: "Ya, Hapus",
+      cancelText: "Batal",
+      variant: "danger",
+      icon: "trash",
+    });
+    if (!isConfirmed) return;
 
     deleteSnapshot(snapshotId);
     refreshBackupData();
@@ -376,11 +399,16 @@ export default function SettingsPage() {
   };
 
   // Pembersihan Cache dengan Konfirmasi & Safety Snapshot
-  const handleClearCache = () => {
-    const confirmed = window.confirm(
-      "PERHATIAN: Tindakan ini akan mengosongkan cache presensi dan nilai di peramban ini.\n\nSistem akan otomatis mengamankan 1 snapshot darurat sebelum dibersihkan.\n\nPastikan Anda sudah mengunduh cadangan berkas (.json) jika ingin menyimpan data secara permanen di komputer. Lanjutkan?"
-    );
-    if (!confirmed) return;
+  const handleClearCache = async () => {
+    const isConfirmed = await confirm({
+      title: "Pembersihan Cache Lokal",
+      message: "Tindakan ini akan mengosongkan cache presensi dan nilai di peramban ini. Sistem akan otomatis mengamankan 1 snapshot darurat sebelum dibersihkan. Lanjutkan?",
+      confirmText: "Ya, Bersihkan Cache",
+      cancelText: "Batal",
+      variant: "danger",
+      icon: "trash",
+    });
+    if (!isConfirmed) return;
 
     triggerAutoSnapshot("Sebelum Pengosongan Cache");
     localStorage.removeItem("absensi_sessions_v1");

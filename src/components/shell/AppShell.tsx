@@ -24,6 +24,7 @@ import {
   STORAGE_KEY_LAST_BACKUP_TIME,
 } from "@/lib/backupManager";
 import { useAuth } from "@/context/AuthContext";
+import { useConfirm } from "@/context/ConfirmContext";
 
 interface NavItem {
   href: string;
@@ -60,6 +61,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { currentUser, isLoading, isAuthenticated, isAdmin, isGuru, logout } = useAuth();
+  const { confirm, alert } = useConfirm();
 
   // 1. Jika rute adalah halaman login, jangan tampilkan AppShell (render halaman penuh)
   const isLoginPage = pathname === "/login";
@@ -76,10 +78,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     // Jika Guru mencoba membuka halaman /settings atau /admin, tolak dan kembalikan ke /
     if (isGuru && (pathname === "/settings" || pathname.startsWith("/admin"))) {
-      alert("Akses Terbatas: Menu Pengaturan hanya dapat diakses oleh Administrator.");
+      alert({
+        title: "Akses Terbatas",
+        message: "Menu Pengaturan dan Administrasi hanya dapat diakses oleh Administrator Sistem.",
+        variant: "warning",
+      });
       router.replace("/");
     }
-  }, [isAuthenticated, isGuru, isLoading, isLoginPage, pathname, router]);
+  }, [isAuthenticated, isGuru, isLoading, isLoginPage, pathname, router, alert]);
 
   // 3. Mesin Cadangan Otomatis Latar Belakang & Pemulihan Darurat
   useEffect(() => {
@@ -126,8 +132,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Pilih daftar menu navigasi berdasarkan peran pengguna
   const navItems = isAdmin ? ADMIN_NAV_ITEMS : GURU_NAV_ITEMS;
 
-  const handleLogout = () => {
-    if (confirm("Apakah Anda yakin ingin keluar dari sistem?")) {
+  const handleLogout = async () => {
+    const isConfirmed = await confirm({
+      title: "Keluar dari Sistem",
+      message: `Apakah Anda yakin ingin keluar dari sistem? Sesi login aktif akun ${currentUser?.fullName || "Anda"} akan diakhiri.`,
+      confirmText: "Ya, Keluar",
+      cancelText: "Batal",
+      variant: "danger",
+      icon: "logout",
+    });
+
+    if (isConfirmed) {
       logout();
       router.replace("/login");
     }
