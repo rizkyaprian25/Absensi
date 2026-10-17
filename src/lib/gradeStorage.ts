@@ -120,7 +120,13 @@ export function getStoredAssessments(): AssessmentItem[] {
       return INITIAL_MOCK_ASSESSMENTS;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : INITIAL_MOCK_ASSESSMENTS;
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+    // Jika data tersimpan berupa array kosong ([]), isi dengan 43 asesmen otentik
+    localStorage.setItem(STORAGE_KEY_ASSESSMENTS, JSON.stringify(INITIAL_MOCK_ASSESSMENTS));
+    localStorage.setItem(STORAGE_KEY_GRADE_7_SEEDED, "true");
+    return INITIAL_MOCK_ASSESSMENTS;
   } catch (err) {
     console.warn("Gagal membaca daftar asesmen dari localStorage:", err);
     return INITIAL_MOCK_ASSESSMENTS;
@@ -177,10 +183,76 @@ export function getStoredScores(): StudentScoreRecord[] {
       return initial;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : generateInitialMockScores();
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+    // Jika data tersimpan berupa array kosong ([]), isi dengan 757 nilai otentik
+    const initial = generateInitialMockScores();
+    localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify(initial));
+    return initial;
   } catch (err) {
     console.warn("Gagal membaca catatan nilai dari localStorage:", err);
     return generateInitialMockScores();
+  }
+}
+
+/**
+ * Memastikan data asesmen dan nilai otentik terpasang lengkap di peramban
+ * (terutama saat membuka di mode Incognito atau browser baru yang belum memiliki data lokal).
+ */
+export function ensureAuthenticGradesData(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const asmts = getStoredAssessments();
+    const scrs = getStoredScores();
+
+    // Pastikan seluruh 43 asesmen otentik tersedia jika belum ada di penyimpanan lokal
+    const asmtIdSet = new Set(asmts.map((a) => a.id));
+    let asmtsChanged = false;
+    const updatedAsmts = [...asmts];
+
+    for (const initAsmt of INITIAL_MOCK_ASSESSMENTS) {
+      if (!asmtIdSet.has(initAsmt.id)) {
+        const duplicate = updatedAsmts.some(
+          (a) => a.classId === initAsmt.classId && a.title.trim().toLowerCase() === initAsmt.title.trim().toLowerCase()
+        );
+        if (!duplicate) {
+          updatedAsmts.push(initAsmt);
+          asmtIdSet.add(initAsmt.id);
+          asmtsChanged = true;
+        }
+      }
+    }
+
+    if (asmtsChanged) {
+      localStorage.setItem(STORAGE_KEY_ASSESSMENTS, JSON.stringify(updatedAsmts));
+    }
+
+    // Pastikan seluruh 757 nilai otentik siswa tersedia jika belum ada
+    if (scrs.length === 0) {
+      const initialScores = generateInitialMockScores();
+      localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify(initialScores));
+    } else {
+      const scoreKeySet = new Set(scrs.map((s) => `${s.assessmentId}:${s.studentId}`));
+      let scrsChanged = false;
+      const updatedScores = [...scrs];
+      const initialScores = generateInitialMockScores();
+
+      for (const initScore of initialScores) {
+        const key = `${initScore.assessmentId}:${initScore.studentId}`;
+        if (!scoreKeySet.has(key)) {
+          updatedScores.push(initScore);
+          scoreKeySet.add(key);
+          scrsChanged = true;
+        }
+      }
+
+      if (scrsChanged) {
+        localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify(updatedScores));
+      }
+    }
+  } catch (err) {
+    console.warn("Peringatan saat memastikan kelengkapan data otentik nilai:", err);
   }
 }
 
@@ -259,9 +331,9 @@ export function getStoredKkmByGrade(): Record<string, number> {
     }
     const parsed = JSON.parse(raw);
     return {
-      "7": typeof parsed?.["7"] === "number" && parsed["7"] >= 0 && parsed["7"] <= 100 ? parsed["7"] : DEFAULT_KKM,
-      "8": typeof parsed?.["8"] === "number" && parsed["8"] >= 0 && parsed["8"] <= 100 ? parsed["8"] : DEFAULT_KKM,
-      "9": typeof parsed?.["9"] === "number" && parsed["9"] >= 0 && parsed["9"] <= 100 ? parsed["9"] : DEFAULT_KKM,
+      "7": typeof parsed?.["7"] === "number" && parsed["7"] >= 0 && parsed["7"] <= 100 ? parsed["7"] : (DEFAULT_KKM_BY_GRADE["7"] ?? 82),
+      "8": typeof parsed?.["8"] === "number" && parsed["8"] >= 0 && parsed["8"] <= 100 ? parsed["8"] : (DEFAULT_KKM_BY_GRADE["8"] ?? 83),
+      "9": typeof parsed?.["9"] === "number" && parsed["9"] >= 0 && parsed["9"] <= 100 ? parsed["9"] : (DEFAULT_KKM_BY_GRADE["9"] ?? 84),
     };
   } catch {
     return { ...DEFAULT_KKM_BY_GRADE };

@@ -249,9 +249,9 @@ export type GradeLevelKkmMap = Record<string, number>;
 
 /** Nilai default KKM per angkatan (Informatika SMPN 3 Cibungbulang) */
 export const DEFAULT_KKM_BY_GRADE: GradeLevelKkmMap = {
-  "7": DEFAULT_KKM,
-  "8": DEFAULT_KKM,
-  "9": DEFAULT_KKM,
+  "7": 82,
+  "8": 83,
+  "9": 84,
 };
 
 /**

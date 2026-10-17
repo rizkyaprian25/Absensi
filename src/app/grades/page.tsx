@@ -89,10 +89,12 @@ import {
   getAssessmentsByClass,
   getAssessmentOrderForClass,
   saveAssessmentOrderForClass,
+  ensureAuthenticGradesData,
   getStoredStudentAttitudes,
   saveStudentAttitude,
   batchSetAllStudentAttitudes,
 } from "@/lib/gradeStorage";
+import { syncCloudDataToLocal } from "@/lib/syncManager";
 import {
   generateGradesExcelHtmlWithKop,
   generateGradesCsvWithKop,
@@ -228,8 +230,9 @@ function GradesPageContent() {
   // 8. State Mounted untuk perlindungan hidrasi SSR (Hydration Mismatch Shield)
   const [isMounted, setIsMounted] = useState(false);
 
-  // Muat data awal dari localStorage
+  // Muat data awal dari localStorage & pastikan data otentik terpasang
   const refreshData = () => {
+    ensureAuthenticGradesData();
     initGrade7AssessmentsIfMissing();
     setAssessments(getStoredAssessments());
     setScores(getStoredScores());
@@ -242,6 +245,22 @@ function GradesPageContent() {
   useEffect(() => {
     setIsMounted(true);
     refreshData();
+
+    // Listener pembaruan data reaktif dari sinkronisasi cloud atau restore backup
+    const handleDataChanged = () => {
+      refreshData();
+    };
+    window.addEventListener("absensi-data-changed", handleDataChanged);
+
+    // Sinkronisasi otomatis di latar belakang dari Supabase (Silent Cloud Pull)
+    // Berjalan tanpa memblokir UI agar data selalu mutakhir jika ada pembaruan dari perangkat lain
+    syncCloudDataToLocal().catch(() => {
+      // Abaikan jika offline atau belum terkonfigurasi
+    });
+
+    return () => {
+      window.removeEventListener("absensi-data-changed", handleDataChanged);
+    };
   }, []);
 
   // Sinkronkan nilai sikap ketika kelas mengajar berganti
