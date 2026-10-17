@@ -144,6 +144,13 @@ import {
   resetUserPasswordByAdmin,
   updateUserProfile,
 } from "./authStorage.ts";
+import {
+  getStoredSubjects,
+  getTeacherAssignments,
+  setTeacherEnrollmentMatrix,
+  DEFAULT_TEACHER_ASSIGNMENTS,
+  saveTeacherAssignmentsForTeacher,
+} from "./academicStorage.ts";
 
 /**
  * Smoke Test Mandiri (Fase 4 SOP §3.5 & PRD §14)
@@ -1545,8 +1552,52 @@ function runSmokeTest() {
     console.log("✓ LULUS: Sistem autentikasi pengguna (Username + Password & RBAC) terverifikasi 100% aman dan akurat.");
   }
 
+  // --------------------------------------------------------------------------
+  // TEST 21: Master Data Mata Pelajaran & Penugasan Mengajar Mandiri (Self-Enrollment)
+  // --------------------------------------------------------------------------
+  {
+    console.log("\n[TEST 21] Menjalankan verifikasi sistem Self-Enrollment & penugasan mengajar guru...");
+
+    // 1. Verifikasi ketersediaan master mapel Kurikulum Merdeka
+    const subjects = getStoredSubjects();
+    assert.ok(subjects.length >= 12, "Master mata pelajaran harus memuat minimal 12 mapel resmi");
+    const infSubject = subjects.find((s) => s.code === "INF");
+    assert.ok(infSubject !== undefined, "Mata pelajaran Informatika wajib terdaftar");
+    assert.strictEqual(infSubject?.defaultKkm, 82, "KKM Informatika standar adalah 82");
+
+    // 2. Verifikasi penugasan bawaan Pak Rizky (Informatika 7A-7H & 8A-8B)
+    const initialAssignments = getTeacherAssignments("user-rizky");
+    assert.ok(initialAssignments.length >= 10, "Penugasan awal Pak Rizky minimal mencakup 10 kelas");
+    const assignedClassIds = initialAssignments.map((a) => a.classId);
+    assert.ok(assignedClassIds.includes("class-7a"), "Pak Rizky harus mengampu kelas 7A");
+    assert.ok(assignedClassIds.includes("class-8a"), "Pak Rizky harus mengampu kelas 8A");
+
+    // 3. Uji simulasi Self-Enrollment: Pak Rizky menambah mapel Prakarya di kelas 8A dan 8B
+    const newEnrollmentMatrix: Record<string, string[]> = {
+      "sub-inf": ["class-7a", "class-7b", "class-7c", "class-7d", "class-7e", "class-7f", "class-7g", "class-7h"],
+      "sub-prak": ["class-8a", "class-8b"], // Mengajar 2 mapel berbeda (>1 mapel)
+    };
+    const updatedAssignments = setTeacherEnrollmentMatrix("user-rizky", newEnrollmentMatrix);
+    assert.strictEqual(updatedAssignments.length, 10, "Total penugasan aktif harus 10 rombel");
+
+    // Verifikasi penugasan tersimpan
+    const savedAssignments = getTeacherAssignments("user-rizky");
+    const infClasses = savedAssignments.filter((a) => a.subjectId === "sub-inf");
+    const prakClasses = savedAssignments.filter((a) => a.subjectId === "sub-prak");
+    assert.strictEqual(infClasses.length, 8, "Informatika harus mencakup 8 rombel kelas 7");
+    assert.strictEqual(prakClasses.length, 2, "Prakarya harus mencakup 2 rombel kelas 8");
+
+    // 4. Pulihkan ke penugasan default
+    saveTeacherAssignmentsForTeacher("user-rizky", DEFAULT_TEACHER_ASSIGNMENTS);
+    const restored = getTeacherAssignments("user-rizky");
+    assert.strictEqual(restored.length, DEFAULT_TEACHER_ASSIGNMENTS.length, "Penugasan awal berhasil dipulihkan");
+
+    console.log("✓ LULUS: Sistem Self-Enrollment & penugasan mengajar multi-mapel & multi-kelas terverifikasi 100% akurat.");
+  }
+
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");
 }
 
 runSmokeTest();
+
 
