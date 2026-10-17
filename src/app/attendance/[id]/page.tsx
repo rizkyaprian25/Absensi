@@ -52,6 +52,8 @@ import {
   getSessionAndRecords,
   saveSessionAndRecords,
 } from "@/lib/attendanceStorage.ts";
+import { useAuth } from "@/context/AuthContext";
+import { triggerAutoSnapshot } from "@/lib/backupManager";
 
 interface StudentAttendanceState {
   status: AttendanceStatus;
@@ -67,6 +69,7 @@ function AttendanceTakingContent() {
   const searchParams = useSearchParams();
   const classId = params.id as string;
   const dateParam = searchParams.get("date");
+  const { currentUser } = useAuth();
 
   // Dapatkan informasi kelas dari jadwal resmi (fallback ke kelas pertama)
   const currentClass =
@@ -259,6 +262,7 @@ function AttendanceTakingContent() {
     setIsSaving(true);
 
     const sessionId = `session-${classId}-${selectedDate}`;
+    const nowTimeStr = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
     const session: AttendanceSession = {
       id: sessionId,
       classId,
@@ -268,6 +272,9 @@ function AttendanceTakingContent() {
       topic: topic.trim() || null,
       learningActivities: learningActivities.trim() || null,
       note: sessionNote.trim() || (isBackfill ? "Presensi Susulan" : null),
+      teacherId: currentUser?.id ?? "user-rizky",
+      teacherName: currentUser?.fullName ?? "Muhamad Rizky Aprian, S.Kom",
+      recordedAtTime: nowTimeStr,
       clientRequestId: `req-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -285,6 +292,7 @@ function AttendanceTakingContent() {
     });
 
     saveSessionAndRecords(session, records);
+    triggerAutoSnapshot(`Snapshot Presensi Baru Kelas ${currentClass.name}`);
 
     setTimeout(() => {
       setIsSaving(false);

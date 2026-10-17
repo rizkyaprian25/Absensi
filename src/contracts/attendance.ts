@@ -205,6 +205,9 @@ export const AttendanceSessionSchema = z.object({
   topic: z.string().max(200).nullable().optional(), // Materi Pokok / Topik Bahasan Pembelajaran
   learningActivities: z.string().max(500).nullable().optional(), // Uraian Agenda KBM / Aktivitas Belajar
   note: z.string().max(MAX_NOTE_LENGTH).nullable().optional(), // Catatan Refleksi / Kejadian Khusus di Kelas
+  teacherId: z.string().optional().nullable(),
+  teacherName: z.string().optional().nullable(),
+  recordedAtTime: z.string().optional().nullable(), // Catatan Jam Realisasi Pengabsenan (misal: "07:35 WIB")
   clientRequestId: z.string(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

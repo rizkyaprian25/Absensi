@@ -31,6 +31,25 @@ import {
   getStoredHolidays,
   saveStoredHolidays,
 } from "./calendarUtils.ts";
+import type { AppUser, Subject, TeacherAssignment } from "../contracts/academic.ts";
+import {
+  getStoredUsers,
+  getStoredPasswords,
+  STORAGE_KEY_USERS,
+  STORAGE_KEY_PASSWORDS,
+} from "./authStorage.ts";
+import {
+  getStoredSubjects,
+  getStoredTeacherAssignments,
+  STORAGE_KEY_SUBJECTS,
+  STORAGE_KEY_TEACHER_ASSIGNMENTS,
+} from "./academicStorage.ts";
+import {
+  getStoredDynamicStudentsMap,
+  STORAGE_KEY_DYNAMIC_STUDENTS,
+  STORAGE_KEY_ALUMNI_STUDENTS,
+  type AlumniStudentRecord,
+} from "./rolloverStorage.ts";
 
 export const STORAGE_KEY_AUTO_SNAPSHOTS = "absensi_auto_snapshots_v1";
 export const STORAGE_KEY_CUSTOM_STUDENTS = "absensi_custom_students_v1";
@@ -63,6 +82,12 @@ export interface AppBackupPayload {
     kkm: number;
     kkmByGrade?: Record<string, number>;
     customStudents?: Record<string, Student[]>;
+    users?: AppUser[];
+    passwords?: Record<string, string>;
+    subjects?: Subject[];
+    teacherAssignments?: TeacherAssignment[];
+    dynamicStudents?: Record<string, Student[]>;
+    alumniStudents?: AlumniStudentRecord[];
   };
 }
 
@@ -135,6 +160,19 @@ export function createFullBackupPayload(): AppBackupPayload {
   const kkm = getStoredKKM();
   const kkmByGrade = getStoredKkmByGrade();
   const customStudents = getStoredCustomStudents();
+  const users = getStoredUsers();
+  const passwords = getStoredPasswords();
+  const subjects = getStoredSubjects();
+  const teacherAssignments = getStoredTeacherAssignments();
+  const dynamicStudents = getStoredDynamicStudentsMap();
+
+  let alumniStudents: AlumniStudentRecord[] = [];
+  try {
+    const rawAlumni = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY_ALUMNI_STUDENTS) : null;
+    if (rawAlumni) alumniStudents = JSON.parse(rawAlumni);
+  } catch (e) {
+    console.warn("Gagal membaca alumni untuk cadangan:", e);
+  }
 
   const dataPayload = {
     sessions,
@@ -145,6 +183,12 @@ export function createFullBackupPayload(): AppBackupPayload {
     kkm,
     kkmByGrade,
     customStudents,
+    users,
+    passwords,
+    subjects,
+    teacherAssignments,
+    dynamicStudents,
+    alumniStudents,
   };
 
   const contentStr = JSON.stringify(dataPayload);
@@ -497,6 +541,30 @@ export function applyBackupPayloadToLocalStorage(payload: AppBackupPayload): voi
 
   if (data.customStudents && typeof data.customStudents === "object") {
     localStorage.setItem(STORAGE_KEY_CUSTOM_STUDENTS, JSON.stringify(data.customStudents));
+  }
+
+  if (Array.isArray(data.users)) {
+    localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(data.users));
+  }
+
+  if (data.passwords && typeof data.passwords === "object") {
+    localStorage.setItem(STORAGE_KEY_PASSWORDS, JSON.stringify(data.passwords));
+  }
+
+  if (Array.isArray(data.subjects)) {
+    localStorage.setItem(STORAGE_KEY_SUBJECTS, JSON.stringify(data.subjects));
+  }
+
+  if (Array.isArray(data.teacherAssignments)) {
+    localStorage.setItem(STORAGE_KEY_TEACHER_ASSIGNMENTS, JSON.stringify(data.teacherAssignments));
+  }
+
+  if (data.dynamicStudents && typeof data.dynamicStudents === "object") {
+    localStorage.setItem(STORAGE_KEY_DYNAMIC_STUDENTS, JSON.stringify(data.dynamicStudents));
+  }
+
+  if (Array.isArray(data.alumniStudents)) {
+    localStorage.setItem(STORAGE_KEY_ALUMNI_STUDENTS, JSON.stringify(data.alumniStudents));
   }
 
   // Perbarui juga replika IndexedDB
