@@ -105,6 +105,7 @@ import {
 import {
   MOCK_CLASSES,
   ALL_STUDENTS_BY_CLASS,
+  getStudentsForClass,
   MOCK_HEADMASTER_NAME,
   MOCK_HEADMASTER_NIP,
 } from "../contracts/mocks/attendanceMocks.ts";
@@ -173,6 +174,7 @@ import {
   getSchoolTotalStudentsStats,
   STORAGE_KEY_DYNAMIC_STUDENTS,
   getStoredDynamicStudentsMap,
+  getDynamicStudentsForClass,
   getStoredStudentMutations,
   deactivateStudentWithMutation,
   reactivateStudentFromMutation,
@@ -921,8 +923,8 @@ function runSmokeTest() {
     }
     assert.strictEqual(
       totalVerifiedStudents,
-      600,
-      "Harus ada 600 siswa otentik terverifikasi relasi foreign key-nya (319 di Kelas 7, 281 di Kelas 8)"
+      883,
+      "Harus ada 883 siswa otentik terverifikasi relasi foreign key-nya (319 di Kelas 7, 281 di Kelas 8, 283 di Kelas 9)"
     );
 
     // Uji isolasi & penyaringan rekaman yatim (orphan record filter simulation)
@@ -1644,12 +1646,16 @@ function runSmokeTest() {
 
     // 2. Verifikasi statistik siswa sekolah awal
     const statsBefore = getSchoolTotalStudentsStats();
-    assert.strictEqual(statsBefore.total, 600, "Total siswa awal harus 600 siswa");
+    assert.strictEqual(statsBefore.total, 883, "Total siswa awal harus 883 siswa");
     assert.strictEqual(statsBefore.byGrade.grade7, 319, "Total siswa kelas 7 harus 319");
     assert.strictEqual(statsBefore.byGrade.grade8, 281, "Total siswa kelas 8 harus 281");
-    assert.strictEqual(statsBefore.byGrade.grade9, 0, "Total siswa kelas 9 awal harus 0");
+    assert.strictEqual(statsBefore.byGrade.grade9, 283, "Total siswa kelas 9 awal harus 283");
 
-    // 3. Uji simulasi kenaikan kelas paralel: 8 -> 9 dan 7 -> 8
+    // 3. Uji simulasi kelulusan kelas 9 (alumni) terlebih dahulu sebelum kelas 8 naik
+    const gradRes = executeGraduationClass9("admin");
+    assert.strictEqual(gradRes.graduatedCount, 283, "Siswa lulus dari kelas 9 harus 283 orang");
+
+    // 4. Uji simulasi kenaikan kelas paralel: 8 -> 9 dan 7 -> 8
     const retainedIds = new Set<string>();
     // Tandai 1 siswa tinggal kelas di kelas 8 (ambil salah satu siswa kelas 8B)
     const studs8b = ALL_STUDENTS_BY_CLASS["class-8b"] || [];
@@ -1660,10 +1666,6 @@ function runSmokeTest() {
     assert.strictEqual(promotionRes.retainedCount, 1, "Siswa tinggal kelas harus terhitung 1");
     assert.strictEqual(promotionRes.promotedToGrade9, 280, "Siswa naik ke kelas 9 harus 280 (281 - 1)");
     assert.strictEqual(promotionRes.promotedToGrade8, 319, "Siswa naik ke kelas 8 harus 319");
-
-    // 4. Uji simulasi kelulusan kelas 9 (alumni)
-    const gradRes = executeGraduationClass9("admin");
-    assert.strictEqual(gradRes.graduatedCount, 280, "Siswa lulus dari kelas 9 harus 280 orang");
 
     // 5. Uji impor siswa baru PPDB (16 siswa baru dengan auto-alokasi berimbang)
     const mockNewStudents = Array.from({ length: 16 }, (_, i) => ({
@@ -1684,7 +1686,7 @@ function runSmokeTest() {
       (globalThis as any).localStorage.removeItem(STORAGE_KEY_DYNAMIC_STUDENTS);
     }
     const restoredStats = getSchoolTotalStudentsStats();
-    assert.strictEqual(restoredStats.total, 600, "Statistik harus kembali ke 600 siswa otentik");
+    assert.strictEqual(restoredStats.total, 883, "Statistik harus kembali ke 883 siswa otentik");
 
     console.log("✓ LULUS: Mesin PPDB XLSX, alokasi berimbang gender, kenaikan kelas paralel, dan kelulusan alumni terverifikasi 100% akurat.");
   }
@@ -2000,6 +2002,81 @@ function runSmokeTest() {
     );
 
     console.log("✓ LULUS: Pengarsipan mutasi siswa, audit trail dinas, dan pemulihan siswa terverifikasi 100% aman.");
+  }
+
+  // ============================================================================
+  // UJI VALIDASI DATA SISWA KELAS 9 (9A - 9G) & INTEGRITAS SSOT SEKOLAH
+  // ============================================================================
+  {
+    console.log("\n--- Memulai Pengujian Data Otentik Siswa Kelas 9 (9A–9G) ---");
+
+    const expectedGrade9Counts: Record<string, number> = {
+      "class-9a": 40,
+      "class-9b": 41,
+      "class-9c": 39,
+      "class-9d": 42,
+      "class-9e": 40,
+      "class-9f": 41,
+      "class-9g": 40,
+    };
+
+    let totalGrade9 = 0;
+    for (const [classId, expectedCount] of Object.entries(expectedGrade9Counts)) {
+      const students = ALL_STUDENTS_BY_CLASS[classId];
+      assert.ok(Array.isArray(students), `Data siswa ${classId} harus berupa array`);
+      assert.strictEqual(
+        students.length,
+        expectedCount,
+        `Jumlah siswa ${classId} harus ${expectedCount}, terdeteksi ${students.length}`
+      );
+      totalGrade9 += students.length;
+
+      // Verifikasi integritas setiap record siswa
+      for (const s of students) {
+        assert.ok(s.id.startsWith(`std-${classId}-`), `Format ID siswa ${s.id} tidak valid`);
+        assert.strictEqual(s.classId, classId, `classId siswa ${s.id} tidak cocok`);
+        assert.ok(s.nis && s.nis.trim().length >= 8, `NIS siswa ${s.fullName} harus valid`);
+        assert.ok(s.fullName && s.fullName.trim().length > 0, `Nama siswa ${s.id} wajib terisi`);
+        assert.ok(s.gender === "L" || s.gender === "P", `Gender siswa ${s.fullName} harus L atau P`);
+        assert.strictEqual(s.isActive, true, `Status aktif siswa ${s.fullName} harus true`);
+      }
+
+      // Verifikasi melalui helper getStudentsForClass
+      const fetchedStudents = getStudentsForClass(classId);
+      assert.strictEqual(fetchedStudents.length, expectedCount, `getStudentsForClass(${classId}) harus menghasilkan ${expectedCount}`);
+
+      // Verifikasi melalui dynamic storage
+      const dynamicStudents = getDynamicStudentsForClass(classId);
+      assert.strictEqual(dynamicStudents.length, expectedCount, `getDynamicStudentsForClass(${classId}) harus menghasilkan ${expectedCount}`);
+    }
+
+    assert.strictEqual(totalGrade9, 283, `Total seluruh siswa kelas 9 harus tepat 283`);
+
+    // Uji ketahanan sinkronisasi cache: simulasi cache lama yang belum memuat kelas 9
+    const dummyCorruptedCache: Record<string, Student[]> = {
+      "class-7a": ALL_STUDENTS_BY_CLASS["class-7a"],
+    };
+    (globalThis as any).localStorage.setItem(
+      STORAGE_KEY_DYNAMIC_STUDENTS,
+      JSON.stringify(dummyCorruptedCache)
+    );
+
+    const healedMap = getStoredDynamicStudentsMap();
+    assert.strictEqual(healedMap["class-9a"].length, 40, "Cache tanpa kelas 9A harus disembuhkan otomatis");
+    assert.strictEqual(healedMap["class-9b"].length, 41, "Cache tanpa kelas 9B harus disembuhkan otomatis");
+
+    // Uji fallback getStudentsForClass ketika cache lokal bernilai array kosong
+    (globalThis as any).localStorage.setItem(
+      STORAGE_KEY_DYNAMIC_STUDENTS,
+      JSON.stringify({ "class-9a": [] })
+    );
+    const fallbackStudents = getStudentsForClass("class-9a");
+    assert.strictEqual(fallbackStudents.length, 40, "getStudentsForClass harus fallback ke data otentik jika cache kosong");
+
+    // Bersihkan kembali
+    (globalThis as any).localStorage.removeItem(STORAGE_KEY_DYNAMIC_STUDENTS);
+
+    console.log("✓ LULUS: Seluruh 283 siswa kelas 9 (9A-9G) terverifikasi otentik, valid, dan tahan inkonsistensi cache.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");

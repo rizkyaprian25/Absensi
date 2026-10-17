@@ -356,10 +356,10 @@ export const MOCK_STUDENTS_8B: Student[] = STUDENTS_CLASS_8B;
 export function getStudentsForClass(classId: string): Student[] {
   if (typeof window !== "undefined") {
     try {
-      const raw = localStorage.getItem("absensi_dynamic_students_v1");
+      const raw = localStorage.getItem("absensi_dynamic_students_v2");
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed[classId])) {
+        if (parsed && Array.isArray(parsed[classId]) && parsed[classId].length > 0) {
           return parsed[classId];
         }
       }

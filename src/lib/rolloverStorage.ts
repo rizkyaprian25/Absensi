@@ -13,7 +13,7 @@ import type {
 // KUNCI PENYIMPANAN DATA ROLLOVER, PPDB & MUTASI (LOCALSTORAGE SSOT)
 // ============================================================================
 
-export const STORAGE_KEY_DYNAMIC_STUDENTS = "absensi_dynamic_students_v1";
+export const STORAGE_KEY_DYNAMIC_STUDENTS = "absensi_dynamic_students_v2";
 export const STORAGE_KEY_PROMOTION_LOGS = "absensi_promotion_logs_v1";
 export const STORAGE_KEY_ALUMNI_STUDENTS = "absensi_alumni_students_v1";
 export const STORAGE_KEY_STUDENT_MUTATIONS = "absensi_student_mutations_v1";
@@ -38,21 +38,36 @@ export interface AlumniStudentRecord {
  */
 export function getStoredDynamicStudentsMap(): Record<string, Student[]> {
   if (typeof window === "undefined") {
-    return ALL_STUDENTS_BY_CLASS;
+    return JSON.parse(JSON.stringify(ALL_STUDENTS_BY_CLASS));
   }
 
   try {
     const raw = localStorage.getItem(STORAGE_KEY_DYNAMIC_STUDENTS);
     if (!raw) {
-      // Inisialisasi awal dengan data otentik sekolah (7A-7H, 8A-8G)
-      localStorage.setItem(STORAGE_KEY_DYNAMIC_STUDENTS, JSON.stringify(ALL_STUDENTS_BY_CLASS));
-      return ALL_STUDENTS_BY_CLASS;
+      // Inisialisasi awal dengan data otentik sekolah (7A-7H, 8A-8G, 9A-9G)
+      const initialMap = JSON.parse(JSON.stringify(ALL_STUDENTS_BY_CLASS));
+      localStorage.setItem(STORAGE_KEY_DYNAMIC_STUDENTS, JSON.stringify(initialMap));
+      return initialMap;
     }
     const parsed = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null ? parsed : ALL_STUDENTS_BY_CLASS;
+    if (typeof parsed === "object" && parsed !== null) {
+      // Pastikan seluruh rombel terdaftar jika belum ada kuncinya
+      let needsResave = false;
+      for (const [classId, defaultList] of Object.entries(ALL_STUDENTS_BY_CLASS)) {
+        if (!parsed[classId]) {
+          parsed[classId] = JSON.parse(JSON.stringify(defaultList));
+          needsResave = true;
+        }
+      }
+      if (needsResave) {
+        localStorage.setItem(STORAGE_KEY_DYNAMIC_STUDENTS, JSON.stringify(parsed));
+      }
+      return parsed;
+    }
+    return JSON.parse(JSON.stringify(ALL_STUDENTS_BY_CLASS));
   } catch (err) {
     console.warn("Gagal membaca data siswa dinamis:", err);
-    return ALL_STUDENTS_BY_CLASS;
+    return JSON.parse(JSON.stringify(ALL_STUDENTS_BY_CLASS));
   }
 }
 
