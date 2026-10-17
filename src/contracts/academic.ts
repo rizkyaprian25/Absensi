@@ -25,7 +25,8 @@ export type StudentAcademicStatus = z.infer<typeof StudentAcademicStatusSchema>;
 
 export const AppUserSchema = z.object({
   id: z.string(),
-  email: z.string().email("Format surel tidak valid"),
+  username: z.string().min(3, "Username minimal 3 karakter"),
+  email: z.string().email("Format surel tidak valid").optional().nullable(),
   fullName: z.string().min(1, "Nama lengkap wajib diisi"),
   nip: z.string().optional().nullable(),
   role: UserRoleSchema.default("GURU"),
@@ -133,6 +134,7 @@ export const DEFAULT_SUBJECTS: Subject[] = [
 export const DEFAULT_USERS: AppUser[] = [
   {
     id: "user-admin",
+    username: "admin",
     email: "admin@smpn3cibungbulang.sch.id",
     fullName: "Administrator Kurikulum & TU",
     nip: "19800101 200501 1 001",
@@ -142,6 +144,7 @@ export const DEFAULT_USERS: AppUser[] = [
   },
   {
     id: "user-rizky",
+    username: "rizky",
     email: "rizky.aprian@smpn3cibungbulang.sch.id",
     fullName: "Muhamad Rizky Aprian, S.Kom",
     nip: "19940825 202221 1 004",
@@ -151,6 +154,7 @@ export const DEFAULT_USERS: AppUser[] = [
   },
   {
     id: "user-guru-mtk",
+    username: "siti.rahmawati",
     email: "guru.mtk@smpn3cibungbulang.sch.id",
     fullName: "Siti Rahmawati, S.Pd",
     nip: "19880412 201101 2 003",
@@ -160,6 +164,7 @@ export const DEFAULT_USERS: AppUser[] = [
   },
   {
     id: "user-guru-ipa",
+    username: "budi.santoso",
     email: "guru.ipa@smpn3cibungbulang.sch.id",
     fullName: "Budi Santoso, M.Pd",
     nip: "19820315 200801 1 005",
@@ -168,3 +173,4 @@ export const DEFAULT_USERS: AppUser[] = [
     createdAt: "2026-07-01T00:00:00.000Z",
   },
 ];
+
