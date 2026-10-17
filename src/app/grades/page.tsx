@@ -197,6 +197,10 @@ function GradesPageContent() {
     }
   };
 
+  // 7d. State Modal Input Nilai Siswa Mandiri (Sangat Nyaman di Layar HP / Mobile)
+  const [activeStudentScoreModalId, setActiveStudentScoreModalId] = useState<string | null>(null);
+  const [studentModalScores, setStudentModalScores] = useState<Record<string, string>>({});
+
   // 8. State Mounted untuk perlindungan hidrasi SSR (Hydration Mismatch Shield)
   const [isMounted, setIsMounted] = useState(false);
 
@@ -588,6 +592,46 @@ function GradesPageContent() {
     refreshData();
     setIsQuickEntryOpen(false);
     showToast(`Nilai berhasil disimpan untuk ${students.length} siswa.`);
+  };
+
+  // Buka Modal Input Nilai untuk Siswa Tertentu (Sangat praktis di HP)
+  const handleOpenStudentScoreModal = (studentId: string) => {
+    const student = students.find((s) => s.id === studentId);
+    if (!student) return;
+
+    if (classAssessments.length === 0) {
+      alert("Belum ada asesmen/tugas yang dibuat untuk kelas ini. Tambahkan asesmen terlebih dahulu.");
+      return;
+    }
+
+    const currentMap: Record<string, string> = {};
+    classAssessments.forEach((asmt) => {
+      const match = scores.find(
+        (sc) => sc.assessmentId === asmt.id && sc.studentId === studentId
+      );
+      currentMap[asmt.id] = match?.score !== null && match?.score !== undefined ? String(match.score) : "";
+    });
+
+    setStudentModalScores(currentMap);
+    setActiveStudentScoreModalId(studentId);
+  };
+
+  // Simpan Seluruh Nilai dari Modal Siswa
+  const handleSaveStudentScoreModal = () => {
+    if (!activeStudentScoreModalId) return;
+
+    classAssessments.forEach((asmt) => {
+      const val = studentModalScores[asmt.id]?.trim();
+      const num = val === "" || val === undefined ? null : Number(val);
+      if (num === null || (!isNaN(num) && num >= 0 && num <= 100)) {
+        updateSingleScore(asmt.id, activeStudentScoreModalId, num);
+      }
+    });
+
+    refreshData();
+    const st = students.find((s) => s.id === activeStudentScoreModalId);
+    setActiveStudentScoreModalId(null);
+    showToast(`Nilai berhasil disimpan untuk ${st?.fullName || "siswa"}.`);
   };
 
   // Terapkan Nilai Massal
@@ -1335,7 +1379,7 @@ function GradesPageContent() {
               className="px-3 py-1.5 bg-[var(--color-accent)]/15 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/25 rounded-[8px] text-xs font-semibold shrink-0 flex items-center gap-1 transition-colors cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Input Nilai Cepat</span>
+              <span className="inline font-bold">Input Cepat</span>
             </button>
           )}
 
@@ -1498,7 +1542,7 @@ function GradesPageContent() {
                   key={summary.studentId}
                   className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[16px] p-4 shadow-xs transition-all hover:border-[var(--color-accent)]/40 flex flex-col gap-3"
                 >
-                  {/* Baris Atas: Nomor, Nama, NIS, dan Badge Kelengkapan */}
+                  {/* Baris Atas: Nomor, Nama, NIS, Aksi Cepat & Badge Kelengkapan */}
                   <div className="flex items-start justify-between gap-2.5">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="w-7 h-7 rounded-full bg-[var(--surface-recessed)] text-[var(--text-secondary)] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-[var(--border-hairline)]">
@@ -1514,27 +1558,50 @@ function GradesPageContent() {
                       </div>
                     </div>
 
-                    {/* Badge Kelengkapan / Tagihan */}
-                    {totalAsmts > 0 && (
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono shrink-0 border ${
-                          isAllDone
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                            : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
-                        }`}
+                    {/* Tombol Input Nilai Cepat Siswa & Badge Kelengkapan */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenStudentScoreModal(summary.studentId)}
+                        className="px-2.5 py-1 rounded-[8px] bg-[var(--color-accent)] hover:bg-[var(--color-accent)]/90 text-[var(--color-on-accent)] text-xs font-semibold flex items-center gap-1 shadow-xs active:scale-95 cursor-pointer"
+                        title={`Buka form input nilai untuk ${summary.studentName}`}
                       >
-                        {isAllDone ? "✓ Lengkap" : `${missingAsmts} Tagihan`}
-                      </span>
-                    )}
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Isi Nilai</span>
+                      </button>
+
+                      {totalAsmts > 0 && (
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono shrink-0 border ${
+                            isAllDone
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                              : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
+                          }`}
+                        >
+                          {isAllDone ? "✓ Lengkap" : `${missingAsmts} Tagihan`}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* 4 Kotak Metrik Ringkasan Nilai Siswa (2x2 Grid) */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                    {/* Kotak 1: Nilai Akhir */}
-                    <div className="p-2.5 rounded-[12px] bg-[var(--surface-recessed)]/70 border border-[var(--border-hairline)] flex flex-col justify-between">
-                      <span className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-                        Nilai Akhir
-                      </span>
+                    {/* Kotak 1: Nilai Akhir (Interaktif: Klik untuk buka rincian / input nilai) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isExpanded) toggleExpandCard(summary.studentId);
+                        handleOpenStudentScoreModal(summary.studentId);
+                      }}
+                      className="p-2.5 rounded-[12px] bg-[var(--surface-recessed)]/70 hover:bg-[var(--surface-recessed)] border border-[var(--border-hairline)] hover:border-[var(--color-accent)]/50 flex flex-col justify-between text-left transition-all cursor-pointer group active:scale-[0.98]"
+                      title="Klik untuk mengisi atau mengedit nilai siswa ini"
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider group-hover:text-[var(--color-accent)] transition-colors">
+                          Nilai Akhir
+                        </span>
+                        <Edit2 className="w-3 h-3 text-[var(--text-secondary)] opacity-40 group-hover:opacity-100 group-hover:text-[var(--color-accent)] transition-opacity" />
+                      </div>
                       <div className="flex items-baseline gap-1 mt-1">
                         {isCensoredViewActive ? (
                           <span className="text-base font-mono font-bold text-[var(--text-secondary)] opacity-70">
@@ -1545,6 +1612,11 @@ function GradesPageContent() {
                             <span className="text-lg font-bold font-mono text-[var(--text-primary)]">
                               {summary.finalScore !== null ? summary.finalScore : "-"}
                             </span>
+                            {summary.finalScore === null && (
+                              <span className="text-[10px] text-[var(--color-accent)] font-semibold underline">
+                                + Isi
+                              </span>
+                            )}
                             {summary.finalScore !== null && (
                               <span
                                 className={`w-2 h-2 rounded-full shrink-0 ${
@@ -1556,7 +1628,7 @@ function GradesPageContent() {
                           </>
                         )}
                       </div>
-                    </div>
+                    </button>
 
                     {/* Kotak 2: Predikat */}
                     <div className="p-2.5 rounded-[12px] bg-[var(--surface-recessed)]/70 border border-[var(--border-hairline)] flex flex-col justify-between">
@@ -1692,6 +1764,9 @@ function GradesPageContent() {
                             const sc = summary.scores[asmt.id];
                             const asmtMeta = ASSESSMENT_TYPE_METAS[asmt.type];
                             const isUnderKkm = sc !== null && sc !== undefined && sc < kkm;
+                            const isEditingThis =
+                              editingCell?.studentId === summary.studentId &&
+                              editingCell?.assessmentId === asmt.id;
 
                             return (
                               <div
@@ -1712,7 +1787,7 @@ function GradesPageContent() {
                                   </p>
                                 </div>
 
-                                {/* Nilai Siswa & Tombol Edit Cepat */}
+                                {/* Nilai Siswa & Tombol Edit Inline Responsif */}
                                 <div className="shrink-0 flex items-center gap-1.5">
                                   {isCensoredViewActive ? (
                                     sc !== null && sc !== undefined ? (
@@ -1724,20 +1799,61 @@ function GradesPageContent() {
                                         BELUM
                                       </span>
                                     )
+                                  ) : isEditingThis ? (
+                                    <div className="flex items-center gap-1 animate-in fade-in">
+                                      <input
+                                        autoFocus
+                                        type="number"
+                                        inputMode="numeric"
+                                        min={0}
+                                        max={100}
+                                        value={cellInputValue}
+                                        onChange={(e) => setCellInputValue(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") handleSaveCellEdit();
+                                          if (e.key === "Escape") setEditingCell(null);
+                                        }}
+                                        placeholder="0-100"
+                                        className="w-16 px-2 py-1 text-center font-mono text-sm bg-[var(--surface-card)] text-[var(--text-primary)] font-bold border-2 border-[var(--color-accent)] rounded-lg outline-none shadow-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={handleSaveCellEdit}
+                                        className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-xs cursor-pointer active:scale-95"
+                                        title="Simpan nilai"
+                                      >
+                                        <Check className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingCell(null)}
+                                        className="w-8 h-8 rounded-lg bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-[var(--text-secondary)] flex items-center justify-center shrink-0 cursor-pointer active:scale-95"
+                                        title="Batal"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                   ) : (
                                     <button
                                       type="button"
-                                      onClick={() => handleStartCellEdit(summary.studentId, asmt.id, sc)}
-                                      className={`px-2.5 py-1 rounded-[6px] font-mono text-xs font-bold transition-all border cursor-pointer hover:scale-105 active:scale-95 ${
+                                      onClick={() => handleStartCellEdit(summary.studentId, asmt.id, sc ?? null)}
+                                      className={`px-3 py-1.5 rounded-[8px] font-mono text-xs font-bold transition-all border cursor-pointer hover:scale-105 active:scale-95 flex items-center gap-1 ${
                                         sc === null || sc === undefined
-                                          ? "bg-[var(--surface-recessed)] text-[var(--text-secondary)] border-[var(--border-hairline)]"
+                                          ? "bg-[var(--color-accent)]/10 text-[var(--color-accent)] border-[var(--color-accent)]/30 hover:bg-[var(--color-accent)]/20"
                                           : isUnderKkm
                                           ? "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/40 dark:text-rose-300"
                                           : "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300"
                                       }`}
-                                      title="Klik untuk mengubah nilai"
+                                      title="Klik untuk mengisi atau mengubah nilai"
                                     >
-                                      {sc !== null && sc !== undefined ? sc : "+ Isi"}
+                                      {sc === null || sc === undefined ? (
+                                        <>
+                                          <Plus className="w-3.5 h-3.5" />
+                                          <span>Isi Nilai</span>
+                                        </>
+                                      ) : (
+                                        <span>{sc}</span>
+                                      )}
                                     </button>
                                   )}
                                 </div>
@@ -3779,6 +3895,116 @@ function GradesPageContent() {
           </div>
         </div>
       )}
+
+      {/* Modal Input Nilai Siswa Mandiri (Sangat Nyaman di Layar HP / Mobile) */}
+      {activeStudentScoreModalId && (() => {
+        const student = students.find((s) => s.id === activeStudentScoreModalId);
+        if (!student) return null;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
+            <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[20px] shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+              {/* Header Modal */}
+              <div className="p-4 bg-[var(--surface-recessed)] border-b border-[var(--border-hairline)] flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-[var(--color-accent)]/10 text-[var(--color-accent)] font-bold flex items-center justify-center font-mono text-sm">
+                    {student.fullName.charAt(0)}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-[var(--text-primary)]">
+                      Input Nilai: {student.fullName}
+                    </h3>
+                    <p className="text-[11px] text-[var(--text-secondary)] font-mono">
+                      NIS {student.nis ?? "-"} · Kelas {currentClass.name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveStudentScoreModalId(null)}
+                  className="w-8 h-8 rounded-full hover:bg-[var(--surface-card)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Konten Daftar Asesmen */}
+              <div className="p-4 overflow-y-auto space-y-3 flex-1">
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Masukkan nilai (0 - 100) untuk masing-masing tugas dan asesmen:
+                </p>
+
+                {classAssessments.map((asmt) => {
+                  const meta = ASSESSMENT_TYPE_METAS[asmt.type];
+                  const currentVal = studentModalScores[asmt.id] || "";
+                  const numVal = currentVal.trim() !== "" ? Number(currentVal) : null;
+                  const isUnder = numVal !== null && numVal < kkm;
+
+                  return (
+                    <div
+                      key={asmt.id}
+                      className="p-3 rounded-[12px] bg-[var(--surface-recessed)]/50 border border-[var(--border-hairline)] flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold border uppercase ${meta.badgeClass}`}>
+                            {meta.shortLabel}
+                          </span>
+                          <span className="text-[10px] text-[var(--text-secondary)] font-mono">
+                            Max {asmt.maxScore}
+                          </span>
+                        </div>
+                        <p className="text-xs font-bold text-[var(--text-primary)] truncate">
+                          {asmt.title}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0 flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          max={100}
+                          value={currentVal}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setStudentModalScores((prev) => ({ ...prev, [asmt.id]: v }));
+                          }}
+                          placeholder="Kosong"
+                          className={`w-20 px-2.5 py-1.5 text-center font-mono text-sm font-bold rounded-lg border focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                            isUnder
+                              ? "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 focus:ring-rose-400"
+                              : "bg-[var(--surface-card)] text-[var(--text-primary)] border-[var(--border-hairline)] focus:ring-[var(--color-accent)]"
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Footer Modal */}
+              <div className="p-4 bg-[var(--surface-recessed)] border-t border-[var(--border-hairline)] flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveStudentScoreModalId(null)}
+                  className="px-4 py-2 rounded-[10px] border border-[var(--border-hairline)] bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)] text-xs font-semibold text-[var(--text-primary)] transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveStudentScoreModal}
+                  className="px-5 py-2 rounded-[10px] bg-[var(--color-accent)] hover:bg-[var(--color-accent)]/90 text-[var(--color-on-accent)] text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Simpan Nilai Siswa</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
