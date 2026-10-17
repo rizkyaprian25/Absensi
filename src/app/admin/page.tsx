@@ -37,18 +37,18 @@ import {
   STORAGE_KEY_LAST_BACKUP_TIME,
 } from "@/lib/backupManager";
 
-function getCurrentScheduleDay(): ScheduleDay {
+function getCurrentScheduleDay(): ScheduleDay | null {
   const dayIndex = new Date().getDay();
   if (dayIndex === 1) return "Senin";
   if (dayIndex === 2) return "Selasa";
   if (dayIndex === 3) return "Rabu";
   if (dayIndex === 4) return "Kamis";
   if (dayIndex === 5) return "Jumat";
-  return "Senin";
+  return null; // Akhir pekan (Sabtu / Minggu)
 }
 
 interface PunctualityResult {
-  status: "ON_TIME" | "LATE" | "EARLY" | "OVERDUE" | "UPCOMING" | "NOT_RECORDED";
+  status: "ON_TIME" | "LATE" | "EARLY" | "BACKFILL" | "OVERDUE" | "UPCOMING" | "UNASSIGNED" | "NOT_RECORDED";
   label: string;
   badgeClass: string;
   recordedTimeStr: string;
@@ -57,13 +57,27 @@ interface PunctualityResult {
 
 /**
  * Mengevaluasi ketepatan waktu guru saat mengabsen kelas berdasarkan jam jadwal KBM
+ * Membedakan presensi hari H live KBM dengan penginputan susulan/rekap di luar jam sekolah
  */
 function evaluateTeacherPunctuality(
   scheduleTimeStr?: string | null,
   session?: AttendanceSession | null,
-  isToday = true
+  isToday = true,
+  hasAssignedTeacher = true
 ): PunctualityResult {
-  // Parsing jam masuk dari scheduleTime, contoh "07:30 – 09:15"
+  // 1. Jika kelas belum memiliki guru pengampu dan belum ada sesi presensi
+  if (!session && !hasAssignedTeacher) {
+    return {
+      status: "UNASSIGNED",
+      label: "Belum Ditugaskan",
+      badgeClass:
+        "bg-[var(--surface-recessed)] text-[var(--text-tertiary)] border border-[var(--border-hairline)] italic",
+      recordedTimeStr: "-",
+      diffMinutes: 0,
+    };
+  }
+
+  // Parsing jam masuk dari scheduleTime, contoh "08:00 – 09:45"
   let startHour = 7;
   let startMinute = 30;
   if (scheduleTimeStr) {
@@ -75,19 +89,43 @@ function evaluateTeacherPunctuality(
   }
   const scheduleMinutes = startHour * 60 + startMinute;
 
-  // Jika sesi sudah tercatat
+  // 2. Jika sesi sudah tercatat
   if (session) {
     const createdDate = new Date(session.createdAt);
-    const recHour = createdDate.getHours();
-    const recMin = createdDate.getMinutes();
+    const recHour = !isNaN(createdDate.getTime()) ? createdDate.getHours() : 0;
+    const recMin = !isNaN(createdDate.getTime()) ? createdDate.getMinutes() : 0;
     const recMinutes = recHour * 60 + recMin;
     const diff = recMinutes - scheduleMinutes;
 
     const recordedTimeStr =
       session.recordedAtTime ||
-      createdDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
+      (!isNaN(createdDate.getTime())
+        ? createdDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB"
+        : "-");
 
-    if (diff > 5) {
+    // Deteksi apakah ini presensi susulan (rekap jurnal mandiri di luar jam KBM):
+    // - Dicatat di luar jam operasional KBM sekolah (sebelum 06.00 atau setelah 15.30 WIB)
+    // - Catatan sesi memuat kata "susulan"
+    // - Selisih jam simpan dengan jam masuk > 180 menit (3 jam)
+    const isAfterSchoolHours = recHour >= 16 || recHour < 6;
+    const isExplicitSusulan =
+      (session.note && session.note.toLowerCase().includes("susulan")) ||
+      diff > 180 ||
+      isAfterSchoolHours;
+
+    if (isExplicitSusulan) {
+      return {
+        status: "BACKFILL",
+        label: `Presensi Susulan (${recordedTimeStr})`,
+        badgeClass:
+          "bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-900/50 font-medium",
+        recordedTimeStr,
+        diffMinutes: diff,
+      };
+    }
+
+    // Evaluasi presensi hari H selama jam KBM sekolah
+    if (diff > 10) {
       return {
         status: "LATE",
         label: `Terlambat ${diff} Menit`,
@@ -117,35 +155,52 @@ function evaluateTeacherPunctuality(
     }
   }
 
-  // Jika sesi belum ada
+  // 3. Jika sesi belum ada dan hari ini adalah jadwal KBM yang sedang aktif
   if (isToday) {
     const now = new Date();
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const diffNow = nowMinutes - scheduleMinutes;
+    const nowHour = now.getHours();
 
-    if (diffNow > 10) {
-      return {
-        status: "OVERDUE",
-        label: `Belum Diabsen (Lewat ${diffNow} Menit)`,
-        badgeClass: "bg-rose-600 text-white font-bold animate-pulse shadow-xs",
-        recordedTimeStr: "-",
-        diffMinutes: diffNow,
-      };
-    } else if (diffNow >= 0) {
-      return {
-        status: "UPCOMING",
-        label: "Sedang Berlangsung (Segera Absen)",
-        badgeClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 font-semibold",
-        recordedTimeStr: "-",
-        diffMinutes: diffNow,
-      };
+    // Hanya evaluasi ketepatan waktu jika berada dalam jam aktif sekolah (06.30 - 16.00 WIB)
+    if (nowHour >= 6 && nowHour <= 16) {
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const diffNow = nowMinutes - scheduleMinutes;
+
+      if (diffNow > 10) {
+        return {
+          status: "OVERDUE",
+          label: `Belum Diabsen (Lewat ${diffNow} Menit)`,
+          badgeClass: "bg-rose-600 text-white font-bold animate-pulse shadow-xs",
+          recordedTimeStr: "-",
+          diffMinutes: diffNow,
+        };
+      } else if (diffNow >= 0) {
+        return {
+          status: "UPCOMING",
+          label: "Sedang Berlangsung (Segera Absen)",
+          badgeClass:
+            "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 font-semibold",
+          recordedTimeStr: "-",
+          diffMinutes: diffNow,
+        };
+      } else {
+        return {
+          status: "UPCOMING",
+          label: "Menunggu Jam Masuk",
+          badgeClass:
+            "bg-[var(--surface-recessed)] text-[var(--text-tertiary)] border border-[var(--border-hairline)]",
+          recordedTimeStr: "-",
+          diffMinutes: diffNow,
+        };
+      }
     } else {
+      // Di luar jam sekolah (pagi buta atau malam hari)
       return {
-        status: "UPCOMING",
-        label: "Menunggu Jam Masuk",
-        badgeClass: "bg-[var(--surface-recessed)] text-[var(--text-tertiary)] border border-[var(--border-hairline)]",
+        status: "NOT_RECORDED",
+        label: "Belum Diabsen Hari Ini",
+        badgeClass:
+          "bg-[var(--surface-recessed)] text-[var(--text-secondary)] border border-[var(--border-hairline)]",
         recordedTimeStr: "-",
-        diffMinutes: diffNow,
+        diffMinutes: 0,
       };
     }
   }
@@ -153,7 +208,8 @@ function evaluateTeacherPunctuality(
   return {
     status: "NOT_RECORDED",
     label: "Belum Ada Presensi",
-    badgeClass: "bg-[var(--surface-recessed)] text-[var(--text-secondary)] border border-[var(--border-hairline)]",
+    badgeClass:
+      "bg-[var(--surface-recessed)] text-[var(--text-secondary)] border border-[var(--border-hairline)]",
     recordedTimeStr: "-",
     diffMinutes: 0,
   };
@@ -185,7 +241,7 @@ function buildWhatsAppReminderLink(
 export default function AdminDashboardPage() {
   const { currentUser, isAdmin } = useAuth();
   const currentDay = getCurrentScheduleDay();
-  const [selectedDay, setSelectedDay] = useState<ScheduleDay>(currentDay);
+  const [selectedDay, setSelectedDay] = useState<ScheduleDay>(() => currentDay ?? "Senin");
   const [mounted, setMounted] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [lastBackupTime, setLastBackupTime] = useState<string | null>(null);
@@ -212,7 +268,7 @@ export default function AdminDashboardPage() {
     return MOCK_CLASSES.filter((c) => c.scheduleDay === selectedDay);
   }, [selectedDay]);
 
-  const isSelectedDayActualToday = selectedDay === currentDay;
+  const isSelectedDayActualToday = currentDay !== null && selectedDay === currentDay;
 
   // Cari sesi absensi dan evaluasi waktu keterlambatan
   const monitorRows = useMemo(() => {
@@ -222,14 +278,28 @@ export default function AdminDashboardPage() {
       const teacher = asgn ? users.find((u) => u.id === asgn.teacherId) : null;
       const subject = asgn ? subjects.find((s) => s.id === asgn.subjectId) : null;
 
-      // Cari apakah kelas ini sudah memiliki sesi absensi tersimpan
-      const session = savedSessions.find((s) => s.classId === cls.id);
+      // Cari apakah kelas ini sudah memiliki sesi absensi tersimpan (ambil sesi paling mutakhir)
+      const classSessions = savedSessions.filter((s) => s.classId === cls.id);
+      const session =
+        classSessions.length > 0
+          ? [...classSessions].sort(
+              (a, b) =>
+                new Date(b.createdAt || b.sessionDate).getTime() -
+                new Date(a.createdAt || a.sessionDate).getTime()
+            )[0]
+          : null;
 
-      const teacherName = session?.teacherName || teacher?.fullName || "Muhamad Rizky Aprian, S.Kom";
-      const subjectName = session?.subject || subject?.name || cls.subject || "Informatika";
+      const hasAssignedTeacher = !!teacher || !!session?.teacherName;
+      const teacherName = session?.teacherName || teacher?.fullName || "Belum Ditugaskan";
+      const subjectName = session?.subject || subject?.name || cls.subject || "Belum Ditentukan";
       const scheduleTime = cls.scheduleTime || "08:00 – 09:45";
 
-      const punctuality = evaluateTeacherPunctuality(scheduleTime, session, isSelectedDayActualToday);
+      const punctuality = evaluateTeacherPunctuality(
+        scheduleTime,
+        session,
+        isSelectedDayActualToday,
+        hasAssignedTeacher
+      );
 
       return {
         cls,
@@ -250,7 +320,10 @@ export default function AdminDashboardPage() {
   // Statistik Disiplin KBM
   const completedCount = monitorRows.filter((r) => r.isAbsenceCompleted).length;
   const totalClassesToday = monitorRows.length;
-  const onTimeCount = monitorRows.filter((r) => r.punctuality.status === "ON_TIME" || r.punctuality.status === "EARLY").length;
+  const onTimeCount = monitorRows.filter(
+    (r) => r.punctuality.status === "ON_TIME" || r.punctuality.status === "EARLY"
+  ).length;
+  const backfillCount = monitorRows.filter((r) => r.punctuality.status === "BACKFILL").length;
   const lateCount = monitorRows.filter((r) => r.punctuality.status === "LATE").length;
   const overdueCount = monitorRows.filter((r) => r.punctuality.status === "OVERDUE").length;
 
@@ -529,35 +602,54 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Pemilih Hari Jadwal */}
-          <div className="flex items-center gap-1 bg-[var(--surface-recessed)] p-1 rounded-xl border border-[var(--border-hairline)] self-start">
-            {scheduleDays.map((day) => (
-              <button
-                key={day}
-                onClick={() => setSelectedDay(day)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  selectedDay === day
-                    ? "bg-[var(--color-accent)] text-white shadow-xs"
-                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                {day} {day === currentDay && "· Hari Ini"}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2 self-start">
+            <div className="flex items-center gap-1 bg-[var(--surface-recessed)] p-1 rounded-xl border border-[var(--border-hairline)]">
+              {scheduleDays.map((day) => (
+                <button
+                  key={day}
+                  onClick={() => setSelectedDay(day)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    selectedDay === day
+                      ? "bg-[var(--color-accent)] text-white shadow-xs"
+                      : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {day} {currentDay === day && "· Hari Ini"}
+                </button>
+              ))}
+            </div>
+            {currentDay === null && (
+              <span className="text-[11px] px-2.5 py-1 rounded-lg bg-stone-500/10 text-stone-500 border border-stone-200 dark:border-stone-800 font-medium">
+                Akhir Pekan · Mode Peninjauan Jadwal
+              </span>
+            )}
           </div>
         </div>
 
-        {/* 3 Kartu Ringkasan Kedisiplinan Guru Hari Ini */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* 4 Kartu Ringkasan Kedisiplinan Guru */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-between">
             <div>
               <span className="text-xs text-emerald-800 dark:text-emerald-300 font-semibold block">
-                Tepat Waktu / Lebih Awal
+                Tepat Waktu / Awal
               </span>
               <span className="text-2xl font-black text-emerald-700 dark:text-emerald-300">
                 {onTimeCount} kelas
               </span>
             </div>
             <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400 opacity-80" />
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-sky-500/10 border border-sky-200 dark:border-sky-900/50 flex items-center justify-between">
+            <div>
+              <span className="text-xs text-sky-800 dark:text-sky-300 font-semibold block">
+                Presensi Susulan
+              </span>
+              <span className="text-2xl font-black text-sky-700 dark:text-sky-300">
+                {backfillCount} kelas
+              </span>
+            </div>
+            <Clock className="w-8 h-8 text-sky-600 dark:text-sky-400 opacity-80" />
           </div>
 
           <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-200 dark:border-amber-900/50 flex items-center justify-between">
@@ -642,18 +734,47 @@ export default function AdminDashboardPage() {
                         {row.subjectName}
                       </td>
                       <td className="py-3 px-3">
-                        <span className="font-semibold text-[var(--text-primary)] block">
-                          {row.teacherName}
-                        </span>
-                        <span className="text-[10px] text-[var(--text-tertiary)] font-mono">
-                          @{row.teacher?.username || "guru"}
-                        </span>
+                        {row.teacher ? (
+                          <>
+                            <span className="font-semibold text-[var(--text-primary)] block">
+                              {row.teacher.fullName}
+                            </span>
+                            <span className="text-[10px] text-[var(--text-tertiary)] font-mono">
+                              @{row.teacher.username}
+                            </span>
+                          </>
+                        ) : row.session?.teacherName ? (
+                          <>
+                            <span className="font-semibold text-[var(--text-primary)] block">
+                              {row.session.teacherName}
+                            </span>
+                            <span className="text-[10px] text-sky-600 dark:text-sky-400 font-medium block">
+                              Penginput Sesi Presensi
+                            </span>
+                          </>
+                        ) : (
+                          <div>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-stone-500/10 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-800">
+                              Belum Ditugaskan
+                            </span>
+                            <span className="text-[10px] text-[var(--text-tertiary)] block mt-0.5">
+                              Belum ada guru pengampu
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-center font-mono">
                         {row.punctuality.recordedTimeStr !== "-" ? (
-                          <span className="font-bold text-[var(--text-primary)] bg-[var(--surface-recessed)] px-2 py-1 rounded-md border border-[var(--border-hairline)]">
-                            {row.punctuality.recordedTimeStr}
-                          </span>
+                          <div>
+                            <span className="font-bold text-[var(--text-primary)] bg-[var(--surface-recessed)] px-2 py-1 rounded-md border border-[var(--border-hairline)]">
+                              {row.punctuality.recordedTimeStr}
+                            </span>
+                            {row.sessionDate && (
+                              <span className="block text-[10px] text-[var(--text-tertiary)] mt-0.5">
+                                KBM: {row.sessionDate}
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-[var(--text-tertiary)] italic">-</span>
                         )}
@@ -675,20 +796,42 @@ export default function AdminDashboardPage() {
                         )}
                       </td>
                       <td className="py-3 px-3 text-center">
-                        {isLateOrOverdue ? (
-                          <a
-                            href={waLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs transition-colors"
-                            title="Kirim pesan peringatan sopan ke guru pengampu via WhatsApp"
+                        {row.punctuality.status === "UNASSIGNED" ? (
+                          <Link
+                            href="/admin/users"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--surface-recessed)] hover:bg-[var(--border-hairline)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-[11px] font-semibold border border-[var(--border-hairline)] transition-colors"
+                            title="Atur penugasan guru untuk rombel ini"
                           >
-                            <MessageCircle className="w-3.5 h-3.5" />
-                            <span>Tegur / WA</span>
-                          </a>
+                            <UserCheck className="w-3.5 h-3.5 text-blue-500" />
+                            <span>Tugaskan</span>
+                          </Link>
+                        ) : isLateOrOverdue ? (
+                          row.teacher?.phone ? (
+                            <a
+                              href={waLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs transition-colors"
+                              title="Kirim pesan peringatan sopan ke guru pengampu via WhatsApp"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              <span>Tegur / WA</span>
+                            </a>
+                          ) : (
+                            <span className="text-[10px] text-rose-500 font-medium italic">
+                              WA Belum Diset
+                            </span>
+                          )
                         ) : row.isAbsenceCompleted ? (
-                          <span className="text-emerald-600 text-[11px] font-bold flex items-center justify-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Tuntas
+                          <span
+                            className={`${
+                              row.punctuality.status === "BACKFILL"
+                                ? "text-sky-600 dark:text-sky-400"
+                                : "text-emerald-600 dark:text-emerald-400"
+                            } text-[11px] font-bold inline-flex items-center justify-center gap-1`}
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {row.punctuality.status === "BACKFILL" ? "Susulan" : "Tuntas"}
                           </span>
                         ) : (
                           <span className="text-[var(--text-tertiary)] text-[10px]">-</span>
