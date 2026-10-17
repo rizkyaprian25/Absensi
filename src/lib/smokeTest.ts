@@ -151,6 +151,8 @@ import {
   deleteUserByAdmin,
 } from "./authStorage.ts";
 import {
+  STORAGE_KEY_TEACHER_ASSIGNMENTS,
+  getStoredTeacherAssignments,
   getStoredSubjects,
   getTeacherAssignments,
   setTeacherEnrollmentMatrix,
@@ -2077,6 +2079,72 @@ function runSmokeTest() {
     (globalThis as any).localStorage.removeItem(STORAGE_KEY_DYNAMIC_STUDENTS);
 
     console.log("✓ LULUS: Seluruh 283 siswa kelas 9 (9A-9G) terverifikasi otentik, valid, dan tahan inkonsistensi cache.");
+  }
+
+  // ============================================================================
+  // UJI VALIDASI ANTI-DUPLIKASI KELAS PADA getEnrolledClassesForUser & PENUGASAN
+  // ============================================================================
+  {
+    console.log("\n--- Memulai Pengujian Anti-Duplikasi Kelas & Penugasan Guru ---");
+
+    // 1. Verifikasi seluruh guru & admin tidak memiliki ID kelas ganda
+    const allUsers = getStoredUsers();
+    for (const u of allUsers) {
+      const enrolled = getEnrolledClassesForUser(u);
+      const classIdSet = new Set<string>();
+      for (const c of enrolled) {
+        assert.strictEqual(
+          classIdSet.has(c.id),
+          false,
+          `Pengguna ${u.username} (${u.role}) tidak boleh memiliki kelas ganda: ${c.id}`
+        );
+        classIdSet.add(c.id);
+      }
+    }
+
+    // 2. Simulasi cache penugasan mengajar yang kotor (terdapat record duplikat dari versi lawas)
+    const dirtyAssignments = [
+      {
+        id: "asgn-user-rizky-sub-inf-class-7a",
+        teacherId: "user-rizky",
+        subjectId: "sub-inf",
+        classId: "class-7a",
+        academicYear: "2026/2027",
+        semester: 1,
+        isActive: true,
+        createdAt: "2026-07-15T00:00:00Z",
+      },
+      {
+        id: "asgn-rizky-inf-7a",
+        teacherId: "user-rizky",
+        subjectId: "sub-inf",
+        classId: "class-7a",
+        academicYear: "2026/2027",
+        semester: 1,
+        isActive: true,
+        createdAt: "2026-07-15T00:00:00Z",
+      },
+    ];
+    (globalThis as any).localStorage.setItem(
+      STORAGE_KEY_TEACHER_ASSIGNMENTS,
+      JSON.stringify(dirtyAssignments)
+    );
+
+    // Saat dibaca, sistem harus otomatis membersihkan duplikasi tersebut
+    const cleaned = getStoredTeacherAssignments();
+    const rizky7a = cleaned.filter((a) => a.teacherId === "user-rizky" && a.classId === "class-7a");
+    assert.strictEqual(rizky7a.length, 1, "Penugasan guru 7A yang duplikat harus dibersihkan menjadi tepat 1");
+
+    // Verifikasi getEnrolledClassesForUser tetap menghasilkan kelas unik 100%
+    const rizkyUser = allUsers.find((u) => u.username === "rizky");
+    const rizkyEnrolled = getEnrolledClassesForUser(rizkyUser!);
+    const rizky7aClasses = rizkyEnrolled.filter((c) => c.id === "class-7a");
+    assert.strictEqual(rizky7aClasses.length, 1, "Rombel 7A di enrolledClasses Pak Rizky wajib tepat 1");
+
+    // Bersihkan kembali ke default
+    (globalThis as any).localStorage.removeItem(STORAGE_KEY_TEACHER_ASSIGNMENTS);
+
+    console.log("✓ LULUS: Anti-duplikasi kelas dan penyembuhan otomatis penugasan guru teruji 100% aman.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");

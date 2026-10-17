@@ -201,16 +201,36 @@ export function getStoredTeacherAssignments(): TeacherAssignment[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      // Periksa apakah penugasan seluruh guru sekolah (29 Guru, 264 rombel-mapel) sudah termuat
-      const hasLucky = parsed.some((a) => a.teacherId === "user-lucky-aditya");
-      if (!hasLucky || parsed.length < DEFAULT_TEACHER_ASSIGNMENTS.length) {
-        const existingIds = new Set(parsed.map((a) => a.id));
-        const missingAssignments = DEFAULT_TEACHER_ASSIGNMENTS.filter((a) => !existingIds.has(a.id));
-        const merged = [...parsed, ...missingAssignments];
-        localStorage.setItem(STORAGE_KEY_TEACHER_ASSIGNMENTS, JSON.stringify(merged));
-        return merged;
+      // Pembersihan otomatis: hilangkan duplikasi historis penugasan (teacherId + subjectId + classId)
+      const assignmentMap = new Map<string, TeacherAssignment>();
+      let hasDuplicates = false;
+
+      for (const a of parsed) {
+        if (!a || !a.teacherId || !a.classId) continue;
+        const key = `${a.teacherId}___${a.subjectId || "sub-inf"}___${a.classId}`;
+        if (assignmentMap.has(key)) {
+          hasDuplicates = true;
+        } else {
+          assignmentMap.set(key, a);
+        }
       }
-      return parsed;
+
+      // Pastikan jika ada guru resmi baru yang belum ada penugasannya di cache lokal, tambahkan penugasan awalnya
+      const existingTeacherIds = new Set(Array.from(assignmentMap.values()).map((a) => a.teacherId));
+      let hasNewTeachers = false;
+      for (const def of DEFAULT_TEACHER_ASSIGNMENTS) {
+        if (!existingTeacherIds.has(def.teacherId)) {
+          const key = `${def.teacherId}___${def.subjectId}___${def.classId}`;
+          assignmentMap.set(key, def);
+          hasNewTeachers = true;
+        }
+      }
+
+      const cleanList = Array.from(assignmentMap.values());
+      if (hasDuplicates || hasNewTeachers) {
+        localStorage.setItem(STORAGE_KEY_TEACHER_ASSIGNMENTS, JSON.stringify(cleanList));
+      }
+      return cleanList;
     }
     return DEFAULT_TEACHER_ASSIGNMENTS;
   } catch (err) {
@@ -311,9 +331,14 @@ export function getEnrolledClassesForUser(
     return MOCK_CLASSES.filter((c) => rizkyIds.has(c.id));
   }
 
-  // Admin memiliki akses supervisi ke seluruh rombel sekolah (22 kelas)
+  // Admin memiliki akses supervisi ke seluruh rombel sekolah (22 kelas unik)
   if (user.role === "ADMIN") {
-    return MOCK_CLASSES;
+    const seen = new Set<string>();
+    return MOCK_CLASSES.filter((c) => {
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
   }
 
   // Untuk Guru: Ambil penugasan mengajar aktif
@@ -328,7 +353,7 @@ export function getEnrolledClassesForUser(
   }
 
   const allSubjects = getStoredSubjects();
-  return assignments.map((asgn) => {
+  const mapped = assignments.map((asgn) => {
     const baseClass = MOCK_CLASSES.find((c) => c.id === asgn.classId);
     const subject = allSubjects.find((s) => s.id === asgn.subjectId);
     const slots = OFFICIAL_SCHEDULE_SLOTS.filter(
@@ -362,6 +387,15 @@ export function getEnrolledClassesForUser(
       homeroomTeacherName: baseClass?.homeroomTeacherName,
     };
   });
+
+  // Jaminan integritas SSOT: deduplikasi kelas berdasarkan classId unik
+  const uniqueMap = new Map<string, Class>();
+  for (const c of mapped) {
+    if (!uniqueMap.has(c.id)) {
+      uniqueMap.set(c.id, c);
+    }
+  }
+  return Array.from(uniqueMap.values());
 }
 
 /**

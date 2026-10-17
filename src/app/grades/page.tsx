@@ -1133,12 +1133,12 @@ function GradesPageContent() {
           activeSelector="[data-active='true']"
           gradientFromClass="from-[var(--surface-recessed)]"
         >
-          {enrolledClasses.map((cls) => {
+          {enrolledClasses.map((cls, idx) => {
             const isSelected = cls.id === selectedClassId;
 
             return (
               <button
-                key={cls.id}
+                key={`${cls.id}-${idx}`}
                 type="button"
                 data-active={isSelected}
                 onClick={() => handleSelectClass(cls.id)}

@@ -768,11 +768,11 @@ export default function ProfilePage() {
 
                   {/* Grid Pilihan Kelas */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2 pt-1">
-                    {MOCK_CLASSES.map((cls) => {
+                    {MOCK_CLASSES.map((cls, idx) => {
                       const isClassSelected = selectedClasses.includes(cls.id);
                       return (
                         <button
-                          key={cls.id}
+                          key={`${cls.id}-${idx}`}
                           type="button"
                           onClick={() => toggleClassForSubject(subId, cls.id)}
                           className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-between transition-all ${

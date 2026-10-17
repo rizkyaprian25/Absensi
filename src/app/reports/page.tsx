@@ -747,8 +747,8 @@ export default function ReportsPage() {
               onChange={(e) => setSelectedClassId(e.target.value)}
               className="text-xs px-2.5 py-1.5 rounded-[8px] bg-[var(--surface-card)] text-[var(--color-accent)] font-mono font-bold border border-[var(--border-hairline)] shadow-xs focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] cursor-pointer"
             >
-              {enrolledClasses.map((cls) => (
-                <option key={cls.id} value={cls.id}>
+              {enrolledClasses.map((cls, idx) => (
+                <option key={`${cls.id}-${idx}`} value={cls.id}>
                   Kelas {cls.name} ({cls.scheduleDay} · {cls.schedulePeriod})
                 </option>
               ))}

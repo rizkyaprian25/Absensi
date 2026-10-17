@@ -216,8 +216,8 @@ export default function WeeklyScheduleViewerModal({
                   onChange={(e) => setSelectedClassId(e.target.value)}
                   className="min-h-[38px] px-3 py-1.5 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] cursor-pointer"
                 >
-                  {MOCK_CLASSES.map((c) => (
-                    <option key={c.id} value={c.id}>
+                  {MOCK_CLASSES.map((c, idx) => (
+                    <option key={`${c.id}-${idx}`} value={c.id}>
                       Kelas {c.name}
                     </option>
                   ))}

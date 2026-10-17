@@ -138,12 +138,12 @@ export default function ClassesPage() {
 
       {/* Daftar Kelas (Ruled Cards) */}
       <div className="flex flex-col gap-3">
-        {classes.map((cls) => {
+        {classes.map((cls, idx) => {
           const studentCount = getStudentsForClass(cls.id).length;
 
           return (
             <Link
-              key={cls.id}
+              key={`${cls.id}-${idx}`}
               href={`/classes/${cls.id}`}
               className="p-4 bg-[var(--surface-card)] hover:bg-[var(--surface-recessed)]/50 border border-[var(--border-hairline)] rounded-[14px] flex items-center justify-between gap-3 transition-colors shadow-xs group"
             >

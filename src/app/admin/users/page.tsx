@@ -765,11 +765,11 @@ export default function AdminUsersPage() {
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {MOCK_CLASSES.map((cls) => {
+                  {MOCK_CLASSES.map((cls, idx) => {
                     const isChecked = (teacherEnrollmentMap[selectedSubjectForTeacher] || []).includes(cls.id);
                     return (
                       <button
-                        key={cls.id}
+                        key={`${cls.id}-${idx}`}
                         type="button"
                         onClick={() => handleToggleClassForSubject(cls.id)}
                         className={`p-2.5 rounded-xl border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${

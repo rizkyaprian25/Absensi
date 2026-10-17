@@ -371,8 +371,8 @@ export default function AdminStudentsArchivePage() {
                 className="px-3 py-1.5 rounded-xl bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] cursor-pointer focus:outline-none"
               >
                 <option value="ALL">Semua Kelas ({MOCK_CLASSES.length} Rombel)</option>
-                {MOCK_CLASSES.map((c) => (
-                  <option key={c.id} value={c.id}>
+                {MOCK_CLASSES.map((c, idx) => (
+                  <option key={`${c.id}-${idx}`} value={c.id}>
                     Kelas {c.name}
                   </option>
                 ))}
