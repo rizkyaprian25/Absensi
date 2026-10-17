@@ -73,6 +73,8 @@ import {
   getStoredStudentAttitudes,
   saveStudentAttitude,
   batchSetAllStudentAttitudes,
+  createAssessment,
+  clearAssessmentsForClass,
 } from "./gradeStorage.ts";
 import {
   INITIAL_MOCK_ASSESSMENTS,
@@ -2145,6 +2147,61 @@ function runSmokeTest() {
     (globalThis as any).localStorage.removeItem(STORAGE_KEY_TEACHER_ASSIGNMENTS);
 
     console.log("✓ LULUS: Anti-duplikasi kelas dan penyembuhan otomatis penugasan guru teruji 100% aman.");
+  }
+
+  // --- UJI PEMISAHAN NILAI & ASESMEN BERDASARKAN MATA PELAJARAN (INFORMATIKA VS MATEMATIKA) ---
+  {
+    console.log("\n--- Memulai Pengujian Pemisahan Nilai Berdasarkan Mata Pelajaran (Informatika vs MTK) ---");
+    const testClass = "class-7a";
+
+    // 1. Ambil asesmen Informatika untuk 7A
+    const infAssessments = getAssessmentsByClass(testClass, undefined, "sub-inf");
+    assert.ok(infAssessments.length > 0, "Kelas 7A harus memiliki asesmen awal Informatika");
+    assert.ok(
+      infAssessments.every((a) => (a.subject || "").toLowerCase() === "informatika" || a.subjectId === "sub-inf"),
+      "Seluruh asesmen harus merupakan Informatika"
+    );
+
+    // 2. Ambil asesmen Matematika untuk 7A (sebelum dibuat penilaian MTK)
+    const mtkAssessmentsBefore = getAssessmentsByClass(testClass, undefined, "sub-mtk");
+    assert.strictEqual(mtkAssessmentsBefore.length, 0, "Kelas 7A belum boleh memiliki asesmen Matematika jika belum ditambahkan");
+
+    // 3. Tambahkan 1 asesmen baru untuk Matematika
+    const newMtkAsmt = createAssessment({
+      classId: testClass,
+      subject: "Matematika",
+      subjectId: "sub-mtk",
+      type: "TUGAS",
+      title: "Tugas 1: Bilangan Bulat",
+      date: "2026-08-10",
+      maxScore: 100,
+      weight: 1,
+    });
+
+    // 4. Verifikasi setelah dibuat:
+    // - Saat filter 'sub-mtk': Menghasilkan tepat 1 asesmen Matematika
+    const mtkAssessmentsAfter = getAssessmentsByClass(testClass, undefined, "sub-mtk");
+    assert.strictEqual(mtkAssessmentsAfter.length, 1, "Asesmen Matematika baru harus muncul pada filter sub-mtk");
+    assert.strictEqual(mtkAssessmentsAfter[0].id, newMtkAsmt.id);
+    assert.strictEqual(mtkAssessmentsAfter[0].title, "Tugas 1: Bilangan Bulat");
+
+    // - Saat filter 'sub-inf': Asesmen Matematika TIDAK boleh bocor / tercampur ke Informatika
+    const infAssessmentsAfter = getAssessmentsByClass(testClass, undefined, "sub-inf");
+    assert.ok(
+      infAssessmentsAfter.every((a) => a.id !== newMtkAsmt.id),
+      "Asesmen Matematika tidak boleh muncul di filter Informatika"
+    );
+
+    // 5. Bersihkan asesmen uji Matematika
+    clearAssessmentsForClass(testClass, "sub-mtk");
+    const mtkAfterClear = getAssessmentsByClass(testClass, undefined, "sub-mtk");
+    assert.strictEqual(mtkAfterClear.length, 0, "Asesmen Matematika harus bersih setelah clearAssessmentsForClass(classId, 'sub-mtk')");
+
+    // Verifikasi asesmen Informatika tetap utuh tidak ikut terhapus
+    const infAfterClear = getAssessmentsByClass(testClass, undefined, "sub-inf");
+    assert.strictEqual(infAfterClear.length, infAssessments.length, "Asesmen Informatika harus tetap utuh 100%");
+
+    console.log("✓ LULUS: Pemisahan data nilai dan asesmen per mata pelajaran (Informatika vs MTK) teruji 100% aman dan terisolasi.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");

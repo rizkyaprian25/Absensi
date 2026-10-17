@@ -21,6 +21,8 @@ import {
   generateInitialMockScores,
 } from "../contracts/mocks/gradesMocks";
 import { triggerAutoSnapshot } from "./backupManager.ts";
+import { DEFAULT_SUBJECTS } from "../contracts/academic.ts";
+import { getStoredSubjects } from "./academicStorage.ts";
 
 export const STORAGE_KEY_ASSESSMENTS = "absensi_grade_assessments_v2";
 export const STORAGE_KEY_SCORES = "absensi_student_scores_v2";
@@ -289,9 +291,9 @@ export function saveStoredScores(scores: StudentScoreRecord[]): void {
 }
 
 /**
- * Mengosongkan seluruh penilaian dan nilai (baik untuk satu kelas atau seluruh kelas)
+ * Mengosongkan seluruh penilaian dan nilai (baik untuk satu kelas, filter mata pelajaran, atau seluruh kelas)
  */
-export function clearAssessmentsForClass(classId?: string): void {
+export function clearAssessmentsForClass(classId?: string, subjectId?: string): void {
   if (typeof window === "undefined") return;
   try {
     if (!classId) {
@@ -299,8 +301,11 @@ export function clearAssessmentsForClass(classId?: string): void {
       saveStoredScores([]);
     } else {
       const allAssessments = getStoredAssessments();
-      const removedIds = new Set(allAssessments.filter((a) => a.classId === classId).map((a) => a.id));
-      const remainingAssessments = allAssessments.filter((a) => a.classId !== classId);
+      const toRemove = allAssessments.filter(
+        (a) => a.classId === classId && (!subjectId || isAssessmentMatchingSubject(a, subjectId))
+      );
+      const removedIds = new Set(toRemove.map((a) => a.id));
+      const remainingAssessments = allAssessments.filter((a) => !removedIds.has(a.id));
       const remainingScores = getStoredScores().filter((s) => !removedIds.has(s.assessmentId));
       saveStoredAssessments(remainingAssessments);
       saveStoredScores(remainingScores);
@@ -496,14 +501,72 @@ export function batchSetAllStudentAttitudes(
 // ============================================================================
 
 /**
+ * Memeriksa apakah sebuah item asesmen cocok dengan mata pelajaran tertentu (berdasarkan ID atau nama/kode)
+ */
+export function isAssessmentMatchingSubject(
+  assessment: AssessmentItem,
+  subjectIdOrName?: string
+): boolean {
+  if (!subjectIdOrName || subjectIdOrName === "ALL") return true;
+
+  const target = subjectIdOrName.trim().toLowerCase();
+
+  // 1. Cek langsung jika subjectId assessment cocok
+  if (assessment.subjectId) {
+    const aSubId = assessment.subjectId.trim().toLowerCase();
+    if (aSubId === target) return true;
+  }
+
+  // 2. Normalisasi via master data mata pelajaran (id, code, name)
+  const allSubjects = typeof getStoredSubjects === "function" ? getStoredSubjects() : DEFAULT_SUBJECTS;
+  const targetSubject = allSubjects.find(
+    (s) =>
+      s.id.toLowerCase() === target ||
+      s.code.toLowerCase() === target ||
+      s.name.toLowerCase() === target
+  );
+
+  if (targetSubject) {
+    // Cocokkan id
+    if (assessment.subjectId && assessment.subjectId.toLowerCase() === targetSubject.id.toLowerCase()) {
+      return true;
+    }
+
+    // Cocokkan nama atau kode
+    const asmtSub = (assessment.subject || "").trim().toLowerCase();
+    if (
+      asmtSub === targetSubject.name.toLowerCase() ||
+      asmtSub === targetSubject.code.toLowerCase() ||
+      asmtSub === targetSubject.id.toLowerCase()
+    ) {
+      return true;
+    }
+
+    // Kasus data awal / legacy (tanpa subjectId dan default "Informatika"):
+    // Hanya cocok jika target mata pelajaran adalah Informatika ("sub-inf")
+    if (!assessment.subjectId && (!assessment.subject || asmtSub === "informatika")) {
+      return targetSubject.id === "sub-inf";
+    }
+
+    return false;
+  }
+
+  // Fallback pencocokan string biasa
+  const asmtSub = (assessment.subject || "").trim().toLowerCase();
+  return asmtSub === target || (assessment.subjectId || "").toLowerCase() === target;
+}
+
+/**
  * Mengambil daftar ID urutan asesmen kustom untuk kelas tertentu
  */
-export function getAssessmentOrderForClass(classId: string): string[] {
+export function getAssessmentOrderForClass(classId: string, subjectId?: string): string[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY_ASSESSMENT_ORDER);
     if (!raw) return [];
     const map = JSON.parse(raw);
+    const key = subjectId ? `${classId}_${subjectId}` : classId;
+    if (Array.isArray(map?.[key])) return map[key];
     return Array.isArray(map?.[classId]) ? map[classId] : [];
   } catch {
     return [];
@@ -514,18 +577,28 @@ export function getAssessmentOrderForClass(classId: string): string[] {
  * Menyimpan daftar ID urutan asesmen kustom untuk kelas tertentu
  * dan menyinkronkan urutan item pada penyimpanan global
  */
-export function saveAssessmentOrderForClass(classId: string, orderedIds: string[]): void {
+export function saveAssessmentOrderForClass(
+  classId: string,
+  orderedIds: string[],
+  subjectId?: string
+): void {
   if (typeof window === "undefined") return;
   try {
     const raw = localStorage.getItem(STORAGE_KEY_ASSESSMENT_ORDER);
     const map = raw ? JSON.parse(raw) : {};
+    const key = subjectId ? `${classId}_${subjectId}` : classId;
+    map[key] = orderedIds;
     map[classId] = orderedIds;
     localStorage.setItem(STORAGE_KEY_ASSESSMENT_ORDER, JSON.stringify(map));
 
     // Sinkronkan urutan daftar asesmen kelas pada penyimpanan utama
     const all = getStoredAssessments();
-    const classItems = all.filter((a) => a.classId === classId);
-    const otherItems = all.filter((a) => a.classId !== classId);
+    const classItems = all.filter(
+      (a) => a.classId === classId && (!subjectId || isAssessmentMatchingSubject(a, subjectId))
+    );
+    const otherItems = all.filter(
+      (a) => a.classId !== classId || (subjectId ? !isAssessmentMatchingSubject(a, subjectId) : false)
+    );
 
     const orderMap = new Map(orderedIds.map((id, idx) => [id, idx]));
     classItems.sort((a, b) => {
@@ -546,11 +619,17 @@ export function saveAssessmentOrderForClass(classId: string, orderedIds: string[
  */
 export function getAssessmentsByClass(
   classId: string,
-  allAssessments?: AssessmentItem[]
+  allAssessments?: AssessmentItem[],
+  subjectIdOrName?: string
 ): AssessmentItem[] {
   const all = allAssessments ?? getStoredAssessments();
-  const classItems = all.filter((a) => a.classId === classId);
-  const customOrder = getAssessmentOrderForClass(classId);
+  let classItems = all.filter((a) => a.classId === classId);
+
+  if (subjectIdOrName) {
+    classItems = classItems.filter((a) => isAssessmentMatchingSubject(a, subjectIdOrName));
+  }
+
+  const customOrder = getAssessmentOrderForClass(classId, subjectIdOrName);
 
   if (customOrder.length > 0) {
     const orderMap = new Map(customOrder.map((id, idx) => [id, idx]));
@@ -580,9 +659,9 @@ export function createAssessment(data: Omit<AssessmentItem, "id" | "createdAt">)
   saveStoredAssessments(updated);
 
   // Jika kelas memiliki urutan kustom, tambahkan item baru di urutan paling akhir
-  const customOrder = getAssessmentOrderForClass(data.classId);
+  const customOrder = getAssessmentOrderForClass(data.classId, data.subjectId);
   if (customOrder.length > 0 && !customOrder.includes(newItem.id)) {
-    saveAssessmentOrderForClass(data.classId, [...customOrder, newItem.id]);
+    saveAssessmentOrderForClass(data.classId, [...customOrder, newItem.id], data.subjectId);
   }
 
   return newItem;

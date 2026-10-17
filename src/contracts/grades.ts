@@ -200,6 +200,7 @@ export const AssessmentItemSchema = z.object({
   id: z.string().min(1),
   classId: z.string().min(1),
   subject: z.string().default("Informatika"),
+  subjectId: z.string().optional(),
   type: AssessmentTypeSchema,
   title: z.string().min(1, "Judul penilaian wajib diisi"),
   description: z.string().optional(),

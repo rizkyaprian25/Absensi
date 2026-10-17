@@ -121,14 +121,18 @@ function GradesPageContent() {
   const router = useRouter();
   const { currentUser } = useAuth();
   const { confirm, alert } = useConfirm();
-  const enrolledClasses = useMemo(() => getEnrolledClassesForUser(currentUser), [currentUser]);
+  const enrolledSubjects = useMemo(() => getEnrolledSubjectsForUser(currentUser), [currentUser]);
+  const initialSubjectId = searchParams.get("subjectId") || "sub-inf";
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(initialSubjectId);
+
+  const enrolledClasses = useMemo(
+    () => getEnrolledClassesForUser(currentUser, currentUser?.role === "ADMIN" ? undefined : selectedSubjectId),
+    [currentUser, selectedSubjectId]
+  );
 
   // 1. State Pilihan Kelas
   const initialClassId = searchParams.get("classId") || (enrolledClasses[0]?.id || "class-7a");
   const [selectedClassId, setSelectedClassId] = useState<string>(initialClassId);
-
-  const enrolledSubjects = useMemo(() => getEnrolledSubjectsForUser(currentUser), [currentUser]);
-  const [selectedSubjectId, setSelectedSubjectId] = useState("sub-inf");
 
   useEffect(() => {
     if (enrolledSubjects.length > 0 && !enrolledSubjects.some((s) => s.id === selectedSubjectId)) {
@@ -272,11 +276,17 @@ function GradesPageContent() {
     }
   }, [selectedClassId, isMounted]);
 
+  // Update URL jika mata pelajaran diganti
+  const handleSelectSubject = (subId: string) => {
+    setSelectedSubjectId(subId);
+    router.replace(`/grades?classId=${selectedClassId}&subjectId=${subId}`);
+  };
+
   // Update URL jika kelas diganti
   const handleSelectClass = (clsId: string) => {
     setSelectedClassId(clsId);
     setStudentAttitudes(getStoredStudentAttitudes(clsId));
-    router.replace(`/grades?classId=${clsId}`);
+    router.replace(`/grades?classId=${clsId}&subjectId=${selectedSubjectId}`);
   };
 
   const currentClass =
@@ -292,12 +302,12 @@ function GradesPageContent() {
     return getStudentsForClass(selectedClassId);
   }, [selectedClassId]);
 
-  // Asesmen untuk kelas yang dipilih (mempertimbangkan urutan kustom yang telah diatur)
+  // Asesmen untuk kelas yang dipilih (mempertimbangkan urutan kustom yang telah diatur dan mata pelajaran terpilih)
   // Menjaga agar pada SSR dan first hydration render tidak membaca storage browser secara prematur
   const classAssessments = useMemo(() => {
     if (!isMounted || assessments.length === 0) return [];
-    return getAssessmentsByClass(selectedClassId, assessments);
-  }, [isMounted, assessments, selectedClassId]);
+    return getAssessmentsByClass(selectedClassId, assessments, selectedSubjectId);
+  }, [isMounted, assessments, selectedClassId, selectedSubjectId]);
 
   // Handler memindahkan urutan asesmen (Drag & Drop atau tombol geser)
   const handleReorderAssessments = (sourceId: string, targetId: string) => {
@@ -313,7 +323,7 @@ function GradesPageContent() {
     const [moved] = newIds.splice(sourceIdx, 1);
     newIds.splice(targetIdx, 0, moved);
 
-    saveAssessmentOrderForClass(selectedClassId, newIds);
+    saveAssessmentOrderForClass(selectedClassId, newIds, selectedSubjectId);
     refreshData();
 
     const movedItem = classAssessments.find((a) => a.id === sourceId);
@@ -557,7 +567,8 @@ function GradesPageContent() {
     } else {
       createAssessment({
         classId: selectedClassId,
-        subject: currentClass.subject || "Informatika",
+        subject: currentSubject?.name || "Informatika",
+        subjectId: currentSubject?.id || selectedSubjectId,
         title,
         type,
         date,
@@ -818,27 +829,33 @@ function GradesPageContent() {
 
   // Unduh Berkas Excel (.xlsx) Ber-Kop Resmi
   const handleDownloadExcel = () => {
+    const subName = currentSubject?.name || "Informatika";
+    const subClean = subName.replace(/[^a-zA-Z0-9]/g, "_");
     const xlsxBuffer = generateGradesXlsxWithKop(
       currentClass.name,
       classAssessments,
       studentSummaries,
-      kkm
+      kkm,
+      { subject: subName }
     );
 
-    const filename = `Daftar_Nilai_Kelas_${currentClass.name}_Informatika_SMPN3Cibungbulang_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const filename = `Daftar_Nilai_Kelas_${currentClass.name}_${subClean}_SMPN3Cibungbulang_${new Date().toISOString().slice(0, 10)}.xlsx`;
     downloadXlsxFile(xlsxBuffer, filename);
 
-    setToastMessage(`Berkas Excel (.xlsx) Nilai Kelas ${currentClass.name} berhasil diunduh`);
+    setToastMessage(`Berkas Excel (.xlsx) Nilai ${subName} Kelas ${currentClass.name} berhasil diunduh`);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
   // Unduh Berkas CSV Ber-Kop Resmi
   const handleDownloadCSV = () => {
+    const subName = currentSubject?.name || "Informatika";
+    const subClean = subName.replace(/[^a-zA-Z0-9]/g, "_");
     const csvContent = generateGradesCsvWithKop(
       currentClass.name,
       classAssessments,
       studentSummaries,
-      kkm
+      kkm,
+      { subject: subName }
     );
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -847,7 +864,7 @@ function GradesPageContent() {
     link.href = url;
     link.setAttribute(
       "download",
-      `Daftar_Nilai_Kelas_${currentClass.name}_Informatika_SMPN3Cibungbulang_${new Date().toISOString().slice(0, 10)}.csv`
+      `Daftar_Nilai_Kelas_${currentClass.name}_${subClean}_SMPN3Cibungbulang_${new Date().toISOString().slice(0, 10)}.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -857,13 +874,16 @@ function GradesPageContent() {
 
   // Unduh Berkas Excel (.xlsx) Mode Pengumuman Disensor (Status Kelengkapan)
   const handleDownloadCensoredExcel = () => {
+    const subName = currentSubject?.name || "Informatika";
+    const subClean = subName.replace(/[^a-zA-Z0-9]/g, "_");
     const xlsxBuffer = generateCensoredGradesXlsxWithKop(
       currentClass.name,
       classAssessments,
-      studentSummaries
+      studentSummaries,
+      { subject: subName }
     );
 
-    const filename = `Pengumuman_Kelengkapan_Tugas_Kelas_${currentClass.name}_Informatika_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const filename = `Pengumuman_Kelengkapan_Tugas_Kelas_${currentClass.name}_${subClean}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     downloadXlsxFile(xlsxBuffer, filename);
 
     showToast(`Berkas Excel (.xlsx) Pengumuman Nilai Disensor Kelas ${currentClass.name} berhasil diunduh`);
@@ -871,10 +891,13 @@ function GradesPageContent() {
 
   // Unduh Berkas CSV Mode Pengumuman Disensor
   const handleDownloadCensoredCSV = () => {
+    const subName = currentSubject?.name || "Informatika";
+    const subClean = subName.replace(/[^a-zA-Z0-9]/g, "_");
     const csvContent = generateCensoredGradesCsvWithKop(
       currentClass.name,
       classAssessments,
-      studentSummaries
+      studentSummaries,
+      { subject: subName }
     );
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -883,7 +906,7 @@ function GradesPageContent() {
     link.href = url;
     link.setAttribute(
       "download",
-      `Pengumuman_Kelengkapan_Tugas_Kelas_${currentClass.name}_Informatika_${new Date().toISOString().slice(0, 10)}.csv`
+      `Pengumuman_Kelengkapan_Tugas_Kelas_${currentClass.name}_${subClean}_${new Date().toISOString().slice(0, 10)}.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -894,10 +917,12 @@ function GradesPageContent() {
 
   // Salin Teks Ringkasan Pengumuman WhatsApp
   const handleCopyWhatsAppText = () => {
+    const subName = currentSubject?.name || "Informatika";
     const text = generateCensoredGradesWhatsAppText(
       currentClass.name,
       classAssessments,
-      studentSummaries
+      studentSummaries,
+      { subject: subName }
     );
 
     if (typeof navigator !== "undefined" && navigator.clipboard) {
@@ -992,7 +1017,7 @@ function GradesPageContent() {
   const handleClearAssessments = async () => {
     const isConfirm = await confirm({
       title: "Kosongkan Penilaian Kelas",
-      message: `Apakah Anda yakin ingin mengosongkan seluruh penilaian dan nilai untuk Kelas ${currentClass.name}? Semua tugas, ulangan, dan nilai yang dibuat pada kelas ini akan dihapus bersih.`,
+      message: `Apakah Anda yakin ingin mengosongkan seluruh penilaian dan nilai untuk mata pelajaran ${currentSubject?.name || "Informatika"} pada Kelas ${currentClass.name}? Semua tugas, ulangan, dan nilai yang dibuat pada mata pelajaran ini di kelas ini akan dihapus bersih.`,
       confirmText: "Ya, Kosongkan",
       cancelText: "Batal",
       variant: "danger",
@@ -1000,7 +1025,7 @@ function GradesPageContent() {
     });
     if (!isConfirm) return;
 
-    clearAssessmentsForClass(selectedClassId);
+    clearAssessmentsForClass(selectedClassId, selectedSubjectId);
     refreshData();
   };
 
@@ -1024,7 +1049,7 @@ function GradesPageContent() {
             Daftar Nilai &amp; Asesmen
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            SMP Negeri 3 Cibungbulang · Informatika · Guru: Muhamad Rizky Aprian, S.Kom
+            SMP Negeri 3 Cibungbulang · {currentSubject?.name || "Informatika"} · {currentUser?.role === "ADMIN" ? "Administrator Sekolah" : (currentUser?.fullName || "Guru Pengampu")}
           </p>
         </div>
 
@@ -1131,28 +1156,32 @@ function GradesPageContent() {
         </div>
       </div>
 
-      {/* Pengalih Mata Pelajaran (Tampil jika guru mengampu > 1 mata pelajaran) */}
-      {enrolledSubjects.length > 1 && (
-        <div className="flex items-center gap-2 p-2 bg-[var(--surface-card)] rounded-xl border border-[var(--border-hairline)] shadow-xs">
-          <span className="text-xs font-semibold text-[var(--text-secondary)]">Mata Pelajaran:</span>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {enrolledSubjects.map((s) => (
+      {/* Pengalih Mata Pelajaran (Tampil jika guru mengampu > 1 mata pelajaran atau admin) */}
+      <div className="flex items-center gap-2 p-2 bg-[var(--surface-card)] rounded-xl border border-[var(--border-hairline)] shadow-xs">
+        <span className="text-xs font-semibold text-[var(--text-secondary)]">Mata Pelajaran:</span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {enrolledSubjects.length > 1 ? (
+            enrolledSubjects.map((s) => (
               <button
                 key={s.id}
                 type="button"
-                onClick={() => setSelectedSubjectId(s.id)}
+                onClick={() => handleSelectSubject(s.id)}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   selectedSubjectId === s.id
-                    ? "bg-purple-600 text-white shadow-xs"
+                    ? "bg-[var(--color-accent)] text-[var(--color-on-accent)] shadow-xs"
                     : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] border border-[var(--border-hairline)] hover:text-[var(--text-primary)]"
                 }`}
               >
                 {s.name}
               </button>
-            ))}
-          </div>
+            ))
+          ) : (
+            <span className="px-3 py-1 rounded-lg text-xs font-bold bg-[var(--color-accent)]/15 text-[var(--color-accent)] border border-[var(--color-accent)]/30">
+              {currentSubject?.name || "Informatika"}
+            </span>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Pemilih Kelas (Rombel Switcher 7A-7H, 8A-8B) */}
       <div className="flex flex-col gap-2">
@@ -1270,10 +1299,10 @@ function GradesPageContent() {
             <BookOpen className="w-7 h-7" />
           </div>
           <h3 className="text-base font-bold text-[var(--text-primary)]">
-            Buku Nilai Kelas {currentClass.name} Masih Kosong
+            Buku Nilai Kelas {currentClass.name} ({currentSubject?.name || "Mata Pelajaran"}) Masih Kosong
           </h3>
           <p className="text-xs text-[var(--text-secondary)] max-w-md mt-1 mb-4 leading-relaxed">
-            Data penilaian tugas, ulangan harian, kuis, UTS, dan UAS telah dikosongkan. Anda dapat membuat penilaian mandiri sesuai jadwal dan materi ajar Anda.
+            Belum ada data penilaian untuk mata pelajaran <strong>{currentSubject?.name || "Informatika"}</strong> di kelas ini. Anda dapat membuat penilaian mandiri sesuai jadwal dan materi ajar Anda.
           </p>
           <button
             type="button"
@@ -2519,7 +2548,7 @@ function GradesPageContent() {
                     {editingAssessment ? "Ubah Penilaian" : "Tambah Penilaian Baru"}
                   </h3>
                   <p className="text-xs text-[var(--text-secondary)]">
-                    Kelas {currentClass.name} · {currentClass.subject || "Informatika"}
+                    Kelas {currentClass.name} · {currentSubject?.name || "Informatika"}
                   </p>
                 </div>
               </div>
