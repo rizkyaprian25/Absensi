@@ -24,6 +24,7 @@ import {
   getStoredSubjects,
   getTeacherAssignments,
   setTeacherEnrollmentMatrix,
+  DEFAULT_TEACHER_ASSIGNMENTS,
 } from "@/lib/academicStorage";
 import { MOCK_CLASSES } from "@/contracts/mocks/attendanceMocks";
 import type { Subject } from "@/contracts/academic";
@@ -81,10 +82,11 @@ export default function ProfilePage() {
         }
       });
 
-      // Default jika belum ada penugasan sama sekali dan guru adalah Pak Rizky
+      // Default jika belum ada penugasan sama sekali dan guru adalah Pak Rizky (10 kelas: 7A-7H & 8A-8B)
       if (Object.keys(matrix).length === 0 && currentUser.role === "GURU") {
-        matrix["sub-inf"] = MOCK_CLASSES.map((c) => c.id);
+        matrix["sub-inf"] = DEFAULT_TEACHER_ASSIGNMENTS.map((a) => a.classId);
       }
+
 
       setEnrollmentMap(matrix);
     }

@@ -1,22 +1,30 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Plus, Users, ChevronRight, School, Archive, CheckCircle2 } from "lucide-react";
 import { Toast } from "@/components/ui/Toast";
-import { MOCK_CLASSES, getStudentsForClass } from "@/contracts/mocks/attendanceMocks";
+import { getStudentsForClass } from "@/contracts/mocks/attendanceMocks";
 import { Class } from "@/contracts/attendance";
+import { useAuth } from "@/context/AuthContext";
+import { getEnrolledClassesForUser } from "@/lib/academicStorage";
 
 /**
  * Halaman Daftar Kelas (L5 Stitch)
  * Memuat daftar rombongan belajar guru, tahun ajaran, dan status arsip
  */
 export default function ClassesPage() {
-  const [classes, setClasses] = useState<Class[]>(MOCK_CLASSES);
+  const { currentUser } = useAuth();
+  const enrolledClasses = useMemo(() => getEnrolledClassesForUser(currentUser), [currentUser]);
+  const [classes, setClasses] = useState<Class[]>(enrolledClasses);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newClassName, setNewClassName] = useState("");
   const [newAcademicYear, setNewAcademicYear] = useState("2026/2027");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setClasses(enrolledClasses);
+  }, [enrolledClasses]);
 
   const handleCreateClass = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +32,7 @@ export default function ClassesPage() {
 
     const newClass: Class = {
       id: `class-${Date.now()}`,
-      teacherId: "teacher-1",
+      teacherId: currentUser?.id || "teacher-1",
       name: newClassName.trim(),
       academicYear: newAcademicYear,
       semester: 1,
@@ -52,9 +60,10 @@ export default function ClassesPage() {
             Daftar Kelas
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            10 Rombongan Belajar Informatika · SMP Negeri 3 Cibungbulang
+            {classes.length} Rombongan Belajar {currentUser?.role === "ADMIN" ? "Sekolah (Mode Admin)" : "yang Diampu"} · SMP Negeri 3 Cibungbulang
           </p>
         </div>
+
 
         <button
           type="button"

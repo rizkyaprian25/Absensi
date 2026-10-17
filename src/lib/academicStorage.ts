@@ -1,5 +1,7 @@
-import type { Subject, TeacherAssignment } from "../contracts/academic.ts";
+import type { Subject, TeacherAssignment, AppUser } from "../contracts/academic.ts";
 import { DEFAULT_SUBJECTS } from "../contracts/academic.ts";
+import type { Class } from "../contracts/attendance.ts";
+import { MOCK_CLASSES } from "../contracts/mocks/attendanceMocks.ts";
 
 // ============================================================================
 // KUNCI PENYIMPANAN DATA AKADEMIK (LOCALSTORAGE SSOT)
@@ -148,3 +150,39 @@ export function setTeacherEnrollmentMatrix(
   saveTeacherAssignmentsForTeacher(teacherId, newAssignments);
   return newAssignments;
 }
+
+/**
+ * Mengambil daftar kelas yang di-enroll oleh guru yang sedang aktif
+ * - Jika peran ADMIN: Mengembalikan seluruh kelas (supervisi sekolah)
+ * - Jika peran GURU: Hanya mengembalikan rombel kelas yang terdaftar pada penugasan guru
+ */
+export function getEnrolledClassesForUser(
+  user: AppUser | null,
+  subjectId?: string
+): Class[] {
+  if (!user) {
+    // Fallback awal default untuk Pak Rizky (10 kelas: 7A-7H & 8A-8B)
+    const defaultIds = new Set(DEFAULT_TEACHER_ASSIGNMENTS.map((a) => a.classId));
+    return MOCK_CLASSES.filter((c) => defaultIds.has(c.id));
+  }
+
+  // Admin memiliki akses supervisi ke seluruh rombel sekolah (22 kelas)
+  if (user.role === "ADMIN") {
+    return MOCK_CLASSES;
+  }
+
+  // Untuk Guru: Ambil penugasan mengajar aktif
+  let assignments = getTeacherAssignments(user.id);
+  if (assignments.length === 0 && (user.username === "rizky" || user.id === "user-rizky")) {
+    assignments = DEFAULT_TEACHER_ASSIGNMENTS;
+  }
+
+  // Filter berdasarkan mata pelajaran jika ditentukan
+  if (subjectId) {
+    assignments = assignments.filter((a) => a.subjectId === subjectId);
+  }
+
+  const assignedClassIds = new Set(assignments.map((a) => a.classId));
+  return MOCK_CLASSES.filter((c) => assignedClassIds.has(c.id));
+}
+

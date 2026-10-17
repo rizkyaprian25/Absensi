@@ -31,6 +31,9 @@ import {
   MOCK_CLASSES,
   getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
+import { useAuth } from "@/context/AuthContext";
+import { getEnrolledClassesForUser } from "@/lib/academicStorage";
+
 import type {
   Class,
   HolidayItem,
@@ -363,7 +366,16 @@ export function computeSemesterRecapForClass(
  * Memuat matriks presensi siswa x tanggal, rekap akumulasi raport, ekspor Excel .xlsx, CSV, dan cetak native
  */
 export default function ReportsPage() {
+  const { currentUser } = useAuth();
+  const enrolledClasses = useMemo(() => getEnrolledClassesForUser(currentUser), [currentUser]);
   const [selectedClassId, setSelectedClassId] = useState("class-7a");
+
+  useEffect(() => {
+    if (enrolledClasses.length > 0 && !enrolledClasses.some((c) => c.id === selectedClassId)) {
+      setSelectedClassId(enrolledClasses[0].id);
+    }
+  }, [enrolledClasses, selectedClassId]);
+
   const [recapMode, setRecapMode] = useState<"monthly" | "semester">("monthly");
   const [semesterViewType, setSemesterViewType] = useState<"summary" | "detailed">("summary");
   const [selectedMonth, setSelectedMonth] = useState("2026-09");
@@ -408,7 +420,8 @@ export default function ReportsPage() {
   }, [selectedClassId, selectedMonth]);
 
   const currentClass =
-    MOCK_CLASSES.find((c) => c.id === selectedClassId) ?? MOCK_CLASSES[0];
+    enrolledClasses.find((c) => c.id === selectedClassId) ?? enrolledClasses[0] ?? MOCK_CLASSES[0];
+
 
   const currentMonthLabel = useMemo(() => {
     const found = SEMESTER_MONTHS.find((m) => m.value === selectedMonth);
@@ -625,10 +638,11 @@ export default function ReportsPage() {
   const handleExportAllClasses = async (format: "xlsx" | "csv" | "xls") => {
     setIsExportDropdownOpen(false);
     const modeLabel = recapMode === "semester" ? "Total Semester" : `Bulan ${currentMonthLabel}`;
-    setToastMessage(`Memproses ekspor 10 kelas [${modeLabel}] (${format.toUpperCase()})...`);
+    setToastMessage(`Memproses ekspor ${enrolledClasses.length} kelas [${modeLabel}] (${format.toUpperCase()})...`);
 
-    for (let i = 0; i < MOCK_CLASSES.length; i++) {
-      const cls = MOCK_CLASSES[i];
+    for (let i = 0; i < enrolledClasses.length; i++) {
+      const cls = enrolledClasses[i];
+
       if (format === "csv") {
         handleExportCsv(cls);
       } else {
@@ -720,12 +734,13 @@ export default function ReportsPage() {
               onChange={(e) => setSelectedClassId(e.target.value)}
               className="text-xs px-2.5 py-1.5 rounded-[8px] bg-[var(--surface-card)] text-[var(--color-accent)] font-mono font-bold border border-[var(--border-hairline)] shadow-xs focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] cursor-pointer"
             >
-              {MOCK_CLASSES.map((cls) => (
+              {enrolledClasses.map((cls) => (
                 <option key={cls.id} value={cls.id}>
                   Kelas {cls.name} ({cls.scheduleDay} · {cls.schedulePeriod})
                 </option>
               ))}
             </select>
+
           </div>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
             Informatika · SMP Negeri 3 Cibungbulang · Muhamad Rizky Aprian, S.Kom

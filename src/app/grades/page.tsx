@@ -49,6 +49,9 @@ import {
   MOCK_CLASSES,
   getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
+import { useAuth } from "@/context/AuthContext";
+import { getEnrolledClassesForUser } from "@/lib/academicStorage";
+
 import type { Student } from "@/contracts/attendance";
 import type {
   AssessmentItem,
@@ -113,12 +116,22 @@ import { SmoothHorizontalScroll } from "@/components/ui/SmoothHorizontalScroll";
 function GradesPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { currentUser } = useAuth();
+  const enrolledClasses = useMemo(() => getEnrolledClassesForUser(currentUser), [currentUser]);
 
   // 1. State Pilihan Kelas
-  const initialClassId = searchParams.get("classId") || "class-7a";
+  const initialClassId = searchParams.get("classId") || (enrolledClasses[0]?.id || "class-7a");
   const [selectedClassId, setSelectedClassId] = useState<string>(initialClassId);
 
+  // Pastikan kelas terpilih selalu berada di dalam daftar rombel yang di-enroll
+  useEffect(() => {
+    if (enrolledClasses.length > 0 && !enrolledClasses.some((c) => c.id === selectedClassId)) {
+      setSelectedClassId(enrolledClasses[0].id);
+    }
+  }, [enrolledClasses, selectedClassId]);
+
   // 2. Data Penilaian & Nilai
+
   const [assessments, setAssessments] = useState<AssessmentItem[]>([]);
   const [scores, setScores] = useState<ReturnType<typeof getStoredScores>>([]);
   const [kkmByGrade, setKkmByGrade] = useState<Record<string, number>>({ ...DEFAULT_KKM_BY_GRADE });
@@ -234,7 +247,9 @@ function GradesPageContent() {
     router.replace(`/grades?classId=${clsId}`);
   };
 
-  const currentClass = MOCK_CLASSES.find((c) => c.id === selectedClassId) ?? MOCK_CLASSES[0];
+  const currentClass =
+    enrolledClasses.find((c) => c.id === selectedClassId) ?? enrolledClasses[0] ?? MOCK_CLASSES[0];
+
   const activeGradeLevel = useMemo(() => extractGradeLevel(currentClass.name), [currentClass.name]);
 
   // Nilai KKM aktif untuk angkatan kelas yang sedang dipilih
@@ -1084,8 +1099,9 @@ function GradesPageContent() {
           activeSelector="[data-active='true']"
           gradientFromClass="from-[var(--surface-recessed)]"
         >
-          {MOCK_CLASSES.map((cls) => {
+          {enrolledClasses.map((cls) => {
             const isSelected = cls.id === selectedClassId;
+
             return (
               <button
                 key={cls.id}

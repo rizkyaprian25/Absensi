@@ -24,6 +24,9 @@ import {
   MOCK_SUBJECT,
   getStudentsForClass,
 } from "@/contracts/mocks/attendanceMocks";
+import { useAuth } from "@/context/AuthContext";
+import { getEnrolledClassesForUser } from "@/lib/academicStorage";
+
 import {
   ScheduleDay,
   HolidayItem,
@@ -92,10 +95,14 @@ export default function TodayDashboardPage() {
     setSessions(getSavedSessions());
   }, []);
 
-  // Filter kelas berdasarkan hari yang dipilih
+  const { currentUser } = useAuth();
+  const enrolledClasses = useMemo(() => getEnrolledClassesForUser(currentUser), [currentUser]);
+
+  // Filter kelas berdasarkan hari yang dipilih dari rombel yang di-enroll
   const classesForSelectedDay = useMemo(() => {
-    return MOCK_CLASSES.filter((c) => c.scheduleDay === selectedDay);
-  }, [selectedDay]);
+    return enrolledClasses.filter((c) => c.scheduleDay === selectedDay);
+  }, [enrolledClasses, selectedDay]);
+
 
   // Tanggal pekan aktif untuk hari terpilih (YYYY-MM-DD)
   const selectedDate = useMemo(() => {
@@ -531,11 +538,12 @@ export default function TodayDashboardPage() {
               onChange={(e) => setQuickBackfillClassId(e.target.value)}
               className="min-h-[42px] px-3 py-2 rounded-[10px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] text-xs font-bold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] cursor-pointer"
             >
-              {MOCK_CLASSES.map((c) => (
+              {enrolledClasses.map((c) => (
                 <option key={c.id} value={c.id}>
                   Kelas {c.name} ({c.scheduleDay} · {c.scheduleTime} WIB)
                 </option>
               ))}
+
             </select>
           </div>
 
