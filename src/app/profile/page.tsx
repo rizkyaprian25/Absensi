@@ -17,6 +17,8 @@ import {
   EyeOff,
   Sparkles,
   School,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { updateUserProfile, changePassword } from "@/lib/authStorage";
@@ -59,6 +61,43 @@ export default function ProfilePage() {
   // Mapping subjectId -> array of classIds
   const [enrollmentMap, setEnrollmentMap] = useState<Record<string, string[]>>({});
   const [enrollSuccess, setEnrollSuccess] = useState<string | null>(null);
+
+  // State Preferensi Tema (Gelap / Terang Mandiri)
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [themeSuccess, setThemeSuccess] = useState<string | null>(null);
+
+  // Inisialisasi tema aktif saat komponen dimuat
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("app_theme");
+      if (savedTheme === "light") {
+        setIsDarkMode(false);
+      } else {
+        setIsDarkMode(true);
+      }
+    }
+  }, []);
+
+  // Mengubah mode tema secara instan dan menyimpannya ke penyimpanan lokal
+  const setThemeMode = (dark: boolean) => {
+    setIsDarkMode(dark);
+    if (typeof window !== "undefined") {
+      if (dark) {
+        document.documentElement.classList.add("dark");
+        localStorage.setItem("app_theme", "dark");
+        setThemeSuccess("Mode Gelap diaktifkan. Nyaman untuk mata dan hemat daya baterai.");
+      } else {
+        document.documentElement.classList.remove("dark");
+        localStorage.setItem("app_theme", "light");
+        setThemeSuccess("Mode Terang diaktifkan. Tampilan kertas hangat, jelas di pencahayaan terang.");
+      }
+      setTimeout(() => setThemeSuccess(null), 3500);
+    }
+  };
+
+  const toggleTheme = () => {
+    setThemeMode(!isDarkMode);
+  };
 
   // Inisialisasi Data dari Pengguna Aktif
   useEffect(() => {
@@ -313,16 +352,35 @@ export default function ProfilePage() {
           </p>
         </div>
 
-        {/* Lencana Peran */}
-        <div className="flex items-center gap-2">
+        {/* Tombol Cepat Tema & Lencana Peran */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            title={isDarkMode ? "Beralih ke Mode Terang (Light)" : "Beralih ke Mode Gelap (Dark)"}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[var(--surface-recessed)] hover:bg-[var(--surface-card)] border border-[var(--border-hairline)] text-[var(--text-primary)] transition-all cursor-pointer shadow-xs"
+          >
+            {isDarkMode ? (
+              <>
+                <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span>Mode Terang</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span>Mode Gelap</span>
+              </>
+            )}
+          </button>
+
           <span
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
               currentUser?.role === "ADMIN"
                 ? "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20"
                 : "bg-[var(--color-accent)]/15 text-[var(--color-accent)] border border-[var(--color-accent)]/20"
             }`}
           >
-            <Shield className="w-3.5 h-3.5" />
+            <Shield className="w-3.5 h-3.5 shrink-0" />
             {currentUser?.role === "ADMIN" ? "Administrator Sekolah" : "Guru Mata Pelajaran"}
           </span>
         </div>
@@ -530,7 +588,164 @@ export default function ProfilePage() {
       </div>
 
       {/* ================================================================= */}
-      {/* KARTU 3: TANDA TANGAN DIGITAL RESMI GURU                          */}
+      {/* KARTU 3: PREFERENSI TEMA & TAMPILAN LAYAR (GELAP / TERANG)        */}
+      {/* ================================================================= */}
+      <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border-hairline)]">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-sm">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-sm text-[var(--text-primary)]">
+                Preferensi Tema &amp; Tampilan Layar
+              </h2>
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                Atur tema antarmuka mandiri sesuai kenyamanan penglihatan dan pencahayaan ruangan Anda
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 rounded-full bg-[var(--surface-recessed)] text-[11px] font-semibold text-[var(--text-secondary)] font-mono border border-[var(--border-hairline)] flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${isDarkMode ? "bg-indigo-500" : "bg-amber-500"}`} />
+              Mode Aktif: {isDarkMode ? "Gelap (Dark)" : "Terang (Light)"}
+            </span>
+          </div>
+        </div>
+
+        {themeSuccess && (
+          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{themeSuccess}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+          {/* Opsi 1: Mode Gelap */}
+          <button
+            type="button"
+            onClick={() => setThemeMode(true)}
+            className={`p-4 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-3 group cursor-pointer ${
+              isDarkMode
+                ? "bg-[var(--surface-recessed)]/90 border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/20 shadow-sm"
+                : "bg-[var(--surface-recessed)]/40 border-[var(--border-hairline)] hover:border-[var(--text-tertiary)]"
+            }`}
+          >
+            <div className="flex items-start justify-between w-full">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-700 text-indigo-400 flex items-center justify-center shrink-0">
+                  <Moon className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-xs text-[var(--text-primary)]">
+                    Mode Gelap (Dark Mode)
+                  </h3>
+                  <p className="text-[10px] text-[var(--text-secondary)]">
+                    OLED Deep Dark &amp; Lembut di Mata
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] border transition-colors ${
+                  isDarkMode
+                    ? "bg-[var(--color-accent)] border-[var(--color-accent)] text-[var(--color-on-accent)] font-bold"
+                    : "border-[var(--border-hairline)] opacity-40"
+                }`}
+              >
+                {isDarkMode && <Check className="w-3 h-3 stroke-[3]" />}
+              </div>
+            </div>
+
+            {/* Pratinjau Miniatur Mode Gelap */}
+            <div className="w-full h-20 rounded-xl bg-[#121412] p-2.5 border border-zinc-800 flex flex-col justify-between overflow-hidden shadow-inner">
+              <div className="flex items-center justify-between pb-1.5 border-b border-zinc-800/80">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <div className="w-10 h-1.5 rounded-full bg-zinc-700" />
+                </div>
+                <div className="w-4 h-1.5 rounded-full bg-zinc-800" />
+              </div>
+              <div className="space-y-1">
+                <div className="w-3/4 h-2 rounded-md bg-zinc-800" />
+                <div className="w-1/2 h-1.5 rounded-md bg-zinc-800/60" />
+              </div>
+              <div className="flex gap-1 pt-0.5">
+                <div className="w-1/3 h-2 rounded-md bg-emerald-950 border border-emerald-800/50" />
+                <div className="w-1/3 h-2 rounded-md bg-zinc-800/80" />
+                <div className="w-1/3 h-2 rounded-md bg-zinc-800/80" />
+              </div>
+            </div>
+
+            <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+              Mengurangi kelelahan mata di ruang berpencahayaan temaram serta menghemat baterai laptop/tablet saat mengajar.
+            </p>
+          </button>
+
+          {/* Opsi 2: Mode Terang */}
+          <button
+            type="button"
+            onClick={() => setThemeMode(false)}
+            className={`p-4 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-3 group cursor-pointer ${
+              !isDarkMode
+                ? "bg-[var(--surface-recessed)]/90 border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/20 shadow-sm"
+                : "bg-[var(--surface-recessed)]/40 border-[var(--border-hairline)] hover:border-[var(--text-tertiary)]"
+            }`}
+          >
+            <div className="flex items-start justify-between w-full">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
+                  <Sun className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-xs text-[var(--text-primary)]">
+                    Mode Terang (Light Mode)
+                  </h3>
+                  <p className="text-[10px] text-[var(--text-secondary)]">
+                    Kertas Hangat &amp; Jelas di Ruang Terang
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] border transition-colors ${
+                  !isDarkMode
+                    ? "bg-[var(--color-accent)] border-[var(--color-accent)] text-[var(--color-on-accent)] font-bold"
+                    : "border-[var(--border-hairline)] opacity-40"
+                }`}
+              >
+                {!isDarkMode && <Check className="w-3 h-3 stroke-[3]" />}
+              </div>
+            </div>
+
+            {/* Pratinjau Miniatur Mode Terang */}
+            <div className="w-full h-20 rounded-xl bg-[#FAF8F5] p-2.5 border border-stone-300/80 flex flex-col justify-between overflow-hidden shadow-inner">
+              <div className="flex items-center justify-between pb-1.5 border-b border-stone-200">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-600" />
+                  <div className="w-10 h-1.5 rounded-full bg-stone-300" />
+                </div>
+                <div className="w-4 h-1.5 rounded-full bg-stone-300" />
+              </div>
+              <div className="space-y-1">
+                <div className="w-3/4 h-2 rounded-md bg-stone-200" />
+                <div className="w-1/2 h-1.5 rounded-md bg-stone-200/60" />
+              </div>
+              <div className="flex gap-1 pt-0.5">
+                <div className="w-1/3 h-2 rounded-md bg-emerald-100 border border-emerald-300/70" />
+                <div className="w-1/3 h-2 rounded-md bg-stone-200/80" />
+                <div className="w-1/3 h-2 rounded-md bg-stone-200/80" />
+              </div>
+            </div>
+
+            <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+              Sangat jernih di bawah pencahayaan lampu kelas atau sinar matahari siang, memberikan keterbacaan dokumen optimal.
+            </p>
+          </button>
+        </div>
+      </div>
+
+      {/* ================================================================= */}
+      {/* KARTU 4: TANDA TANGAN DIGITAL RESMI GURU                          */}
       {/* ================================================================= */}
       <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-2xl p-5 shadow-sm space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-hairline)]">
@@ -633,7 +848,7 @@ export default function ProfilePage() {
       </div>
 
       {/* ================================================================= */}
-      {/* KARTU 4: SELF-ENROLLMENT PENUGASAN MENGAJAR MANDIRI                */}
+      {/* KARTU 5: SELF-ENROLLMENT PENUGASAN MENGAJAR MANDIRI                */}
       {/* ================================================================= */}
       <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-2xl p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border-hairline)]">
