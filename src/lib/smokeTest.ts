@@ -69,6 +69,10 @@ import {
   saveStoredKKM,
   initGrade7AssessmentsIfMissing,
   STORAGE_KEY_GRADE_7_SEEDED,
+  STORAGE_KEY_STUDENT_ATTITUDES,
+  getStoredStudentAttitudes,
+  saveStudentAttitude,
+  batchSetAllStudentAttitudes,
 } from "./gradeStorage.ts";
 import {
   INITIAL_MOCK_ASSESSMENTS,
@@ -80,6 +84,12 @@ import {
   DEFAULT_KKM_BY_GRADE,
   extractGradeLevel,
   getGradePredicate,
+  AttitudeGradeSchema,
+  type AttitudeGrade,
+  ATTITUDE_GRADE_METAS,
+  DEFAULT_ATTITUDE_GRADE,
+  formatAttitudeLabel,
+  parseAttitudeGrade,
   type AssessmentItem,
   type StudentScoreRecord,
   type StudentGradeSummary,
@@ -1349,6 +1359,123 @@ function runSmokeTest() {
     assert.strictEqual(seeded7b.length, 4, "Kelas 7B harus terisi 4 asesmen oleh mesin seed");
 
     console.log("✓ LULUS: Inisialisasi 4 penilaian baku seluruh kelas 7 (kecuali 7A & 7D) terverifikasi 100% aman dan akurat.");
+  }
+
+  // --------------------------------------------------------------------------
+  // [TEST 19] Pengujian Fitur Nilai Sikap Siswa (Buruk, Kurang Baik, Baik, Sangat Baik)
+  // --------------------------------------------------------------------------
+  {
+    console.log("\n[TEST 19] Menjalankan verifikasi sistem penilaian sikap siswa...");
+
+    // 19.1 Skema Zod Predikat Sikap Siswa
+    const validPredicates: AttitudeGrade[] = ["SANGAT_BAIK", "BAIK", "KURANG_BAIK", "BURUK"];
+    for (const pred of validPredicates) {
+      const parsed = AttitudeGradeSchema.safeParse(pred);
+      assert.strictEqual(parsed.success, true, `Predikat ${pred} harus valid menurut AttitudeGradeSchema`);
+    }
+
+    const invalidTest = AttitudeGradeSchema.safeParse("SEMPURNA");
+    assert.strictEqual(invalidTest.success, false, "Predikat di luar 4 ketentuan harus invalid");
+
+    // 19.2 Pengujian Fungsi parseAttitudeGrade & formatAttitudeLabel
+    assert.strictEqual(parseAttitudeGrade("sangat baik"), "SANGAT_BAIK");
+    assert.strictEqual(parseAttitudeGrade("SB"), "SANGAT_BAIK");
+    assert.strictEqual(parseAttitudeGrade("A"), "SANGAT_BAIK");
+    assert.strictEqual(parseAttitudeGrade("baik"), "BAIK");
+    assert.strictEqual(parseAttitudeGrade("B"), "BAIK");
+    assert.strictEqual(parseAttitudeGrade("kurang baik"), "KURANG_BAIK");
+    assert.strictEqual(parseAttitudeGrade("KB"), "KURANG_BAIK");
+    assert.strictEqual(parseAttitudeGrade("buruk"), "BURUK");
+    assert.strictEqual(parseAttitudeGrade(undefined), null);
+    assert.strictEqual(parseAttitudeGrade(undefined) ?? DEFAULT_ATTITUDE_GRADE, DEFAULT_ATTITUDE_GRADE);
+
+    assert.strictEqual(formatAttitudeLabel("SANGAT_BAIK"), "Sangat Baik");
+    assert.strictEqual(formatAttitudeLabel("BAIK"), "Baik");
+    assert.strictEqual(formatAttitudeLabel("KURANG_BAIK"), "Kurang Baik");
+    assert.strictEqual(formatAttitudeLabel("BURUK"), "Buruk");
+
+    // 19.3 Pengujian Persistensi Penyimpanan Sikap Siswa ke localStorage
+    localStorage.removeItem(STORAGE_KEY_STUDENT_ATTITUDES);
+    const initialAttitudes = getStoredStudentAttitudes("class-7a");
+    assert.deepStrictEqual(initialAttitudes, {}, "Data sikap awal harus objek kosong");
+
+    // Simpan nilai sikap siswa secara individual
+    saveStudentAttitude("class-7a", "std-1", "SANGAT_BAIK");
+    saveStudentAttitude("class-7a", "std-2", "KURANG_BAIK");
+    saveStudentAttitude("class-7a", "std-3", "BURUK");
+
+    const attitudes7a = getStoredStudentAttitudes("class-7a");
+    assert.strictEqual(attitudes7a["std-1"], "SANGAT_BAIK");
+    assert.strictEqual(attitudes7a["std-2"], "KURANG_BAIK");
+    assert.strictEqual(attitudes7a["std-3"], "BURUK");
+    assert.strictEqual(attitudes7a["std-non-existent"], undefined);
+
+    // Pengujian batchSetAllStudentAttitudes (Set Semua: Baik)
+    batchSetAllStudentAttitudes("class-7a", ["std-1", "std-2", "std-3"], "BAIK");
+    const attitudesBatch = getStoredStudentAttitudes("class-7a");
+    assert.strictEqual(attitudesBatch["std-1"], "BAIK");
+    assert.strictEqual(attitudesBatch["std-2"], "BAIK");
+    assert.strictEqual(attitudesBatch["std-3"], "BAIK");
+
+    // 19.4 Pengujian Integrasi calculateStudentGradeSummary dengan Nilai Sikap
+    const testStudent: Student = {
+      id: "std-test-1",
+      classId: "class-7a",
+      nis: "262707999",
+      fullName: "Siswa Uji Coba Sikap",
+      gender: "L",
+      isActive: true,
+      createdAt: "2026-08-01T00:00:00Z",
+    };
+    const summaryDefault = calculateStudentGradeSummary(testStudent, [], [], DEFAULT_KKM);
+    assert.strictEqual(summaryDefault.attitudeGrade, "BAIK", "Default attitude grade harus BAIK");
+
+    const summaryExplicit = calculateStudentGradeSummary(testStudent, [], [], DEFAULT_KKM, "SANGAT_BAIK");
+    assert.strictEqual(summaryExplicit.attitudeGrade, "SANGAT_BAIK", "Explicit attitude grade harus SANGAT_BAIK");
+
+    // 19.5 Pengujian Ekspor Nilai XLSX & CSV Memuat Kolom Nilai Sikap
+    const sampleAssessments: AssessmentItem[] = [
+      {
+        id: "asmt-t1",
+        classId: "class-7a",
+        subject: "Informatika",
+        type: "TUGAS",
+        title: "Tugas 1",
+        date: "2026-08-01",
+        maxScore: 100,
+        weight: 1,
+        createdAt: "2026-08-01T00:00:00Z",
+      },
+    ];
+    const sampleSummaries: StudentGradeSummary[] = [
+      {
+        studentId: "std-test-1",
+        nis: "262707999",
+        studentName: "Siswa Uji Coba Sikap",
+        gender: "L",
+        scores: { "asmt-t1": 95 },
+        finalScore: 95,
+        predicate: "A",
+        attitudeGrade: "SANGAT_BAIK",
+        isPassed: true,
+        gradedCount: 1,
+        totalCount: 1,
+        categoryAverages: { TUGAS: 95, UH: null, QUIZ: null, UTS: null, UAS: null, PRAKTIK: null, LAINNYA: null },
+      },
+    ];
+
+    const xlsxBytes = generateGradesXlsxWithKop("7A", sampleAssessments, sampleSummaries, DEFAULT_KKM);
+    const wb = XLSX.read(xlsxBytes, { type: "array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const sheetText = JSON.stringify(sheet);
+    assert.ok(sheetText.includes("NILAI SIKAP"), "Berkas XLSX nilai harus memuat header NILAI SIKAP");
+    assert.ok(sheetText.includes("Sangat Baik"), "Berkas XLSX nilai harus memuat nilai sikap 'Sangat Baik'");
+
+    const csvText = generateGradesCsvWithKop("7A", sampleAssessments, sampleSummaries, DEFAULT_KKM);
+    assert.ok(csvText.includes("Nilai Sikap"), "Berkas CSV nilai harus memuat header Nilai Sikap");
+    assert.ok(csvText.includes("Sangat Baik"), "Berkas CSV nilai harus memuat nilai sikap 'Sangat Baik'");
+
+    console.log("✓ LULUS: Sistem penilaian sikap siswa (Buruk, Kurang Baik, Baik, Sangat Baik) terverifikasi 100% akurat.");
   }
 
   console.log("\n=== SEMUA ASSERTION SMOKE TEST LULUS 100% ===");

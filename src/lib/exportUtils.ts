@@ -6,9 +6,10 @@ import type {
   StudentSemesterRecap,
   SemesterClassRecap,
 } from "../contracts/attendance";
-import type {
-  AssessmentItem,
-  StudentGradeSummary,
+import {
+  type AssessmentItem,
+  type StudentGradeSummary,
+  formatAttitudeLabel,
 } from "../contracts/grades";
 import { formatIndonesianDate, getCategoryLabel } from "./calendarUtils";
 import {
@@ -2180,7 +2181,7 @@ export function generateGradesXlsxWithKop(
   meta: SchoolExportMetadata = {}
 ): Uint8Array {
   const mergedMeta = { ...DEFAULT_EXPORT_META, ...meta };
-  const totalCols = 4 + assessments.length + 3;
+  const totalCols = 4 + assessments.length + 4;
 
   const rows: any[][] = [];
   const merges: any[] = [];
@@ -2223,6 +2224,7 @@ export function generateGradesXlsxWithKop(
   headerRow.push(
     { v: "NILAI AKHIR", t: "s", s: { ...styleThDefault, fill: { fgColor: { rgb: "D1FAE5" } } } },
     { v: "PREDIKAT", t: "s", s: styleThDefault },
+    { v: "NILAI SIKAP", t: "s", s: styleThDefault },
     { v: "STATUS KKM", t: "s", s: styleThDefault }
   );
 
@@ -2261,6 +2263,7 @@ export function generateGradesXlsxWithKop(
 
     const finalVal = s.finalScore !== null && s.finalScore !== undefined ? s.finalScore : "-";
     const isPass = s.finalScore !== null && s.finalScore !== undefined && s.finalScore >= kkm;
+    const attitudeLabel = formatAttitudeLabel(s.attitudeGrade ?? "BAIK");
 
     row.push(
       {
@@ -2272,6 +2275,7 @@ export function generateGradesXlsxWithKop(
         },
       },
       { v: s.predicate, t: "s", s: styleCellCenterBold },
+      { v: attitudeLabel, t: "s", s: styleCellCenterBold },
       {
         v: s.isPassed ? "Tuntas" : "Remedial",
         t: "s",
@@ -2417,7 +2421,7 @@ export function generateGradesCsvWithKop(
   assessments.forEach((a) => {
     headerCols.push(`"${a.title.replace(/"/g, '""')} (${a.type})"`);
   });
-  headerCols.push("Nilai Akhir", "Predikat", "Status KKM");
+  headerCols.push("Nilai Akhir", "Predikat", "Nilai Sikap", "Status KKM");
   rows.push(headerCols.join(","));
 
   // Baris Siswa
@@ -2436,6 +2440,7 @@ export function generateGradesCsvWithKop(
 
     rowCols.push(s.finalScore !== null && s.finalScore !== undefined ? String(s.finalScore) : '""');
     rowCols.push(`"${s.predicate}"`);
+    rowCols.push(`"${formatAttitudeLabel(s.attitudeGrade ?? "BAIK")}"`);
     rowCols.push(s.isPassed ? '"Tuntas"' : '"Remedial"');
 
     rows.push(rowCols.join(","));
@@ -3342,6 +3347,15 @@ export function generateGradesHtmlPrint(
           s.finalScore !== null && s.finalScore < kkm ? "color: #B45309;" : "color: #166534;"
         }">${s.finalScore !== null ? s.finalScore : "-"}</td>
         <td style="text-align: center; font-weight: bold; font-size: ${badgeFontSize};">${s.predicate}</td>
+        <td style="text-align: center; font-weight: bold; font-size: ${badgeFontSize}; color: ${
+          s.attitudeGrade === 'BURUK'
+            ? '#DC2626'
+            : s.attitudeGrade === 'KURANG_BAIK'
+            ? '#D97706'
+            : s.attitudeGrade === 'SANGAT_BAIK'
+            ? '#059669'
+            : '#2563EB'
+        };">${formatAttitudeLabel(s.attitudeGrade ?? 'BAIK')}</td>
         <td style="text-align: center; font-weight: bold; font-size: ${badgeFontSize}; ${
           s.isPassed ? "color: #166534; background-color: #DCFCE7;" : "color: #991B1B; background-color: #FEE2E2;"
         }">${s.isPassed ? "TUNTAS" : "REMEDIAL"}</td>
@@ -3488,9 +3502,10 @@ export function generateGradesHtmlPrint(
                 `<th style="padding: ${rowPaddingY} 3px; background-color: #F3F4F6;">${a.title}<br/><span style="font-size: 6.5pt; color: #4B5563; font-weight: normal;">[${a.type}]</span></th>`
             )
             .join("")}
-          <th style="width: 50px; background-color: #E0F2FE; color: #0369A1;">NILAI AKHIR</th>
-          <th style="width: 40px; background-color: #E0F2FE; color: #0369A1;">PREDIKAT</th>
-          <th style="width: 76px; background-color: #E0F2FE; color: #0369A1;">STATUS KKM</th>
+          <th style="width: 48px; background-color: #E0F2FE; color: #0369A1;">NILAI AKHIR</th>
+          <th style="width: 38px; background-color: #E0F2FE; color: #0369A1;">PREDIKAT</th>
+          <th style="width: 60px; background-color: #E0F2FE; color: #0369A1;">NILAI SIKAP</th>
+          <th style="width: 70px; background-color: #E0F2FE; color: #0369A1;">STATUS KKM</th>
         </tr>
       </thead>
       <tbody>

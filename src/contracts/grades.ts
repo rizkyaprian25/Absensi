@@ -95,6 +95,104 @@ export const ASSESSMENT_TYPE_METAS: Record<AssessmentType, AssessmentTypeMeta> =
 };
 
 // ============================================================================
+// SKEMA & PREDIKAT NILAI SIKAP SISWA (BURUK, KURANG BAIK, BAIK, SANGAT BAIK)
+// ============================================================================
+
+/**
+ * Tipe Predikat Nilai Sikap Siswa
+ * Ketentuan: Sangat Baik, Baik, Kurang Baik, Buruk
+ */
+export const AttitudeGradeSchema = z.enum([
+  "SANGAT_BAIK",
+  "BAIK",
+  "KURANG_BAIK",
+  "BURUK",
+]);
+
+export type AttitudeGrade = z.infer<typeof AttitudeGradeSchema>;
+
+export interface AttitudeGradeMeta {
+  code: AttitudeGrade;
+  label: string; // "Sangat Baik", "Baik", "Kurang Baik", "Buruk"
+  shortLabel: string; // "SB", "B", "KB", "BR"
+  predicate: string; // "A", "B", "C", "D"
+  description: string;
+  badgeClass: string;
+  color: string;
+}
+
+export const ATTITUDE_GRADE_METAS: Record<AttitudeGrade, AttitudeGradeMeta> = {
+  SANGAT_BAIK: {
+    code: "SANGAT_BAIK",
+    label: "Sangat Baik",
+    shortLabel: "SB",
+    predicate: "A",
+    description: "Menunjukkan sikap dan perilaku yang sangat teladan, santun, serta disiplin tinggi",
+    badgeClass: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800",
+    color: "#059669",
+  },
+  BAIK: {
+    code: "BAIK",
+    label: "Baik",
+    shortLabel: "B",
+    predicate: "B",
+    description: "Menunjukkan sikap dan perilaku yang baik, tertib, dan menghargai lingkungan sekolah",
+    badgeClass: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border-blue-300 dark:border-blue-800",
+    color: "#2563EB",
+  },
+  KURANG_BAIK: {
+    code: "KURANG_BAIK",
+    label: "Kurang Baik",
+    shortLabel: "KB",
+    predicate: "C",
+    description: "Perlu bimbingan dan pembinaan dalam kedisiplinan atau keaktifan belajar",
+    badgeClass: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300 dark:border-amber-800",
+    color: "#D97706",
+  },
+  BURUK: {
+    code: "BURUK",
+    label: "Buruk",
+    shortLabel: "BR",
+    predicate: "D",
+    description: "Menunjukkan perilaku indisipliner berulang yang memerlukan koordinasi wali kelas / BP",
+    badgeClass: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border-rose-300 dark:border-rose-800",
+    color: "#DC2626",
+  },
+};
+
+/** Nilai sikap default bagi seluruh siswa */
+export const DEFAULT_ATTITUDE_GRADE: AttitudeGrade = "BAIK";
+
+/**
+ * Memformat label nilai sikap ke string representatif
+ */
+export function formatAttitudeLabel(grade?: AttitudeGrade | null): string {
+  if (!grade) return "-";
+  return ATTITUDE_GRADE_METAS[grade]?.label ?? String(grade);
+}
+
+/**
+ * Mengurai string nilai sikap secara toleran (misal dari input teks atau impor)
+ */
+export function parseAttitudeGrade(val: string | null | undefined): AttitudeGrade | null {
+  if (!val) return null;
+  const clean = val.trim().toUpperCase();
+  if (clean === "SANGAT_BAIK" || clean === "SANGAT BAIK" || clean === "SB" || clean === "A") {
+    return "SANGAT_BAIK";
+  }
+  if (clean === "BAIK" || clean === "B") {
+    return "BAIK";
+  }
+  if (clean === "KURANG_BAIK" || clean === "KURANG BAIK" || clean === "KB" || clean === "CUP" || clean === "C") {
+    return "KURANG_BAIK";
+  }
+  if (clean === "BURUK" || clean === "BR" || clean === "D") {
+    return "BURUK";
+  }
+  return null;
+}
+
+// ============================================================================
 // SKEMA DATA PENILAIAN & NILAI SISWA
 // ============================================================================
 
@@ -136,6 +234,7 @@ export interface StudentGradeSummary {
   categoryAverages: Record<AssessmentType, number | null>;
   finalScore: number | null; // Nilai Rata-rata Akhir (0-100)
   predicate: "A" | "B" | "C" | "D" | "-";
+  attitudeGrade?: AttitudeGrade; // Nilai Sikap: SANGAT_BAIK | BAIK | KURANG_BAIK | BURUK
   isPassed: boolean; // true jika finalScore >= KKM
   gradedCount: number; // Jumlah tugas yang telah memiliki nilai
   totalCount: number; // Total tugas di kelas

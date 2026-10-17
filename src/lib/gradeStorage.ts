@@ -1,6 +1,7 @@
 import type {
   AssessmentItem,
   AssessmentType,
+  AttitudeGrade,
   StudentScoreRecord,
   StudentGradeSummary,
   GradeLevelKkmMap,
@@ -8,6 +9,7 @@ import type {
 import {
   DEFAULT_KKM,
   DEFAULT_KKM_BY_GRADE,
+  DEFAULT_ATTITUDE_GRADE,
   getGradePredicate,
   extractGradeLevel,
 } from "../contracts/grades";
@@ -26,6 +28,7 @@ export const STORAGE_KEY_KKM = "absensi_grade_kkm_v1";
 export const STORAGE_KEY_KKM_BY_GRADE = "absensi_grade_kkm_by_grade_v1";
 export const STORAGE_KEY_ASSESSMENT_ORDER = "absensi_grade_assessment_order_v1";
 export const STORAGE_KEY_GRADE_7_SEEDED = "absensi_grade_7_defaults_seeded_v1";
+export const STORAGE_KEY_STUDENT_ATTITUDES = "absensi_student_attitudes_v1";
 
 // ============================================================================
 // AKSES PENYIMPANAN LOKAL (LOCALSTORAGE OFFLINE-FIRST)
@@ -326,6 +329,97 @@ export function saveStoredKKM(kkm: number, gradeOrClassName?: string): void {
 }
 
 // ============================================================================
+// PENGELOLAAN NILAI SIKAP SISWA (BURUK, KURANG BAIK, BAIK, SANGAT BAIK)
+// ============================================================================
+
+/**
+ * Mengambil seluruh data nilai sikap siswa dari localStorage (peta classId -> { studentId -> AttitudeGrade })
+ */
+export function getAllStoredStudentAttitudes(): Record<string, Record<string, AttitudeGrade>> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_STUDENT_ATTITUDES);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null ? parsed : {};
+  } catch (err) {
+    console.warn("Gagal membaca nilai sikap dari localStorage:", err);
+    return {};
+  }
+}
+
+/**
+ * Mengambil nilai sikap seluruh siswa untuk satu kelas tertentu
+ */
+export function getStoredStudentAttitudes(classId: string): Record<string, AttitudeGrade> {
+  const all = getAllStoredStudentAttitudes();
+  return all[classId] ? { ...all[classId] } : {};
+}
+
+/**
+ * Menyimpan nilai sikap untuk seorang siswa dalam kelas tertentu
+ */
+export function saveStudentAttitude(
+  classId: string,
+  studentId: string,
+  attitude: AttitudeGrade
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    const all = getAllStoredStudentAttitudes();
+    if (!all[classId]) {
+      all[classId] = {};
+    }
+    all[classId][studentId] = attitude;
+    localStorage.setItem(STORAGE_KEY_STUDENT_ATTITUDES, JSON.stringify(all));
+    triggerAutoSnapshot("Pembaruan Nilai Sikap Siswa");
+  } catch (err) {
+    console.error("Gagal menyimpan nilai sikap siswa:", err);
+  }
+}
+
+/**
+ * Menyimpan nilai sikap secara massal untuk satu kelas
+ */
+export function batchSaveStudentAttitudes(
+  classId: string,
+  attitudes: Record<string, AttitudeGrade>
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    const all = getAllStoredStudentAttitudes();
+    all[classId] = {
+      ...(all[classId] || {}),
+      ...attitudes,
+    };
+    localStorage.setItem(STORAGE_KEY_STUDENT_ATTITUDES, JSON.stringify(all));
+    triggerAutoSnapshot("Pembaruan Massal Nilai Sikap");
+  } catch (err) {
+    console.error("Gagal menyimpan nilai sikap massal:", err);
+  }
+}
+
+/**
+ * Mengatur nilai sikap seragam untuk seluruh siswa dalam kelas (misal: Set Semua "BAIK")
+ */
+export function batchSetAllStudentAttitudes(
+  classId: string,
+  studentIds: string[],
+  attitude: AttitudeGrade
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    const newClassAttitudes: Record<string, AttitudeGrade> = {};
+    studentIds.forEach((id) => {
+      newClassAttitudes[id] = attitude;
+    });
+    batchSaveStudentAttitudes(classId, newClassAttitudes);
+  } catch (err) {
+    console.error("Gagal menetapkan nilai sikap seragam:", err);
+  }
+}
+
+// ============================================================================
 // FUNGSI CRUD & OPERASIONAL PENILAIAN
 // ============================================================================
 
@@ -553,7 +647,8 @@ export function calculateStudentGradeSummary(
   student: Student,
   assessments: AssessmentItem[],
   allScores: StudentScoreRecord[],
-  kkm: number = DEFAULT_KKM
+  kkm: number = DEFAULT_KKM,
+  attitudeGrade: AttitudeGrade = DEFAULT_ATTITUDE_GRADE
 ): StudentGradeSummary {
   const studentScores = allScores.filter((s) => s.studentId === student.id);
   const scoreMap: Record<string, number | null> = {};
@@ -622,6 +717,7 @@ export function calculateStudentGradeSummary(
     categoryAverages,
     finalScore,
     predicate,
+    attitudeGrade,
     isPassed,
     gradedCount: simpleCount,
     totalCount: assessments.length,

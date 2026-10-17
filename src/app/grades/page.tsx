@@ -38,6 +38,7 @@ import {
   Check,
   Upload,
   Clipboard,
+  Smile,
 } from "lucide-react";
 import { Toast } from "@/components/ui/Toast";
 
@@ -50,6 +51,7 @@ import type {
   AssessmentItem,
   AssessmentType,
   StudentGradeSummary,
+  AttitudeGrade,
 } from "@/contracts/grades";
 import {
   DEFAULT_KKM,
@@ -57,6 +59,9 @@ import {
   extractGradeLevel,
   ASSESSMENT_TYPE_METAS,
   getGradePredicate,
+  ATTITUDE_GRADE_METAS,
+  DEFAULT_ATTITUDE_GRADE,
+  formatAttitudeLabel,
 } from "@/contracts/grades";
 import {
   initGrade7AssessmentsIfMissing,
@@ -78,6 +83,9 @@ import {
   getAssessmentsByClass,
   getAssessmentOrderForClass,
   saveAssessmentOrderForClass,
+  getStoredStudentAttitudes,
+  saveStudentAttitude,
+  batchSetAllStudentAttitudes,
 } from "@/lib/gradeStorage";
 import {
   generateGradesExcelHtmlWithKop,
@@ -160,6 +168,13 @@ function GradesPageContent() {
   const [isCensoredViewActive, setIsCensoredViewActive] = useState(false);
   const [hasCopiedWa, setHasCopiedWa] = useState(false);
 
+  // 7b. State Pengelolaan Nilai Sikap Siswa (Sangat Baik, Baik, Kurang Baik, Buruk)
+  const [studentAttitudes, setStudentAttitudes] = useState<Record<string, AttitudeGrade>>({});
+  const [isAttitudeModalOpen, setIsAttitudeModalOpen] = useState(false);
+  const [attitudeSearchQuery, setAttitudeSearchQuery] = useState("");
+  const [attitudeFilter, setAttitudeFilter] = useState<AttitudeGrade | "ALL">("ALL");
+  const [activeAttitudeDropdownStudentId, setActiveAttitudeDropdownStudentId] = useState<string | null>(null);
+
   // 8. State Mounted untuk perlindungan hidrasi SSR (Hydration Mismatch Shield)
   const [isMounted, setIsMounted] = useState(false);
 
@@ -171,6 +186,7 @@ function GradesPageContent() {
     const savedKkmMap = getStoredKkmByGrade();
     setKkmByGrade(savedKkmMap);
     setTempKkmByGrade(savedKkmMap);
+    setStudentAttitudes(getStoredStudentAttitudes(selectedClassId));
   };
 
   useEffect(() => {
@@ -178,9 +194,17 @@ function GradesPageContent() {
     refreshData();
   }, []);
 
+  // Sinkronkan nilai sikap ketika kelas mengajar berganti
+  useEffect(() => {
+    if (isMounted) {
+      setStudentAttitudes(getStoredStudentAttitudes(selectedClassId));
+    }
+  }, [selectedClassId, isMounted]);
+
   // Update URL jika kelas diganti
   const handleSelectClass = (clsId: string) => {
     setSelectedClassId(clsId);
+    setStudentAttitudes(getStoredStudentAttitudes(clsId));
     router.replace(`/grades?classId=${clsId}`);
   };
 
@@ -279,12 +303,74 @@ function GradesPageContent() {
     };
   }, [categoryFilter, classAssessments]);
 
-  // Ringkasan nilai per siswa
+  // Ringkasan nilai per siswa (termasuk nilai sikap)
   const studentSummaries: StudentGradeSummary[] = useMemo(() => {
-    return students.map((student) =>
-      calculateStudentGradeSummary(student, classAssessments, scores, kkm)
-    );
-  }, [students, classAssessments, scores, kkm]);
+    return students.map((student) => {
+      const attitude = studentAttitudes[student.id] || DEFAULT_ATTITUDE_GRADE;
+      return calculateStudentGradeSummary(student, classAssessments, scores, kkm, attitude);
+    });
+  }, [students, classAssessments, scores, kkm, studentAttitudes]);
+
+  // Daftar Siswa Terfilter untuk Modal Kelola Nilai Sikap
+  const filteredAttitudeStudents = useMemo(() => {
+    let list = students.map((s, originalIdx) => ({
+      student: s,
+      originalIndex: originalIdx + 1,
+      attitude: studentAttitudes[s.id] || DEFAULT_ATTITUDE_GRADE,
+    }));
+
+    if (attitudeSearchQuery.trim()) {
+      const q = attitudeSearchQuery.toLowerCase().trim();
+      list = list.filter(
+        ({ student }) =>
+          student.fullName.toLowerCase().includes(q) ||
+          (student.nis && student.nis.toLowerCase().includes(q))
+      );
+    }
+
+    if (attitudeFilter !== "ALL") {
+      list = list.filter(({ attitude }) => attitude === attitudeFilter);
+    }
+
+    return list;
+  }, [students, studentAttitudes, attitudeSearchQuery, attitudeFilter]);
+
+  // Statistik sebaran nilai sikap siswa di kelas aktif
+  const attitudeStats = useMemo(() => {
+    let sangatBaik = 0;
+    let baik = 0;
+    let kurangBaik = 0;
+    let buruk = 0;
+
+    students.forEach((s) => {
+      const att = studentAttitudes[s.id] || DEFAULT_ATTITUDE_GRADE;
+      if (att === "SANGAT_BAIK") sangatBaik++;
+      else if (att === "BAIK") baik++;
+      else if (att === "KURANG_BAIK") kurangBaik++;
+      else if (att === "BURUK") buruk++;
+    });
+
+    return { sangatBaik, baik, kurangBaik, buruk, total: students.length };
+  }, [students, studentAttitudes]);
+
+  // Handler Perbarui Sikap Siswa
+  const handleUpdateStudentAttitude = (studentId: string, attitude: AttitudeGrade) => {
+    saveStudentAttitude(selectedClassId, studentId, attitude);
+    setStudentAttitudes((prev) => ({ ...prev, [studentId]: attitude }));
+    showToast(`Nilai sikap berhasil diatur ke "${formatAttitudeLabel(attitude)}"`);
+  };
+
+  // Handler Atur Nilai Sikap Massal
+  const handleBatchSetAttitude = (attitude: AttitudeGrade) => {
+    const studentIds = students.map((s) => s.id);
+    batchSetAllStudentAttitudes(selectedClassId, studentIds, attitude);
+    const newMap: Record<string, AttitudeGrade> = {};
+    studentIds.forEach((id) => {
+      newMap[id] = attitude;
+    });
+    setStudentAttitudes(newMap);
+    showToast(`Seluruh siswa Kelas ${currentClass.name} diset ke nilai sikap "${formatAttitudeLabel(attitude)}"`);
+  };
 
   // Statistik Kelas
   const stats = useMemo(() => {
@@ -826,6 +912,21 @@ function GradesPageContent() {
             <span>
               KKM Kls {activeGradeLevel}: <strong className="font-mono text-[var(--color-accent)]">{kkm}</strong>
             </span>
+          </button>
+
+          {/* Tombol Kelola Nilai Sikap Siswa */}
+          <button
+            type="button"
+            onClick={() => {
+              setAttitudeSearchQuery("");
+              setAttitudeFilter("ALL");
+              setIsAttitudeModalOpen(true);
+            }}
+            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs active:scale-[0.98] cursor-pointer"
+            title="Kelola Nilai Sikap Siswa Kelas (Sangat Baik, Baik, Kurang Baik, Buruk)"
+          >
+            <Smile className="w-3.5 h-3.5 text-indigo-100" />
+            <span>Nilai Sikap</span>
           </button>
 
           {/* Tombol Ekspor Excel Ber-Kop */}
@@ -1443,6 +1544,9 @@ function GradesPageContent() {
                 <th className="py-3 px-2.5 text-center font-bold text-[var(--text-secondary)] w-14 bg-[var(--surface-recessed)] border-r border-[var(--border-hairline)]">
                   Predikat
                 </th>
+                <th className="py-3 px-3 text-center font-bold text-[var(--text-secondary)] min-w-[125px] bg-[var(--surface-recessed)] border-r border-[var(--border-hairline)]">
+                  Nilai Sikap
+                </th>
                 <th className="py-3 px-3 text-center font-bold text-[var(--text-secondary)] min-w-[95px] bg-[var(--surface-recessed)]">
                   Ket. KKM
                 </th>
@@ -1454,7 +1558,7 @@ function GradesPageContent() {
               {sortedAndFilteredSummaries.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={filteredAssessments.length + 5}
+                    colSpan={filteredAssessments.length + 6}
                     className="py-12 text-center text-[var(--text-secondary)]"
                   >
                     <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-40" />
@@ -1624,6 +1728,74 @@ function GradesPageContent() {
                             {summary.predicate}
                           </span>
                         )}
+                      </td>
+
+                      {/* Nilai Sikap Siswa (Dropdown Popover 1-Klik) */}
+                      <td className="py-2.5 px-2.5 text-center border-r border-[var(--border-hairline)] relative">
+                        {(() => {
+                          const attitude = summary.attitudeGrade || studentAttitudes[summary.studentId] || DEFAULT_ATTITUDE_GRADE;
+                          const meta = ATTITUDE_GRADE_METAS[attitude] || ATTITUDE_GRADE_METAS.BAIK;
+                          const isOpen = activeAttitudeDropdownStudentId === summary.studentId;
+
+                          return (
+                            <div className="relative inline-block text-left">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setActiveAttitudeDropdownStudentId(isOpen ? null : summary.studentId)
+                                }
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer hover:shadow-2xs active:scale-95 ${meta.badgeClass}`}
+                                title={`Nilai Sikap: ${meta.label} (${meta.predicate}). Klik untuk mengubah langsung.`}
+                              >
+                                <span>{meta.label}</span>
+                                <ChevronDown className="w-3 h-3 opacity-60" />
+                              </button>
+
+                              {isOpen && (
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-40"
+                                    onClick={() => setActiveAttitudeDropdownStudentId(null)}
+                                  />
+                                  <div className="absolute right-0 top-full mt-1.5 w-44 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[12px] shadow-xl py-1 z-50 text-left text-xs animate-in fade-in">
+                                    <div className="px-3 py-1.5 text-[10px] font-bold text-[var(--text-secondary)] border-b border-[var(--border-hairline)] uppercase tracking-wider flex items-center justify-between">
+                                      <span>Ubah Sikap Siswa</span>
+                                    </div>
+                                    {(["SANGAT_BAIK", "BAIK", "KURANG_BAIK", "BURUK"] as AttitudeGrade[]).map((att) => {
+                                      const itemMeta = ATTITUDE_GRADE_METAS[att];
+                                      const isCurrent = att === attitude;
+                                      return (
+                                        <button
+                                          key={att}
+                                          type="button"
+                                          onClick={() => {
+                                            handleUpdateStudentAttitude(summary.studentId, att);
+                                            setActiveAttitudeDropdownStudentId(null);
+                                          }}
+                                          className={`w-full px-3 py-2 flex items-center justify-between text-xs hover:bg-[var(--surface-recessed)] transition-colors cursor-pointer ${
+                                            isCurrent
+                                              ? "font-bold text-[var(--color-accent)] bg-[var(--color-accent)]/10"
+                                              : "text-[var(--text-primary)]"
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <span
+                                              className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-bold border ${itemMeta.badgeClass}`}
+                                            >
+                                              {itemMeta.predicate}
+                                            </span>
+                                            <span>{itemMeta.label}</span>
+                                          </div>
+                                          {isCurrent && <Check className="w-3.5 h-3.5 text-[var(--color-accent)]" />}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Keterangan KKM / Kelengkapan Tugas */}
@@ -2955,6 +3127,263 @@ function GradesPageContent() {
                 className="px-5 py-2 bg-[var(--surface-recessed)] hover:bg-[var(--surface-recessed)]/80 text-[var(--text-primary)] border border-[var(--border-hairline)] rounded-[10px] text-xs font-semibold transition-colors cursor-pointer"
               >
                 Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Kelola Nilai Sikap Siswa (Sangat Baik, Baik, Kurang Baik, Buruk) */}
+      {isAttitudeModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 md:p-6 animate-in fade-in">
+          <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[20px] shadow-2xl max-w-3xl w-full flex flex-col max-h-[92vh] overflow-hidden">
+            {/* Header Modal */}
+            <div className="px-5 py-4 border-b border-[var(--border-hairline)] flex items-center justify-between shrink-0 bg-[var(--surface-card)]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                  <Smile className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-[var(--text-primary)]">
+                      Kelola Nilai Sikap Siswa
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white font-mono text-[10px] font-bold">
+                      Kelas {currentClass.name}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                    Kategori standar: Buruk, Kurang Baik, Baik, dan Sangat Baik
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAttitudeModalOpen(false)}
+                className="p-1.5 rounded-[8px] hover:bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                title="Tutup dialog"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Badan Modal */}
+            <div className="p-5 overflow-y-auto space-y-4">
+              {/* Bar Aksi Cepat Massal (Set Semua Baik / Sangat Baik) */}
+              <div className="p-3.5 rounded-[14px] bg-[var(--surface-recessed)]/70 border border-[var(--border-hairline)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)] block mb-0.5">
+                    Aksi Massal Cepat:
+                  </span>
+                  <p className="text-xs text-[var(--text-primary)]">
+                    Terapkan satu predikat sekaligus untuk seluruh <strong>{students.length} siswa</strong> di kelas ini
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleBatchSetAttitude("BAIK")}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-[8px] transition-colors shadow-2xs cursor-pointer active:scale-95"
+                    title="Set seluruh siswa menjadi Baik (Standar nasional)"
+                  >
+                    Set Semua: Baik
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBatchSetAttitude("SANGAT_BAIK")}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-[8px] transition-colors shadow-2xs cursor-pointer active:scale-95"
+                    title="Set seluruh siswa menjadi Sangat Baik"
+                  >
+                    Set Semua: Sangat Baik
+                  </button>
+                </div>
+              </div>
+
+              {/* Ringkasan Sebaran Kategori Sikap */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="p-2.5 rounded-[10px] bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-300 block">
+                      Sangat Baik (A)
+                    </span>
+                    <strong className="text-lg font-mono font-bold text-emerald-700 dark:text-emerald-200">
+                      {attitudeStats.sangatBaik}
+                    </strong>
+                  </div>
+                  <span className="text-xs font-mono text-emerald-700/70 dark:text-emerald-300/70">
+                    {Math.round((attitudeStats.sangatBaik / (attitudeStats.total || 1)) * 100)}%
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-[10px] bg-blue-500/10 border border-blue-500/30 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-semibold text-blue-800 dark:text-blue-300 block">
+                      Baik (B)
+                    </span>
+                    <strong className="text-lg font-mono font-bold text-blue-700 dark:text-blue-200">
+                      {attitudeStats.baik}
+                    </strong>
+                  </div>
+                  <span className="text-xs font-mono text-blue-700/70 dark:text-blue-300/70">
+                    {Math.round((attitudeStats.baik / (attitudeStats.total || 1)) * 100)}%
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-semibold text-amber-800 dark:text-amber-300 block">
+                      Kurang Baik (C)
+                    </span>
+                    <strong className="text-lg font-mono font-bold text-amber-700 dark:text-amber-200">
+                      {attitudeStats.kurangBaik}
+                    </strong>
+                  </div>
+                  <span className="text-xs font-mono text-amber-700/70 dark:text-amber-300/70">
+                    {Math.round((attitudeStats.kurangBaik / (attitudeStats.total || 1)) * 100)}%
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-[10px] bg-rose-500/10 border border-rose-500/30 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-semibold text-rose-800 dark:text-rose-300 block">
+                      Buruk (D)
+                    </span>
+                    <strong className="text-lg font-mono font-bold text-rose-700 dark:text-rose-200">
+                      {attitudeStats.buruk}
+                    </strong>
+                  </div>
+                  <span className="text-xs font-mono text-rose-700/70 dark:text-rose-300/70">
+                    {Math.round((attitudeStats.buruk / (attitudeStats.total || 1)) * 100)}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Form Pencarian & Filter Kategori */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+                <div className="relative flex-1">
+                  <Search className="w-3.5 h-3.5 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={attitudeSearchQuery}
+                    onChange={(e) => setAttitudeSearchQuery(e.target.value)}
+                    placeholder="Cari nama siswa atau NIS..."
+                    className="w-full pl-8 pr-3 py-1.5 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[8px] text-xs text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setAttitudeFilter("ALL")}
+                    className={`px-2.5 py-1 rounded-[6px] text-[11px] font-semibold transition-colors cursor-pointer ${
+                      attitudeFilter === "ALL"
+                        ? "bg-indigo-600 text-white font-bold"
+                        : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    Semua ({attitudeStats.total})
+                  </button>
+                  {(["SANGAT_BAIK", "BAIK", "KURANG_BAIK", "BURUK"] as AttitudeGrade[]).map((cat) => {
+                    const m = ATTITUDE_GRADE_METAS[cat];
+                    const isSelected = attitudeFilter === cat;
+                    const count =
+                      cat === "SANGAT_BAIK"
+                        ? attitudeStats.sangatBaik
+                        : cat === "BAIK"
+                        ? attitudeStats.baik
+                        : cat === "KURANG_BAIK"
+                        ? attitudeStats.kurangBaik
+                        : attitudeStats.buruk;
+
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setAttitudeFilter(cat)}
+                        className={`px-2.5 py-1 rounded-[6px] text-[11px] font-semibold transition-colors cursor-pointer ${
+                          isSelected
+                            ? "bg-indigo-600 text-white font-bold"
+                            : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        }`}
+                      >
+                        {m.label} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Tabel Daftar Siswa & Pilihan Sikap */}
+              <div className="border border-[var(--border-hairline)] rounded-[12px] overflow-hidden">
+                <div className="max-h-[360px] overflow-y-auto divide-y divide-[var(--border-hairline)] bg-[var(--surface-card)]">
+                  {filteredAttitudeStudents.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-[var(--text-secondary)]">
+                      Tidak ada siswa yang sesuai dengan filter pencarian.
+                    </div>
+                  ) : (
+                    filteredAttitudeStudents.map(({ student, originalIndex, attitude }) => {
+                      return (
+                        <div
+                          key={student.id}
+                          className="px-3.5 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-[var(--surface-recessed)]/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="font-mono text-xs text-[var(--text-secondary)] w-6 text-center shrink-0">
+                              {String(originalIndex).padStart(2, "0")}
+                            </span>
+                            <div className="truncate">
+                              <p className="font-semibold text-xs text-[var(--text-primary)] truncate">
+                                {student.fullName}
+                              </p>
+                              <p className="text-[11px] text-[var(--text-secondary)] font-mono">
+                                NIS {student.nis ?? "-"} · {student.gender === "L" ? "Laki-laki" : "Perempuan"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Tombol 4 Pilihan Sikap */}
+                          <div className="inline-flex rounded-[8px] bg-[var(--surface-recessed)] p-0.5 border border-[var(--border-hairline)] shrink-0 self-end sm:self-auto">
+                            {(["SANGAT_BAIK", "BAIK", "KURANG_BAIK", "BURUK"] as AttitudeGrade[]).map((att) => {
+                              const meta = ATTITUDE_GRADE_METAS[att];
+                              const isSelected = attitude === att;
+
+                              return (
+                                <button
+                                  key={att}
+                                  type="button"
+                                  onClick={() => handleUpdateStudentAttitude(student.id, att)}
+                                  className={`px-2.5 py-1 text-[11px] font-semibold rounded-[6px] transition-all cursor-pointer ${
+                                    isSelected
+                                      ? "bg-[var(--surface-card)] text-[var(--text-primary)] shadow-2xs font-bold ring-1 ring-black/10 dark:ring-white/15"
+                                      : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                  }`}
+                                  title={`Set ke ${meta.label} (${meta.predicate})`}
+                                >
+                                  <span className="sm:hidden">{meta.predicate}</span>
+                                  <span className="hidden sm:inline">{meta.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Modal */}
+            <div className="px-5 py-3 border-t border-[var(--border-hairline)] flex items-center justify-between shrink-0 bg-[var(--surface-card)]">
+              <span className="text-[11px] text-[var(--text-secondary)] hidden sm:inline">
+                Perubahan tersimpan otomatis ke penyimpanan lokal.
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsAttitudeModalOpen(false)}
+                className="w-full sm:w-auto px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[10px] text-xs font-semibold transition-colors shadow-xs cursor-pointer active:scale-95"
+              >
+                Selesai &amp; Tutup
               </button>
             </div>
           </div>
