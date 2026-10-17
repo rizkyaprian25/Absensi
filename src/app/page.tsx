@@ -471,15 +471,17 @@ export default function TodayDashboardPage() {
               </p>
             </div>
           ) : (
-            classesForSelectedDay.map((cls) => {
+            classesForSelectedDay.map((cls, idx) => {
               const studentCount = getStudentsForClass(cls.id).length;
               const classSession = sessions.find(
                 (s) => s.classId === cls.id && s.sessionDate === selectedDate
               );
+              // Kunci unik per sesi slot KBM (menjamin tidak ada duplikasi key class-9a, dll)
+              const sessionKey = cls.slotId || `${cls.id}-${cls.schedulePeriod || idx}-${cls.scheduleTime || ""}-${idx}`;
 
             return (
               <div
-                key={cls.id}
+                key={sessionKey}
                 className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[var(--surface-recessed)]/40 transition-colors"
               >
                 <div className="flex items-center gap-3.5 min-w-0">
@@ -498,6 +500,16 @@ export default function TodayDashboardPage() {
                       <span className="text-[11px] px-2 py-0.5 rounded-[6px] bg-[var(--surface-recessed)] text-[var(--text-secondary)] font-mono font-medium">
                         {cls.schedulePeriod}
                       </span>
+                      {cls.subject && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-[6px] bg-blue-500/10 text-blue-600 font-semibold">
+                          {cls.subject}
+                        </span>
+                      )}
+                      {cls.teacherName && currentUser?.role === "ADMIN" && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-[6px] bg-purple-500/10 text-purple-700 dark:text-purple-300 font-medium">
+                          {cls.teacherName}
+                        </span>
+                      )}
                       {isCurrentDayOff && (
                         <span className="text-[10px] px-2 py-0.5 rounded-[4px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold font-mono">
                           Diliburkan
