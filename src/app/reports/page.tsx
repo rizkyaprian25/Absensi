@@ -20,6 +20,11 @@ import {
   Users,
   Sparkles,
   TrendingUp,
+  LayoutGrid,
+  Table,
+  ChevronUp,
+  Search,
+  X,
 } from "lucide-react";
 import { Toast } from "@/components/ui/Toast";
 import {
@@ -369,6 +374,33 @@ export default function ReportsPage() {
   const [savedRecords, setSavedRecords] = useState<AttendanceRecord[]>([]);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
 
+  // Mode Tampilan Responsif (Mobile Cards vs Desktop Table)
+  const [reportViewMode, setReportViewMode] = useState<"auto" | "cards" | "table">("auto");
+  const [reportSearchQuery, setReportSearchQuery] = useState("");
+  const [expandedReportCards, setExpandedReportCards] = useState<Record<string, boolean>>({});
+  
+  const toggleReportCard = (studentId: string) => {
+    setExpandedReportCards((prev) => ({ ...prev, [studentId]: !prev[studentId] }));
+  };
+
+  const handleToggleExpandAllMonthlyCards = () => {
+    const isAnyExpanded = recapData.students.some((s) => expandedReportCards[s.studentId]);
+    const next: Record<string, boolean> = {};
+    recapData.students.forEach((s) => {
+      next[s.studentId] = !isAnyExpanded;
+    });
+    setExpandedReportCards(next);
+  };
+
+  const handleToggleExpandAllSemesterCards = () => {
+    const isAnyExpanded = semesterRecapData.students.some((s) => expandedReportCards[s.studentId]);
+    const next: Record<string, boolean> = {};
+    semesterRecapData.students.forEach((s) => {
+      next[s.studentId] = !isAnyExpanded;
+    });
+    setExpandedReportCards(next);
+  };
+
   useEffect(() => {
     setHolidays(getStoredHolidays());
     setSavedSessions(getSavedSessions());
@@ -426,6 +458,28 @@ export default function ReportsPage() {
       (s) => s.totalHari > 0 && s.persentaseSemester === 100
     );
   }, [semesterRecapData]);
+
+  // Filter siswa bulanan berdasarkan kata kunci pencarian nama atau NIS
+  const filteredMonthlyStudents = useMemo(() => {
+    const q = reportSearchQuery.trim().toLowerCase();
+    if (!q) return recapData.students;
+    return recapData.students.filter(
+      (s) =>
+        s.fullName.toLowerCase().includes(q) ||
+        (s.nis && s.nis.toLowerCase().includes(q))
+    );
+  }, [recapData.students, reportSearchQuery]);
+
+  // Filter siswa semester berdasarkan kata kunci pencarian nama atau NIS
+  const filteredSemesterStudents = useMemo(() => {
+    const q = reportSearchQuery.trim().toLowerCase();
+    if (!q) return semesterRecapData.students;
+    return semesterRecapData.students.filter(
+      (s) =>
+        s.fullName.toLowerCase().includes(q) ||
+        (s.nis && s.nis.toLowerCase().includes(q))
+    );
+  }, [semesterRecapData.students, reportSearchQuery]);
 
   // Data Jurnal Agenda KBM untuk Bulan Terpilih
   const monthlyAgendas = useMemo(() => {
@@ -763,38 +817,111 @@ export default function ReportsPage() {
         </div>
       </header>
 
-      {/* Pengalih Mode Rekapitulasi (Apple HIG Segmented Control) */}
-      <div className="flex items-center gap-1.5 p-1 bg-[var(--surface-recessed)] rounded-[12px] border border-[var(--border-hairline)] w-fit print:hidden shadow-xs">
-        <button
-          type="button"
-          onClick={() => setRecapMode("monthly")}
-          className={`min-h-[40px] px-4 py-2 rounded-[9px] text-xs font-bold transition-all flex items-center gap-2 ${
-            recapMode === "monthly"
-              ? "bg-[var(--surface-card)] text-[var(--color-accent)] shadow-xs"
-              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          <span>Rekap Bulanan</span>
-          <span className="px-2 py-0.5 rounded-full bg-[var(--surface-recessed)] text-[10px] font-mono">
-            {currentMonthLabel}
+      {/* Pengalih Mode Rekapitulasi & Pengalih Tampilan Mobile (Apple HIG Segmented Control) */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 print:hidden">
+        <div className="flex items-center gap-1.5 p-1 bg-[var(--surface-recessed)] rounded-[12px] border border-[var(--border-hairline)] w-fit shadow-xs">
+          <button
+            type="button"
+            onClick={() => setRecapMode("monthly")}
+            className={`min-h-[40px] px-3.5 py-2 rounded-[9px] text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              recapMode === "monthly"
+                ? "bg-[var(--surface-card)] text-[var(--color-accent)] shadow-xs"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Rekap Bulanan</span>
+            <span className="px-2 py-0.5 rounded-full bg-[var(--surface-recessed)] text-[10px] font-mono">
+              {currentMonthLabel}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setRecapMode("semester")}
+            className={`min-h-[40px] px-3.5 py-2 rounded-[9px] text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              recapMode === "semester"
+                ? "bg-[var(--surface-card)] text-[var(--color-accent)] shadow-xs"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>Total Semester (Kumulatif)</span>
+            <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-mono font-bold">
+              6 Bulan
+            </span>
+          </button>
+        </div>
+
+        {/* Switcher Mode Tampilan: Kartu Siswa (Mobile Friendly) vs Tabel Matriks Lebar */}
+        <div className="flex items-center p-0.5 bg-[var(--surface-recessed)] rounded-[10px] border border-[var(--border-hairline)] shrink-0 shadow-xs">
+          <button
+            type="button"
+            onClick={() => setReportViewMode(reportViewMode === "cards" ? "auto" : "cards")}
+            className={`px-3 py-1.5 rounded-[8px] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              reportViewMode === "cards"
+                ? "bg-[var(--surface-card)] text-[var(--color-accent)] shadow-2xs font-bold ring-1 ring-[var(--border-hairline)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+            title="Tampilan Kartu Siswa (Sangat cocok untuk layar HP / Mobile)"
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span>Kartu</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setReportViewMode(reportViewMode === "table" ? "auto" : "table")}
+            className={`px-3 py-1.5 rounded-[8px] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              reportViewMode === "table"
+                ? "bg-[var(--surface-card)] text-[var(--color-accent)] shadow-2xs font-bold ring-1 ring-[var(--border-hairline)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+            title="Tampilan Tabel Matriks Lebar"
+          >
+            <Table className="w-3.5 h-3.5" />
+            <span>Tabel</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Bilah Pencarian Nama Siswa Responsif */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-[var(--surface-card)] p-3 rounded-[12px] border border-[var(--border-hairline)] shadow-2xs print:hidden">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="w-3.5 h-3.5 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={reportSearchQuery}
+            onChange={(e) => setReportSearchQuery(e.target.value)}
+            placeholder="Cari nama atau NIS siswa..."
+            className="w-full text-xs pl-8 pr-8 py-2 rounded-[8px] bg-[var(--surface-recessed)] text-[var(--text-primary)] border border-transparent focus:border-[var(--color-accent)] focus:bg-[var(--surface-card)] focus:outline-none transition-all"
+          />
+          {reportSearchQuery && (
+            <button
+              type="button"
+              onClick={() => setReportSearchQuery("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-0.5 rounded-full"
+              title="Bersihkan pencarian"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between sm:justify-end gap-2 text-xs text-[var(--text-secondary)]">
+          <span className="font-mono text-[11px]">
+            {recapMode === "monthly"
+              ? `${filteredMonthlyStudents.length} dari ${recapData.students.length} Siswa`
+              : `${filteredSemesterStudents.length} dari ${semesterRecapData.students.length} Siswa`}
           </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setRecapMode("semester")}
-          className={`min-h-[40px] px-4 py-2 rounded-[9px] text-xs font-bold transition-all flex items-center gap-2 ${
-            recapMode === "semester"
-              ? "bg-[var(--surface-card)] text-[var(--color-accent)] shadow-xs"
-              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          }`}
-        >
-          <BarChart3 className="w-4 h-4" />
-          <span>Total Semester (Kumulatif)</span>
-          <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-mono font-bold">
-            6 Bulan
-          </span>
-        </button>
+          {reportSearchQuery && (
+            <button
+              type="button"
+              onClick={() => setReportSearchQuery("")}
+              className="text-[11px] font-semibold text-[var(--color-accent)] hover:underline"
+            >
+              Reset
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tampilan Header Khusus Cetak (Hanya tampil saat print) */}
@@ -965,103 +1092,369 @@ export default function ReportsPage() {
             </span>
           </div>
 
-          {/* Matriks Presensi Harian (Tabel Scrollable Horizontal dengan Kolom Sticky) */}
-          <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] overflow-hidden shadow-xs">
-            <div className="p-3 bg-[var(--surface-recessed)] border-b border-[var(--border-hairline)] flex items-center justify-between text-xs text-[var(--text-secondary)] flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-[var(--text-primary)]">
-                  Matriks Presensi Harian Bulan {currentMonthLabel}
+          {/* ========================================================================= */}
+          {/* MODE KARTU SISWA BULANAN (CARD VIEW MOBILE)                              */}
+          {/* Nyaman untuk smartphone: bebas scroll horizontal, data ringkas & jelas    */}
+          {/* ========================================================================= */}
+          <div className={reportViewMode === "cards" ? "block" : reportViewMode === "table" ? "hidden" : "block md:hidden"}>
+            <div className="flex items-center justify-between gap-2 mb-3 px-1">
+              <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+                <span className="font-semibold text-[var(--text-primary)]">
+                  {filteredMonthlyStudents.length} Siswa Terdaftar
                 </span>
-                <span className="text-[11px] font-mono">
-                  · Kelas {currentClass.name} ({recapData.students.length} Siswa)
-                </span>
+                <span>·</span>
+                <span>Bulan {currentMonthLabel}</span>
               </div>
-              <div className="flex items-center gap-1.5 print:hidden">
+
+              {filteredMonthlyStudents.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => handleExportExcel(currentClass)}
-                  className="px-2.5 py-1 rounded-[6px] bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all active:scale-[0.98]"
-                  title="Unduh Berkas Excel (.xlsx) Presensi Ber-Kop Resmi"
+                  onClick={handleToggleExpandAllMonthlyCards}
+                  className="text-[11px] font-semibold text-[var(--color-accent)] hover:underline flex items-center gap-1 cursor-pointer"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span>Excel (.xlsx)</span>
+                  <Sparkles className="w-3 h-3" />
+                  <span>
+                    {filteredMonthlyStudents.some((s) => expandedReportCards[s.studentId])
+                      ? "Tutup Semua Rincian"
+                      : "Buka Semua Rincian"}
+                  </span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handlePrintMonthlyPdf(currentClass)}
-                  className="px-2.5 py-1 rounded-[6px] bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all active:scale-[0.98]"
-                  title="Cetak atau Simpan PDF Presensi Bulanan Ukuran Folio (21.59 x 33.02 cm) 1 Lembar Ber-Kop Resmi"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Cetak / PDF (Folio)</span>
-                </button>
-              </div>
+              )}
             </div>
 
-            {/* Kontainer Scroll Terisolasi */}
-            <div className="overflow-x-auto max-w-full">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-[var(--surface-recessed)]/50 border-b border-[var(--border-hairline)] text-[var(--text-secondary)]">
-                    {/* Kolom Sticky Kiri untuk Nomor & Nama */}
-                    <th className="sticky left-0 z-10 bg-[var(--surface-card)] p-2.5 font-bold min-w-[160px] border-r border-[var(--border-hairline)] shadow-[2px_0_4px_rgba(0,0,0,0.02)]">
-                      No. &amp; Nama Siswa
-                    </th>
+            {filteredMonthlyStudents.length === 0 ? (
+              <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[16px] p-8 text-center text-[var(--text-secondary)]">
+                <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="font-medium text-sm">Tidak ada siswa ditemukan</p>
+                <p className="text-xs mt-1">Coba sesuaikan kata kunci pencarian Anda</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredMonthlyStudents.map((student, idx) => {
+                  const isExpanded = !!expandedReportCards[student.studentId];
+                  const isWarning = student.needsAttention;
+                  const isPerfect = student.totalHari > 0 && student.persentaseKehadiran === 100;
 
-                    {/* Kolom Tanggal-Tanggal Efektif */}
-                    {recapData.effectiveDates.map((date) => {
-                      const hol = findHolidayByDate(date, holidays);
-                      const isSpecial = hol?.category === "UTS" || hol?.category === "UAS" || hol?.category === "KOKURIKULER";
-                      const badgeText = hol?.category === "UTS" ? "UTS" : hol?.category === "UAS" ? "UAS" : hol?.category === "KOKURIKULER" ? "P5" : "L";
+                  // Ambil riwayat tanggal ketidakhadiran (S, I, A, T, D)
+                  const nonPresentDates: { date: string; code: string; label: string }[] = [];
+                  recapData.effectiveDates.forEach((d) => {
+                    const code = student.dailyStatus[d];
+                    if (code && code !== "H" && code !== "-" && code !== "L") {
+                      const lbl =
+                        code === "S" ? "Sakit" :
+                        code === "I" ? "Izin" :
+                        code === "A" ? "Alpa" :
+                        code === "T" ? "Terlambat" :
+                        code === "D" ? "Dispensasi" : code;
+                      nonPresentDates.push({ date: d, code, label: lbl });
+                    }
+                  });
 
-                      return (
-                        <th
-                          key={date}
-                          title={hol ? `${getCategoryLabel(hol.category)}: ${hol.name}` : `Tanggal ${date}`}
-                          className={`p-2 text-center font-mono font-semibold min-w-[34px] border-r border-[var(--border-hairline)]/60 text-[11px] ${
-                            isSpecial
-                              ? "bg-purple-100/70 text-purple-900 dark:bg-purple-950/40 dark:text-purple-300 font-bold"
-                              : hol
-                              ? "bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold"
-                              : ""
-                          }`}
+                  return (
+                    <div
+                      key={student.studentId}
+                      className={`bg-[var(--surface-card)] border rounded-[16px] p-4 shadow-xs transition-all flex flex-col gap-3 ${
+                        isWarning
+                          ? "border-[var(--status-alpa-fg)]/40 bg-[var(--status-alpa-bg)]/10"
+                          : "border-[var(--border-hairline)] hover:border-[var(--color-accent)]/30"
+                      }`}
+                    >
+                      {/* Baris Atas: No, Nama Lengkap, NIS, dan Badge Status */}
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-7 h-7 rounded-full bg-[var(--surface-recessed)] text-[var(--text-secondary)] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-[var(--border-hairline)]">
+                            {String(idx + 1).padStart(2, "0")}
+                          </span>
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-sm text-[var(--text-primary)] truncate leading-tight">
+                              {student.fullName}
+                            </h4>
+                            <p className="text-[11px] text-[var(--text-secondary)] font-mono mt-0.5">
+                              NIS {student.nis ?? "-"} · {student.gender === "L" ? "Laki-laki" : "Perempuan"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Badge Kehadiran / Perhatian */}
+                        <div className="shrink-0 text-right">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono inline-block border ${
+                              isWarning
+                                ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
+                                : isPerfect
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                                : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
+                            }`}
+                          >
+                            {isWarning ? "⚠️ Perhatian" : isPerfect ? "★ 100% Penuh" : `${student.persentaseKehadiran}%`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Bar Visual Kehadiran */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
+                          <span>Tingkat Kehadiran Bulan Ini</span>
+                          <span className="font-mono font-bold text-[var(--text-primary)]">
+                            {student.hadir + student.dispen} / {student.totalHari} Hari ({student.persentaseKehadiran}%)
+                          </span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-[var(--surface-recessed)] overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              student.persentaseKehadiran >= 85
+                                ? "bg-emerald-500"
+                                : student.persentaseKehadiran >= 75
+                                ? "bg-amber-500"
+                                : "bg-rose-500"
+                            }`}
+                            style={{ width: `${Math.min(100, Math.max(0, student.persentaseKehadiran))}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* 5 Pill Tally Metrik Kehadiran */}
+                      <div className="grid grid-cols-5 gap-1.5 pt-1">
+                        <div className="flex flex-col items-center justify-center p-2 rounded-[10px] bg-[var(--status-hadir-bg)] text-[var(--status-hadir-fg)] border border-[var(--status-hadir-fg)]/20 text-center">
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Hadir</span>
+                          <span className="text-base font-extrabold font-mono mt-0.5">{student.hadir}</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center p-2 rounded-[10px] bg-[var(--status-sakit-bg)] text-[var(--status-sakit-fg)] border border-[var(--status-sakit-fg)]/20 text-center">
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Sakit</span>
+                          <span className="text-base font-extrabold font-mono mt-0.5">{student.sakit}</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center p-2 rounded-[10px] bg-[var(--status-izin-bg)] text-[var(--status-izin-fg)] border border-[var(--status-izin-fg)]/20 text-center">
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Izin</span>
+                          <span className="text-base font-extrabold font-mono mt-0.5">{student.izin}</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center p-2 rounded-[10px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] border border-[var(--status-alpa-fg)]/20 text-center">
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Alpa</span>
+                          <span className="text-base font-extrabold font-mono mt-0.5">{student.alpa}</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center p-2 rounded-[10px] bg-[var(--status-dispen-bg)] text-[var(--status-dispen-fg)] border border-[var(--status-dispen-fg)]/20 text-center">
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Dispen</span>
+                          <span className="text-base font-extrabold font-mono mt-0.5">{student.dispen}</span>
+                        </div>
+                      </div>
+
+                      {/* Accordion Rincian Ketidakhadiran & Tanggal Absen */}
+                      <div className="pt-1 border-t border-[var(--border-hairline)]">
+                        <button
+                          type="button"
+                          onClick={() => toggleReportCard(student.studentId)}
+                          className="w-full flex items-center justify-between text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors py-1 cursor-pointer"
                         >
-                          <span>{date.slice(8)}</span>
-                          {hol && (
-                            <span className={`block text-[8px] leading-tight font-sans uppercase font-extrabold ${
-                              isSpecial ? "text-purple-700 dark:text-purple-300" : ""
-                            }`}>
-                              {badgeText}
+                          <span className="flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+                            <span>
+                              {nonPresentDates.length > 0
+                                ? `Catatan Ketidakhadiran (${nonPresentDates.length} Hari)`
+                                : "Riwayat Kehadiran Lengkap"}
                             </span>
-                          )}
-                        </th>
-                      );
-                    })}
+                          </span>
+                          <div className="flex items-center gap-1 text-[11px] text-[var(--color-accent)]">
+                            <span>{isExpanded ? "Sembunyikan" : "Lihat Rincian"}</span>
+                            {isExpanded ? (
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
+                          </div>
+                        </button>
 
-                    {/* Kolom Ringkasan Total */}
-                    <th className="p-2 text-center font-bold text-[var(--status-hadir-fg)] min-w-[28px] border-l border-[var(--border-hairline)]" title="Hadir">
-                      H
-                    </th>
-                    <th className="p-2 text-center font-bold text-[var(--status-sakit-fg)] min-w-[28px]" title="Sakit">
-                      S
-                    </th>
-                    <th className="p-2 text-center font-bold text-[var(--status-izin-fg)] min-w-[28px]" title="Izin">
-                      I
-                    </th>
-                    <th className="p-2 text-center font-bold text-[var(--status-alpa-fg)] min-w-[28px]" title="Alpa">
-                      A
-                    </th>
-                    <th className="p-2 text-center font-bold text-[var(--status-dispen-fg)] min-w-[28px]" title="Dispensasi">
-                      D
-                    </th>
-                    <th className="p-2 text-center font-bold text-[var(--text-primary)] min-w-[50px] border-l border-[var(--border-hairline)]">
-                      %
-                    </th>
-                  </tr>
-                </thead>
+                        {isExpanded && (
+                          <div className="mt-2.5 pt-2.5 border-t border-dashed border-[var(--border-hairline)] space-y-2 animate-in fade-in duration-200">
+                            {nonPresentDates.length === 0 ? (
+                              <div className="p-3 rounded-[10px] bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                <span>Siswa selalu hadir di seluruh pertemuan KBM bulan ini tanpa ada ketidakhadiran.</span>
+                              </div>
+                            ) : (
+                              <div className="space-y-1.5">
+                                <p className="text-[11px] text-[var(--text-secondary)] font-medium">
+                                  Daftar tanggal siswa tidak hadir atau berstatus khusus:
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                  {nonPresentDates.map((item) => (
+                                    <div
+                                      key={item.date}
+                                      className="p-2 rounded-[8px] bg-[var(--surface-recessed)] border border-[var(--border-hairline)] flex items-center justify-between text-xs"
+                                    >
+                                      <span className="font-semibold text-[var(--text-primary)]">
+                                        {formatIndonesianDate(item.date)}
+                                      </span>
+                                      <span
+                                        className={`px-2 py-0.5 rounded-[4px] font-mono text-[10px] font-bold ${
+                                          item.code === "S"
+                                            ? "bg-[var(--status-sakit-bg)] text-[var(--status-sakit-fg)]"
+                                            : item.code === "I"
+                                            ? "bg-[var(--status-izin-bg)] text-[var(--status-izin-fg)]"
+                                            : item.code === "A"
+                                            ? "bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)]"
+                                            : item.code === "T"
+                                            ? "bg-[var(--status-terlambat-bg)] text-[var(--status-terlambat-fg)]"
+                                            : "bg-[var(--status-dispen-bg)] text-[var(--status-dispen-fg)]"
+                                        }`}
+                                      >
+                                        {item.label} ({item.code})
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
 
-                <tbody className="divide-y divide-[var(--border-hairline)]">
-                  {recapData.students.map((student, idx) => {
+                            {/* Mini Timeline Baris Pertemuan */}
+                            <div className="pt-2">
+                              <p className="text-[10px] text-[var(--text-secondary)] font-semibold uppercase tracking-wider mb-1.5">
+                                Seluruh Pertemuan ({recapData.effectiveDates.length} Hari):
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {recapData.effectiveDates.map((d) => {
+                                  const c = student.dailyStatus[d] ?? "-";
+                                  return (
+                                    <div
+                                      key={d}
+                                      title={`${formatIndonesianDate(d)}: Status ${c}`}
+                                      className={`w-6 h-6 rounded-[4px] text-[10px] font-mono font-bold flex items-center justify-center ${
+                                        c === "H"
+                                          ? "bg-[var(--status-hadir-bg)] text-[var(--status-hadir-fg)]"
+                                          : c === "S"
+                                          ? "bg-[var(--status-sakit-bg)] text-[var(--status-sakit-fg)]"
+                                          : c === "I"
+                                          ? "bg-[var(--status-izin-bg)] text-[var(--status-izin-fg)]"
+                                          : c === "A"
+                                          ? "bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)]"
+                                          : c === "T"
+                                          ? "bg-[var(--status-terlambat-bg)] text-[var(--status-terlambat-fg)]"
+                                          : c === "D"
+                                          ? "bg-[var(--status-dispen-bg)] text-[var(--status-dispen-fg)]"
+                                          : "bg-[var(--surface-recessed)] text-[var(--text-secondary)] opacity-40"
+                                      }`}
+                                    >
+                                      {c}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ========================================================================= */}
+          {/* TAMPILAN 2: TABEL MATRIKS PRESENSI BULANAN DESKTOP                       */}
+          {/* Scrollable horizontal dengan kolom sticky no & nama siswa                */}
+          {/* ========================================================================= */}
+          <div className={reportViewMode === "cards" ? "hidden" : reportViewMode === "table" ? "block" : "hidden md:block"}>
+            <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] overflow-hidden shadow-xs">
+              {/* Petunjuk Geser Horizontal di Mobile jika Mode Tabel Terpilih */}
+              <div className="md:hidden px-3.5 py-2 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                <span>👉</span>
+                <span className="font-medium">Geser tabel ke samping untuk melihat seluruh tanggal presensi harian.</span>
+              </div>
+
+              <div className="p-3 bg-[var(--surface-recessed)] border-b border-[var(--border-hairline)] flex items-center justify-between text-xs text-[var(--text-secondary)] flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-[var(--text-primary)]">
+                    Matriks Presensi Harian Bulan {currentMonthLabel}
+                  </span>
+                  <span className="text-[11px] font-mono">
+                    · Kelas {currentClass.name} ({filteredMonthlyStudents.length} Siswa)
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 print:hidden">
+                  <button
+                    type="button"
+                    onClick={() => handleExportExcel(currentClass)}
+                    className="px-2.5 py-1 rounded-[6px] bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all active:scale-[0.98]"
+                    title="Unduh Berkas Excel (.xlsx) Presensi Ber-Kop Resmi"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    <span>Excel (.xlsx)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePrintMonthlyPdf(currentClass)}
+                    className="px-2.5 py-1 rounded-[6px] bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all active:scale-[0.98]"
+                    title="Cetak atau Simpan PDF Presensi Bulanan Ukuran Folio (21.59 x 33.02 cm) 1 Lembar Ber-Kop Resmi"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Cetak / PDF (Folio)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Kontainer Scroll Terisolasi */}
+              <div className="overflow-x-auto max-w-full">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-[var(--surface-recessed)]/50 border-b border-[var(--border-hairline)] text-[var(--text-secondary)]">
+                      {/* Kolom Sticky Kiri untuk Nomor & Nama */}
+                      <th className="sticky left-0 z-10 bg-[var(--surface-card)] p-2.5 font-bold min-w-[160px] border-r border-[var(--border-hairline)] shadow-[2px_0_4px_rgba(0,0,0,0.02)]">
+                        No. &amp; Nama Siswa
+                      </th>
+
+                      {/* Kolom Tanggal-Tanggal Efektif */}
+                      {recapData.effectiveDates.map((date) => {
+                        const hol = findHolidayByDate(date, holidays);
+                        const isSpecial = hol?.category === "UTS" || hol?.category === "UAS" || hol?.category === "KOKURIKULER";
+                        const badgeText = hol?.category === "UTS" ? "UTS" : hol?.category === "UAS" ? "UAS" : hol?.category === "KOKURIKULER" ? "P5" : "L";
+
+                        return (
+                          <th
+                            key={date}
+                            title={hol ? `${getCategoryLabel(hol.category)}: ${hol.name}` : `Tanggal ${date}`}
+                            className={`p-2 text-center font-mono font-semibold min-w-[34px] border-r border-[var(--border-hairline)]/60 text-[11px] ${
+                              isSpecial
+                                ? "bg-purple-100/70 text-purple-900 dark:bg-purple-950/40 dark:text-purple-300 font-bold"
+                                : hol
+                                ? "bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold"
+                                : ""
+                            }`}
+                          >
+                            <span>{date.slice(8)}</span>
+                            {hol && (
+                              <span className={`block text-[8px] leading-tight font-sans uppercase font-extrabold ${
+                                isSpecial ? "text-purple-700 dark:text-purple-300" : ""
+                              }`}>
+                                {badgeText}
+                              </span>
+                            )}
+                          </th>
+                        );
+                      })}
+
+                      {/* Kolom Ringkasan Total */}
+                      <th className="p-2 text-center font-bold text-[var(--status-hadir-fg)] min-w-[28px] border-l border-[var(--border-hairline)]" title="Hadir">
+                        H
+                      </th>
+                      <th className="p-2 text-center font-bold text-[var(--status-sakit-fg)] min-w-[28px]" title="Sakit">
+                        S
+                      </th>
+                      <th className="p-2 text-center font-bold text-[var(--status-izin-fg)] min-w-[28px]" title="Izin">
+                        I
+                      </th>
+                      <th className="p-2 text-center font-bold text-[var(--status-alpa-fg)] min-w-[28px]" title="Alpa">
+                        A
+                      </th>
+                      <th className="p-2 text-center font-bold text-[var(--status-dispen-fg)] min-w-[28px]" title="Dispensasi">
+                        D
+                      </th>
+                      <th className="p-2 text-center font-bold text-[var(--text-primary)] min-w-[50px] border-l border-[var(--border-hairline)]">
+                        %
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-[var(--border-hairline)]">
+                    {filteredMonthlyStudents.map((student, idx) => {
                     const indexStr = String(idx + 1).padStart(2, "0");
                     const isWarning = student.needsAttention;
 
@@ -1168,6 +1561,7 @@ export default function ReportsPage() {
               </table>
             </div>
           </div>
+        </div>
 
           {/* Seksi Jurnal Agenda Pembelajaran & Materi KBM */}
           <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] overflow-hidden shadow-xs">
@@ -1371,351 +1765,646 @@ export default function ReportsPage() {
 
           {/* TABEL SEMESTER TIPE 1: FORMAT BUKU RAPORT */}
           {semesterViewType === "summary" ? (
-            <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] overflow-hidden shadow-xs">
-              <div className="p-3 bg-[var(--surface-recessed)] border-b border-[var(--border-hairline)] flex items-center justify-between text-xs text-[var(--text-secondary)] flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-[var(--text-primary)]">
-                    Rekapitulasi Akumulasi Semester (Format Buku Raport SMP)
-                  </span>
-                  <span className="text-[11px] font-mono">
-                    · Kelas {currentClass.name} ({semesterRecapData.students.length} Siswa)
-                  </span>
+            <>
+              {/* TAMPILAN 1A: KARTU SISWA AKUMULASI SEMESTER (MOBILE CARD VIEW) */}
+              <div className={reportViewMode === "cards" ? "block" : reportViewMode === "table" ? "hidden" : "block md:hidden"}>
+                <div className="flex items-center justify-between gap-2 mb-3 px-1">
+                  <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+                    <span className="font-semibold text-[var(--text-primary)]">
+                      {filteredSemesterStudents.length} Siswa Terdaftar
+                    </span>
+                    <span>·</span>
+                    <span>Akumulasi Semester Ganjil</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 print:hidden">
-                  <button
-                    type="button"
-                    onClick={() => handleExportExcel(currentClass)}
-                    className="px-2.5 py-1 rounded-[6px] bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all active:scale-[0.98]"
-                    title="Unduh 13 Kolom Akumulasi Excel (.xlsx)"
-                  >
-                    <FileSpreadsheet className="w-3.5 h-3.5" />
-                    <span>Excel (.xlsx)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handlePrintSemesterPdf(currentClass)}
-                    className="px-2.5 py-1 rounded-[6px] bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all active:scale-[0.98]"
-                    title="Cetak atau Simpan PDF Ukuran Folio (21.59 x 33.02 cm) 1 Lembar Ber-Kop Resmi"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Cetak / PDF (Folio)</span>
-                  </button>
-                </div>
-              </div>
 
-              <div className="overflow-x-auto max-w-full">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-[var(--surface-recessed)]/50 border-b border-[var(--border-hairline)] text-[var(--text-secondary)]">
-                      <th className="sticky left-0 z-10 bg-[var(--surface-card)] p-2 font-bold w-10 text-center border-r border-[var(--border-hairline)] shadow-[2px_0_4px_rgba(0,0,0,0.02)]">
-                        No
-                      </th>
-                      <th className="p-2 font-bold w-24 border-r border-[var(--border-hairline)] text-center font-mono">
-                        NIS / NIPD
-                      </th>
-                      <th className="p-2 font-bold min-w-[160px] border-r border-[var(--border-hairline)]">
-                        Nama Lengkap Siswa
-                      </th>
-                      <th className="p-2 font-bold text-center w-10 border-r border-[var(--border-hairline)]">
-                        L/P
-                      </th>
-                      <th className="p-2 text-center font-bold text-[var(--status-hadir-fg)] w-11 border-r border-[var(--border-hairline)]" title="Hadir (H)">
-                        Hadir
-                      </th>
-                      <th className="p-2 text-center font-bold text-[var(--status-sakit-fg)] w-11 border-r border-[var(--border-hairline)]" title="Sakit (S)">
-                        Sakit
-                      </th>
-                      <th className="p-2 text-center font-bold text-[var(--status-izin-fg)] w-11 border-r border-[var(--border-hairline)]" title="Izin (I)">
-                        Izin
-                      </th>
-                      <th className="p-2 text-center font-bold text-[var(--status-alpa-fg)] w-11 border-r border-[var(--border-hairline)]" title="Alpa (A)">
-                        Alpa
-                      </th>
-                      <th className="p-2 text-center font-bold text-amber-700 dark:text-amber-400 w-11 border-r border-[var(--border-hairline)]" title="Terlambat (T)">
-                        Telat
-                      </th>
-                      <th className="p-2 text-center font-bold text-[var(--status-dispen-fg)] w-11 border-r border-[var(--border-hairline)]" title="Dispensasi (D)">
-                        Dispen
-                      </th>
-                      <th className="p-2 text-center font-bold text-[var(--text-primary)] w-12 border-r border-[var(--border-hairline)]" title="Total Hari Belajar">
-                        Total
-                      </th>
-                      <th className="p-2 text-center font-bold text-[var(--text-primary)] w-16 border-r border-[var(--border-hairline)]">
-                        % Hadir
-                      </th>
-                      <th className="p-2 text-center font-bold text-[var(--text-primary)] min-w-[110px]">
-                        Predikat Raport
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--border-hairline)]">
-                    {semesterRecapData.students.map((st, idx) => {
+                {filteredSemesterStudents.length === 0 ? (
+                  <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[16px] p-8 text-center text-[var(--text-secondary)]">
+                    <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                    <p className="font-medium text-sm">Tidak ada siswa ditemukan</p>
+                    <p className="text-xs mt-1">Coba sesuaikan kata kunci pencarian Anda</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredSemesterStudents.map((st, idx) => {
                       const isWarning = st.needsAttention;
+
                       return (
-                        <tr
+                        <div
                           key={st.studentId}
-                          className={`hover:bg-[var(--surface-recessed)]/40 transition-colors ${
-                            isWarning ? "bg-[var(--status-alpa-bg)]/20" : ""
+                          className={`bg-[var(--surface-card)] border rounded-[16px] p-4 shadow-xs transition-all flex flex-col gap-3 ${
+                            isWarning
+                              ? "border-[var(--status-alpa-fg)]/40 bg-[var(--status-alpa-bg)]/10"
+                              : "border-[var(--border-hairline)] hover:border-[var(--color-accent)]/30"
                           }`}
                         >
-                          <td className="sticky left-0 z-10 p-2 text-center font-mono text-[11px] text-[var(--text-secondary)] border-r border-[var(--border-hairline)] bg-[var(--surface-card)]">
-                            {idx + 1}
-                          </td>
-                          <td className="p-2 text-center font-mono text-[11px] border-r border-[var(--border-hairline)]">
-                            {st.nis ?? "-"}
-                          </td>
-                          <td className="p-2 font-semibold text-[var(--text-primary)] border-r border-[var(--border-hairline)]">
-                            <div className="flex items-center gap-1.5">
-                              <span className="truncate">{st.fullName}</span>
-                              {isWarning && (
-                                <span className="text-[9px] px-1 py-0.2 rounded-[3px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold shrink-0">
-                                  Perhatian
-                                </span>
-                              )}
+                          {/* Header Kartu: No, Nama Lengkap, NIS, Gender */}
+                          <div className="flex items-start justify-between gap-2.5">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="w-7 h-7 rounded-full bg-[var(--surface-recessed)] text-[var(--text-secondary)] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-[var(--border-hairline)]">
+                                {String(idx + 1).padStart(2, "0")}
+                              </span>
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-sm text-[var(--text-primary)] truncate leading-tight">
+                                  {st.fullName}
+                                </h4>
+                                <p className="text-[11px] text-[var(--text-secondary)] font-mono mt-0.5">
+                                  NIS {st.nis ?? "-"} · {st.gender === "L" ? "Laki-laki" : "Perempuan"}
+                                </p>
+                              </div>
                             </div>
-                          </td>
-                          <td className="p-2 text-center border-r border-[var(--border-hairline)]">
-                            {st.gender ?? "-"}
-                          </td>
-                          <td className="p-2 text-center font-mono font-bold text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]">
-                            {st.totalHadir}
-                          </td>
-                          <td className="p-2 text-center font-mono font-semibold text-[var(--status-sakit-fg)] border-r border-[var(--border-hairline)]">
-                            {st.totalSakit}
-                          </td>
-                          <td className="p-2 text-center font-mono font-semibold text-[var(--status-izin-fg)] border-r border-[var(--border-hairline)]">
-                            {st.totalIzin}
-                          </td>
-                          <td className="p-2 text-center font-mono font-bold text-[var(--status-alpa-fg)] border-r border-[var(--border-hairline)]">
-                            {st.totalAlpa}
-                          </td>
-                          <td className="p-2 text-center font-mono text-amber-700 dark:text-amber-400 border-r border-[var(--border-hairline)]">
-                            {st.totalTerlambat}
-                          </td>
-                          <td className="p-2 text-center font-mono font-semibold text-[var(--status-dispen-fg)] border-r border-[var(--border-hairline)]">
-                            {st.totalDispen}
-                          </td>
-                          <td className="p-2 text-center font-mono font-bold border-r border-[var(--border-hairline)]">
-                            {st.totalHari}
-                          </td>
-                          <td className="p-2 text-center font-mono font-bold border-r border-[var(--border-hairline)]">
-                            <span
-                              className={`px-2 py-0.5 rounded-[4px] ${
-                                isWarning
-                                  ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                                  : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                              }`}
-                            >
-                              {st.persentaseSemester}%
-                            </span>
-                          </td>
-                          <td className="p-2 text-center">
-                            <span
-                              className={`px-2.5 py-0.5 rounded-[6px] text-[11px] font-bold inline-block ${
-                                st.predikat === "Sangat Baik"
-                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                                  : st.predikat === "Baik"
-                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
-                                  : st.predikat === "Cukup"
-                                  ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                                  : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 font-black"
-                              }`}
-                            >
-                              {st.predikat}
-                            </span>
-                          </td>
-                        </tr>
+
+                            {/* Badge Predikat Raport */}
+                            <div className="shrink-0 text-right">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-[6px] text-[10px] font-bold inline-block border ${
+                                  st.predikat === "Sangat Baik"
+                                    ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800"
+                                    : st.predikat === "Baik"
+                                    ? "bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800"
+                                    : st.predikat === "Cukup"
+                                    ? "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800"
+                                    : "bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800 font-extrabold"
+                                }`}
+                              >
+                                {st.predikat}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Bar Progress Kehadiran Semester */}
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
+                              <span>Akumulasi Kehadiran Semester</span>
+                              <span className="font-mono font-bold text-[var(--text-primary)]">
+                                {st.totalHadir + st.totalDispen} / {st.totalHari} Pertemuan ({st.persentaseSemester}%)
+                              </span>
+                            </div>
+                            <div className="w-full h-2 rounded-full bg-[var(--surface-recessed)] overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${
+                                  st.persentaseSemester >= 85
+                                  ? "bg-emerald-500"
+                                  : st.persentaseSemester >= 75
+                                  ? "bg-amber-500"
+                                  : "bg-rose-500"
+                                }`}
+                                style={{ width: `${Math.min(100, Math.max(0, st.persentaseSemester))}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* 6 Metrik Kehadiran Semester */}
+                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 pt-1">
+                            <div className="p-2 rounded-[10px] bg-[var(--status-hadir-bg)] text-[var(--status-hadir-fg)] border border-[var(--status-hadir-fg)]/20 text-center">
+                              <span className="text-[10px] font-bold uppercase tracking-wider block">Hadir</span>
+                              <span className="text-base font-extrabold font-mono mt-0.5">{st.totalHadir}</span>
+                            </div>
+                            <div className="p-2 rounded-[10px] bg-[var(--status-sakit-bg)] text-[var(--status-sakit-fg)] border border-[var(--status-sakit-fg)]/20 text-center">
+                              <span className="text-[10px] font-bold uppercase tracking-wider block">Sakit</span>
+                              <span className="text-base font-extrabold font-mono mt-0.5">{st.totalSakit}</span>
+                            </div>
+                            <div className="p-2 rounded-[10px] bg-[var(--status-izin-bg)] text-[var(--status-izin-fg)] border border-[var(--status-izin-fg)]/20 text-center">
+                              <span className="text-[10px] font-bold uppercase tracking-wider block">Izin</span>
+                              <span className="text-base font-extrabold font-mono mt-0.5">{st.totalIzin}</span>
+                            </div>
+                            <div className="p-2 rounded-[10px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] border border-[var(--status-alpa-fg)]/20 text-center">
+                              <span className="text-[10px] font-bold uppercase tracking-wider block">Alpa</span>
+                              <span className="text-base font-extrabold font-mono mt-0.5">{st.totalAlpa}</span>
+                            </div>
+                            <div className="p-2 rounded-[10px] bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-center">
+                              <span className="text-[10px] font-bold uppercase tracking-wider block">Telat</span>
+                              <span className="text-base font-extrabold font-mono mt-0.5">{st.totalTerlambat}</span>
+                            </div>
+                            <div className="p-2 rounded-[10px] bg-[var(--status-dispen-bg)] text-[var(--status-dispen-fg)] border border-[var(--status-dispen-fg)]/20 text-center">
+                              <span className="text-[10px] font-bold uppercase tracking-wider block">Dispen</span>
+                              <span className="text-base font-extrabold font-mono mt-0.5">{st.totalDispen}</span>
+                            </div>
+                          </div>
+                        </div>
                       );
                     })}
-                  </tbody>
-                  {/* Footer Baris Total */}
-                  <tfoot>
-                    <tr className="bg-[var(--surface-recessed)] font-bold text-center border-t-2 border-[var(--border-hairline)] text-xs">
-                      <td colSpan={4} className="p-2 text-left pl-4 border-r border-[var(--border-hairline)]">
-                        TOTAL KEHADIRAN KELAS ({semesterRecapData.students.length} Siswa)
-                      </td>
-                      <td className="p-2 font-mono text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]">
-                        {semesterRecapData.students.reduce((acc, curr) => acc + curr.totalHadir, 0)}
-                      </td>
-                      <td className="p-2 font-mono text-[var(--status-sakit-fg)] border-r border-[var(--border-hairline)]">
-                        {semesterRecapData.students.reduce((acc, curr) => acc + curr.totalSakit, 0)}
-                      </td>
-                      <td className="p-2 font-mono text-[var(--status-izin-fg)] border-r border-[var(--border-hairline)]">
-                        {semesterRecapData.students.reduce((acc, curr) => acc + curr.totalIzin, 0)}
-                      </td>
-                      <td className="p-2 font-mono text-[var(--status-alpa-fg)] border-r border-[var(--border-hairline)]">
-                        {semesterRecapData.students.reduce((acc, curr) => acc + curr.totalAlpa, 0)}
-                      </td>
-                      <td className="p-2 font-mono text-amber-700 dark:text-amber-400 border-r border-[var(--border-hairline)]">
-                        {semesterRecapData.students.reduce((acc, curr) => acc + curr.totalTerlambat, 0)}
-                      </td>
-                      <td className="p-2 font-mono text-[var(--status-dispen-fg)] border-r border-[var(--border-hairline)]">
-                        {semesterRecapData.students.reduce((acc, curr) => acc + curr.totalDispen, 0)}
-                      </td>
-                      <td className="p-2 font-mono border-r border-[var(--border-hairline)]">
-                        {semesterRecapData.students.reduce((acc, curr) => acc + curr.totalHari, 0)}
-                      </td>
-                      <td className="p-2 font-mono text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]">
-                        {semesterRecapData.averageAttendance}%
-                      </td>
-                      <td className="p-2 text-[var(--text-secondary)]">-</td>
-                    </tr>
-                  </tfoot>
-                </table>
+                  </div>
+                )}
               </div>
-            </div>
+
+              {/* TAMPILAN 1B: TABEL AKUMULASI SEMESTER DESKTOP */}
+              <div className={reportViewMode === "cards" ? "hidden" : reportViewMode === "table" ? "block" : "hidden md:block"}>
+                <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] overflow-hidden shadow-xs">
+                  {/* Petunjuk Geser Horizontal di Mobile jika Mode Tabel Terpilih */}
+                  <div className="md:hidden px-3.5 py-2 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                    <span>👉</span>
+                    <span className="font-medium">Geser tabel ke samping untuk melihat seluruh kolom akumulasi raport.</span>
+                  </div>
+
+                  <div className="p-3 bg-[var(--surface-recessed)] border-b border-[var(--border-hairline)] flex items-center justify-between text-xs text-[var(--text-secondary)] flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-[var(--text-primary)]">
+                        Rekapitulasi Akumulasi Semester (Format Buku Raport SMP)
+                      </span>
+                      <span className="text-[11px] font-mono">
+                        · Kelas {currentClass.name} ({filteredSemesterStudents.length} Siswa)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 print:hidden">
+                      <button
+                        type="button"
+                        onClick={() => handleExportExcel(currentClass)}
+                        className="px-2.5 py-1 rounded-[6px] bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all active:scale-[0.98]"
+                        title="Unduh 13 Kolom Akumulasi Excel (.xlsx)"
+                      >
+                        <FileSpreadsheet className="w-3.5 h-3.5" />
+                        <span>Excel (.xlsx)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePrintSemesterPdf(currentClass)}
+                        className="px-2.5 py-1 rounded-[6px] bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all active:scale-[0.98]"
+                        title="Cetak atau Simpan PDF Ukuran Folio (21.59 x 33.02 cm) 1 Lembar Ber-Kop Resmi"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Cetak / PDF (Folio)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto max-w-full">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-[var(--surface-recessed)]/50 border-b border-[var(--border-hairline)] text-[var(--text-secondary)]">
+                          <th className="sticky left-0 z-10 bg-[var(--surface-card)] p-2 font-bold w-10 text-center border-r border-[var(--border-hairline)] shadow-[2px_0_4px_rgba(0,0,0,0.02)]">
+                            No
+                          </th>
+                          <th className="p-2 font-bold w-24 border-r border-[var(--border-hairline)] text-center font-mono">
+                            NIS / NIPD
+                          </th>
+                          <th className="p-2 font-bold min-w-[160px] border-r border-[var(--border-hairline)]">
+                            Nama Lengkap Siswa
+                          </th>
+                          <th className="p-2 font-bold text-center w-10 border-r border-[var(--border-hairline)]">
+                            L/P
+                          </th>
+                          <th className="p-2 text-center font-bold text-[var(--status-hadir-fg)] w-11 border-r border-[var(--border-hairline)]" title="Hadir (H)">
+                            Hadir
+                          </th>
+                          <th className="p-2 text-center font-bold text-[var(--status-sakit-fg)] w-11 border-r border-[var(--border-hairline)]" title="Sakit (S)">
+                            Sakit
+                          </th>
+                          <th className="p-2 text-center font-bold text-[var(--status-izin-fg)] w-11 border-r border-[var(--border-hairline)]" title="Izin (I)">
+                            Izin
+                          </th>
+                          <th className="p-2 text-center font-bold text-[var(--status-alpa-fg)] w-11 border-r border-[var(--border-hairline)]" title="Alpa (A)">
+                            Alpa
+                          </th>
+                          <th className="p-2 text-center font-bold text-amber-700 dark:text-amber-400 w-11 border-r border-[var(--border-hairline)]" title="Terlambat (T)">
+                            Telat
+                          </th>
+                          <th className="p-2 text-center font-bold text-[var(--status-dispen-fg)] w-11 border-r border-[var(--border-hairline)]" title="Dispensasi (D)">
+                            Dispen
+                          </th>
+                          <th className="p-2 text-center font-bold text-[var(--text-primary)] w-12 border-r border-[var(--border-hairline)]" title="Total Hari Belajar">
+                            Total
+                          </th>
+                          <th className="p-2 text-center font-bold text-[var(--text-primary)] w-16 border-r border-[var(--border-hairline)]">
+                            % Hadir
+                          </th>
+                          <th className="p-2 text-center font-bold text-[var(--text-primary)] min-w-[110px]">
+                            Predikat Raport
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border-hairline)]">
+                        {filteredSemesterStudents.map((st, idx) => {
+                          const isWarning = st.needsAttention;
+                          return (
+                            <tr
+                              key={st.studentId}
+                              className={`hover:bg-[var(--surface-recessed)]/40 transition-colors ${
+                                isWarning ? "bg-[var(--status-alpa-bg)]/20" : ""
+                              }`}
+                            >
+                              <td className="sticky left-0 z-10 p-2 text-center font-mono text-[11px] text-[var(--text-secondary)] border-r border-[var(--border-hairline)] bg-[var(--surface-card)]">
+                                {idx + 1}
+                              </td>
+                              <td className="p-2 text-center font-mono text-[11px] border-r border-[var(--border-hairline)]">
+                                {st.nis ?? "-"}
+                              </td>
+                              <td className="p-2 font-semibold text-[var(--text-primary)] border-r border-[var(--border-hairline)]">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="truncate">{st.fullName}</span>
+                                  {isWarning && (
+                                    <span className="text-[9px] px-1 py-0.2 rounded-[3px] bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)] font-bold shrink-0">
+                                      Perhatian
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-2 text-center border-r border-[var(--border-hairline)]">
+                                {st.gender ?? "-"}
+                              </td>
+                              <td className="p-2 text-center font-mono font-bold text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]">
+                                {st.totalHadir}
+                              </td>
+                              <td className="p-2 text-center font-mono font-semibold text-[var(--status-sakit-fg)] border-r border-[var(--border-hairline)]">
+                                {st.totalSakit}
+                              </td>
+                              <td className="p-2 text-center font-mono font-semibold text-[var(--status-izin-fg)] border-r border-[var(--border-hairline)]">
+                                {st.totalIzin}
+                              </td>
+                              <td className="p-2 text-center font-mono font-bold text-[var(--status-alpa-fg)] border-r border-[var(--border-hairline)]">
+                                {st.totalAlpa}
+                              </td>
+                              <td className="p-2 text-center font-mono text-amber-700 dark:text-amber-400 border-r border-[var(--border-hairline)]">
+                                {st.totalTerlambat}
+                              </td>
+                              <td className="p-2 text-center font-mono font-semibold text-[var(--status-dispen-fg)] border-r border-[var(--border-hairline)]">
+                                {st.totalDispen}
+                              </td>
+                              <td className="p-2 text-center font-mono font-bold border-r border-[var(--border-hairline)]">
+                                {st.totalHari}
+                              </td>
+                              <td className="p-2 text-center font-mono font-bold border-r border-[var(--border-hairline)]">
+                                <span
+                                  className={`px-2 py-0.5 rounded-[4px] ${
+                                    isWarning
+                                      ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                                      : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                  }`}
+                                >
+                                  {st.persentaseSemester}%
+                                </span>
+                              </td>
+                              <td className="p-2 text-center">
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-[6px] text-[11px] font-bold inline-block ${
+                                    st.predikat === "Sangat Baik"
+                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                      : st.predikat === "Baik"
+                                      ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                                      : st.predikat === "Cukup"
+                                      ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                      : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 font-black"
+                                  }`}
+                                >
+                                  {st.predikat}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      {/* Footer Baris Total */}
+                      <tfoot>
+                        <tr className="bg-[var(--surface-recessed)] font-bold text-center border-t-2 border-[var(--border-hairline)] text-xs">
+                          <td colSpan={4} className="p-2 text-left pl-4 border-r border-[var(--border-hairline)]">
+                            TOTAL KEHADIRAN KELAS ({filteredSemesterStudents.length} Siswa)
+                          </td>
+                          <td className="p-2 font-mono text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]">
+                            {filteredSemesterStudents.reduce((acc, curr) => acc + curr.totalHadir, 0)}
+                          </td>
+                          <td className="p-2 font-mono text-[var(--status-sakit-fg)] border-r border-[var(--border-hairline)]">
+                            {filteredSemesterStudents.reduce((acc, curr) => acc + curr.totalSakit, 0)}
+                          </td>
+                          <td className="p-2 font-mono text-[var(--status-izin-fg)] border-r border-[var(--border-hairline)]">
+                            {filteredSemesterStudents.reduce((acc, curr) => acc + curr.totalIzin, 0)}
+                          </td>
+                          <td className="p-2 font-mono text-[var(--status-alpa-fg)] border-r border-[var(--border-hairline)]">
+                            {filteredSemesterStudents.reduce((acc, curr) => acc + curr.totalAlpa, 0)}
+                          </td>
+                          <td className="p-2 font-mono text-amber-700 dark:text-amber-400 border-r border-[var(--border-hairline)]">
+                            {filteredSemesterStudents.reduce((acc, curr) => acc + curr.totalTerlambat, 0)}
+                          </td>
+                          <td className="p-2 font-mono text-[var(--status-dispen-fg)] border-r border-[var(--border-hairline)]">
+                            {filteredSemesterStudents.reduce((acc, curr) => acc + curr.totalDispen, 0)}
+                          </td>
+                          <td className="p-2 font-mono border-r border-[var(--border-hairline)]">
+                            {filteredSemesterStudents.reduce((acc, curr) => acc + curr.totalHari, 0)}
+                          </td>
+                          <td className="p-2 font-mono text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]">
+                            {semesterRecapData.averageAttendance}%
+                          </td>
+                          <td className="p-2 text-[var(--text-secondary)]">-</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </>
           ) : (
             /* TABEL SEMESTER TIPE 2: RINCIAN PER BULAN (BULAN X SISWA) */
-            <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] overflow-hidden shadow-xs">
-              <div className="p-3 bg-[var(--surface-recessed)] border-b border-[var(--border-hairline)] flex items-center justify-between text-xs text-[var(--text-secondary)]">
-                <span className="font-bold text-[var(--text-primary)]">
-                  Matriks Kehadiran Per Bulan (Juli s.d. Desember 2026)
-                </span>
-                <span className="text-[11px] italic">
-                  Geser ke kanan untuk melihat seluruh bulan &amp; total semester &rarr;
-                </span>
-              </div>
+            <>
+              {/* TAMPILAN 2A: KARTU RINCIAN 6 BULAN MOBILE */}
+              <div className={reportViewMode === "cards" ? "block" : reportViewMode === "table" ? "hidden" : "block md:hidden"}>
+                <div className="flex items-center justify-between gap-2 mb-3 px-1">
+                  <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+                    <span className="font-semibold text-[var(--text-primary)]">
+                      {filteredSemesterStudents.length} Siswa Terdaftar
+                    </span>
+                    <span>·</span>
+                    <span>Rincian 6 Bulan KBM</span>
+                  </div>
 
-              <div className="overflow-x-auto max-w-full">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    {/* Header Baris 1: Nama Bulan & Total */}
-                    <tr className="bg-[var(--surface-recessed)]/50 border-b border-[var(--border-hairline)] text-[var(--text-secondary)]">
-                      <th rowSpan={2} className="sticky left-0 z-10 bg-[var(--surface-card)] p-2.5 font-bold w-10 text-center border-r border-[var(--border-hairline)] shadow-[2px_0_4px_rgba(0,0,0,0.02)]">
-                        No
-                      </th>
-                      <th rowSpan={2} className="p-2.5 font-bold min-w-[80px] border-r border-[var(--border-hairline)] text-center font-mono">
-                        NIS
-                      </th>
-                      <th rowSpan={2} className="p-2.5 font-bold min-w-[180px] border-r border-[var(--border-hairline)]">
-                        Nama Lengkap Siswa
-                      </th>
-                      <th rowSpan={2} className="p-2.5 font-bold text-center w-10 border-r border-[var(--border-hairline)]">
-                        L/P
-                      </th>
+                  {filteredSemesterStudents.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleToggleExpandAllSemesterCards}
+                      className="text-[11px] font-semibold text-[var(--color-accent)] hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>
+                        {filteredSemesterStudents.some((s) => expandedReportCards[`sem-${s.studentId}`])
+                          ? "Tutup Semua Rincian"
+                          : "Buka Semua Rincian"}
+                      </span>
+                    </button>
+                  )}
+                </div>
 
-                      {SEMESTER_MONTHS.map((m) => (
-                        <th
-                          key={m.value}
-                          colSpan={5}
-                          className="p-2 text-center font-bold border-r border-[var(--border-hairline)] bg-[var(--surface-card)]"
-                        >
-                          {m.label.toUpperCase()}
-                        </th>
-                      ))}
-
-                      <th colSpan={8} className="p-2 text-center font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200">
-                        TOTAL KUMULATIF SEMESTER
-                      </th>
-                    </tr>
-
-                    {/* Header Baris 2: Sub-Kolom H, S, I, A, D */}
-                    <tr className="bg-[var(--surface-recessed)]/80 border-b border-[var(--border-hairline)] text-[11px]">
-                      {SEMESTER_MONTHS.map((m) => (
-                        <React.Fragment key={m.value}>
-                          <th className="p-1 text-center font-bold text-[var(--status-hadir-fg)] w-7 border-r border-[var(--border-hairline)]/50">H</th>
-                          <th className="p-1 text-center font-bold text-[var(--status-sakit-fg)] w-7 border-r border-[var(--border-hairline)]/50">S</th>
-                          <th className="p-1 text-center font-bold text-[var(--status-izin-fg)] w-7 border-r border-[var(--border-hairline)]/50">I</th>
-                          <th className="p-1 text-center font-bold text-[var(--status-alpa-fg)] w-7 border-r border-[var(--border-hairline)]/50">A</th>
-                          <th className="p-1 text-center font-bold text-[var(--status-dispen-fg)] w-7 border-r border-[var(--border-hairline)]">D</th>
-                        </React.Fragment>
-                      ))}
-
-                      {/* Sub-Kolom Total Kumulatif */}
-                      <th className="p-1 text-center font-bold text-[var(--status-hadir-fg)] w-8 border-r border-[var(--border-hairline)]/50">H</th>
-                      <th className="p-1 text-center font-bold text-[var(--status-sakit-fg)] w-8 border-r border-[var(--border-hairline)]/50">S</th>
-                      <th className="p-1 text-center font-bold text-[var(--status-izin-fg)] w-8 border-r border-[var(--border-hairline)]/50">I</th>
-                      <th className="p-1 text-center font-bold text-[var(--status-alpa-fg)] w-8 border-r border-[var(--border-hairline)]/50">A</th>
-                      <th className="p-1 text-center font-bold text-[var(--status-dispen-fg)] w-8 border-r border-[var(--border-hairline)]/50">D</th>
-                      <th className="p-1 text-center font-bold text-[var(--text-primary)] w-9 border-r border-[var(--border-hairline)]/50">Total</th>
-                      <th className="p-1 text-center font-bold text-[var(--text-primary)] w-12 border-r border-[var(--border-hairline)]/50">%</th>
-                      <th className="p-1 text-center font-bold text-[var(--text-primary)] min-w-[80px]">Predikat</th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-[var(--border-hairline)]">
-                    {semesterRecapData.students.map((st, idx) => {
+                {filteredSemesterStudents.length === 0 ? (
+                  <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[16px] p-8 text-center text-[var(--text-secondary)]">
+                    <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                    <p className="font-medium text-sm">Tidak ada siswa ditemukan</p>
+                    <p className="text-xs mt-1">Coba sesuaikan kata kunci pencarian Anda</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredSemesterStudents.map((st, idx) => {
+                      const isExpanded = !!expandedReportCards[`sem-${st.studentId}`];
                       const isWarning = st.needsAttention;
+
                       return (
-                        <tr
+                        <div
                           key={st.studentId}
-                          className={`hover:bg-[var(--surface-recessed)]/40 transition-colors ${
-                            isWarning ? "bg-[var(--status-alpa-bg)]/20" : ""
+                          className={`bg-[var(--surface-card)] border rounded-[16px] p-4 shadow-xs transition-all flex flex-col gap-3 ${
+                            isWarning
+                              ? "border-[var(--status-alpa-fg)]/40 bg-[var(--status-alpa-bg)]/10"
+                              : "border-[var(--border-hairline)] hover:border-[var(--color-accent)]/30"
                           }`}
                         >
-                          <td className="sticky left-0 z-10 p-2 text-center font-mono text-[11px] text-[var(--text-secondary)] border-r border-[var(--border-hairline)] bg-[var(--surface-card)]">
-                            {idx + 1}
-                          </td>
-                          <td className="p-2 text-center font-mono text-[11px] border-r border-[var(--border-hairline)]">
-                            {st.nis ?? "-"}
-                          </td>
-                          <td className="p-2 font-semibold text-[var(--text-primary)] border-r border-[var(--border-hairline)]">
-                            <span className="truncate block max-w-[170px]">{st.fullName}</span>
-                          </td>
-                          <td className="p-2 text-center border-r border-[var(--border-hairline)]">
-                            {st.gender ?? "-"}
-                          </td>
+                          {/* Header Siswa */}
+                          <div className="flex items-start justify-between gap-2.5">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="w-7 h-7 rounded-full bg-[var(--surface-recessed)] text-[var(--text-secondary)] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-[var(--border-hairline)]">
+                                {String(idx + 1).padStart(2, "0")}
+                              </span>
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-sm text-[var(--text-primary)] truncate leading-tight">
+                                  {st.fullName}
+                                </h4>
+                                <p className="text-[11px] text-[var(--text-secondary)] font-mono mt-0.5">
+                                  NIS {st.nis ?? "-"} · Predikat: <strong>{st.predikat}</strong>
+                                </p>
+                              </div>
+                            </div>
 
-                          {/* Data Per Bulan */}
-                          {SEMESTER_MONTHS.map((m) => {
-                            const stats = st.monthlyStats[m.value] || { hadir: 0, sakit: 0, izin: 0, alpa: 0, dispen: 0 };
-                            return (
-                              <React.Fragment key={m.value}>
-                                <td className="p-1.5 text-center font-mono font-semibold text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]/50">
-                                  {stats.hadir || "-"}
-                                </td>
-                                <td className="p-1.5 text-center font-mono text-[var(--status-sakit-fg)] border-r border-[var(--border-hairline)]/50">
-                                  {stats.sakit || "-"}
-                                </td>
-                                <td className="p-1.5 text-center font-mono text-[var(--status-izin-fg)] border-r border-[var(--border-hairline)]/50">
-                                  {stats.izin || "-"}
-                                </td>
-                                <td className="p-1.5 text-center font-mono font-bold text-[var(--status-alpa-fg)] border-r border-[var(--border-hairline)]/50">
-                                  {stats.alpa || "-"}
-                                </td>
-                                <td className="p-1.5 text-center font-mono text-[var(--status-dispen-fg)] border-r border-[var(--border-hairline)]">
-                                  {stats.dispen || "-"}
-                                </td>
-                              </React.Fragment>
-                            );
-                          })}
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono inline-block border shrink-0 ${
+                                isWarning
+                                  ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
+                                  : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                              }`}
+                            >
+                              {st.persentaseSemester}% Hadir
+                            </span>
+                          </div>
 
-                          {/* Data Total Semester */}
-                          <td className="p-1.5 text-center font-mono font-bold text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]/50 bg-emerald-50/50 dark:bg-emerald-950/20">
-                            {st.totalHadir}
-                          </td>
-                          <td className="p-1.5 text-center font-mono text-[var(--status-sakit-fg)] border-r border-[var(--border-hairline)]/50">
-                            {st.totalSakit}
-                          </td>
-                          <td className="p-1.5 text-center font-mono text-[var(--status-izin-fg)] border-r border-[var(--border-hairline)]/50">
-                            {st.totalIzin}
-                          </td>
-                          <td className="p-1.5 text-center font-mono font-bold text-[var(--status-alpa-fg)] border-r border-[var(--border-hairline)]/50">
-                            {st.totalAlpa}
-                          </td>
-                          <td className="p-1.5 text-center font-mono text-[var(--status-dispen-fg)] border-r border-[var(--border-hairline)]/50">
-                            {st.totalDispen}
-                          </td>
-                          <td className="p-1.5 text-center font-mono font-bold border-r border-[var(--border-hairline)]/50">
-                            {st.totalHari}
-                          </td>
-                          <td className="p-1.5 text-center font-mono font-bold border-r border-[var(--border-hairline)]/50">
-                            <span className={isWarning ? "text-[var(--status-alpa-fg)]" : "text-[var(--status-hadir-fg)]"}>
-                              {st.persentaseSemester}%
-                            </span>
-                          </td>
-                          <td className="p-1.5 text-center">
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--surface-recessed)]">
-                              {st.predikat}
-                            </span>
-                          </td>
-                        </tr>
+                          {/* Ringkasan Total Akumulasi */}
+                          <div className="flex items-center justify-between text-xs px-2.5 py-1.5 bg-[var(--surface-recessed)] rounded-[8px]">
+                            <span className="text-[var(--text-secondary)]">Total Semester:</span>
+                            <div className="flex items-center gap-2 font-mono font-bold text-[11px]">
+                              <span className="text-[var(--status-hadir-fg)]">{st.totalHadir}H</span>
+                              <span className="text-[var(--status-sakit-fg)]">{st.totalSakit}S</span>
+                              <span className="text-[var(--status-izin-fg)]">{st.totalIzin}I</span>
+                              <span className="text-[var(--status-alpa-fg)]">{st.totalAlpa}A</span>
+                              <span className="text-[var(--status-dispen-fg)]">{st.totalDispen}D</span>
+                            </div>
+                          </div>
+
+                          {/* Accordion Rincian 6 Bulan */}
+                          <div className="pt-1 border-t border-[var(--border-hairline)]">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExpandedReportCards((prev) => ({
+                                  ...prev,
+                                  [`sem-${st.studentId}`]: !prev[`sem-${st.studentId}`],
+                                }));
+                              }}
+                              className="w-full flex items-center justify-between text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors py-1 cursor-pointer"
+                            >
+                              <span className="flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+                                <span>Rincian Per Bulan (Juli - Des 2026)</span>
+                              </span>
+                              <div className="flex items-center gap-1 text-[11px] text-[var(--color-accent)]">
+                                <span>{isExpanded ? "Tutup" : "Lihat 6 Bulan"}</span>
+                                {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                              </div>
+                            </button>
+
+                            {isExpanded && (
+                              <div className="mt-2.5 pt-2 border-t border-dashed border-[var(--border-hairline)] grid grid-cols-2 sm:grid-cols-3 gap-2 animate-in fade-in duration-200">
+                                {SEMESTER_MONTHS.map((m) => {
+                                  const stats = st.monthlyStats[m.value] || { hadir: 0, sakit: 0, izin: 0, alpa: 0, dispen: 0 };
+                                  return (
+                                    <div
+                                      key={m.value}
+                                      className="p-2 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-[10px] flex flex-col gap-1 text-xs"
+                                    >
+                                      <span className="font-bold text-[var(--text-primary)] text-[11px]">
+                                        {m.label}
+                                      </span>
+                                      <div className="grid grid-cols-5 gap-0.5 text-center font-mono text-[10px] font-bold">
+                                        <div className="p-0.5 rounded bg-[var(--status-hadir-bg)] text-[var(--status-hadir-fg)]" title="Hadir">
+                                          {stats.hadir || "-"}
+                                        </div>
+                                        <div className="p-0.5 rounded bg-[var(--status-sakit-bg)] text-[var(--status-sakit-fg)]" title="Sakit">
+                                          {stats.sakit || "-"}
+                                        </div>
+                                        <div className="p-0.5 rounded bg-[var(--status-izin-bg)] text-[var(--status-izin-fg)]" title="Izin">
+                                          {stats.izin || "-"}
+                                        </div>
+                                        <div className="p-0.5 rounded bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)]" title="Alpa">
+                                          {stats.alpa || "-"}
+                                        </div>
+                                        <div className="p-0.5 rounded bg-[var(--status-dispen-bg)] text-[var(--status-dispen-fg)]" title="Dispen">
+                                          {stats.dispen || "-"}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </div>
+                )}
               </div>
-            </div>
+
+              {/* TAMPILAN 2B: TABEL MULTI-LEVEL RINCIAN 6 BULAN DESKTOP */}
+              <div className={reportViewMode === "cards" ? "hidden" : reportViewMode === "table" ? "block" : "hidden md:block"}>
+                <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] overflow-hidden shadow-xs">
+                  {/* Petunjuk Geser Horizontal di Mobile jika Mode Tabel Terpilih */}
+                  <div className="md:hidden px-3.5 py-2 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                    <span>👉</span>
+                    <span className="font-medium">Geser tabel ke samping untuk melihat seluruh bulan &amp; total semester.</span>
+                  </div>
+
+                  <div className="p-3 bg-[var(--surface-recessed)] border-b border-[var(--border-hairline)] flex items-center justify-between text-xs text-[var(--text-secondary)]">
+                    <span className="font-bold text-[var(--text-primary)]">
+                      Matriks Kehadiran Per Bulan (Juli s.d. Desember 2026)
+                    </span>
+                    <span className="text-[11px] italic">
+                      Geser ke kanan untuk melihat seluruh bulan &amp; total semester &rarr;
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto max-w-full">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        {/* Header Baris 1: Nama Bulan & Total */}
+                        <tr className="bg-[var(--surface-recessed)]/50 border-b border-[var(--border-hairline)] text-[var(--text-secondary)]">
+                          <th rowSpan={2} className="sticky left-0 z-10 bg-[var(--surface-card)] p-2.5 font-bold w-10 text-center border-r border-[var(--border-hairline)] shadow-[2px_0_4px_rgba(0,0,0,0.02)]">
+                            No
+                          </th>
+                          <th rowSpan={2} className="p-2.5 font-bold min-w-[80px] border-r border-[var(--border-hairline)] text-center font-mono">
+                            NIS
+                          </th>
+                          <th rowSpan={2} className="p-2.5 font-bold min-w-[180px] border-r border-[var(--border-hairline)]">
+                            Nama Lengkap Siswa
+                          </th>
+                          <th rowSpan={2} className="p-2.5 font-bold text-center w-10 border-r border-[var(--border-hairline)]">
+                            L/P
+                          </th>
+
+                          {SEMESTER_MONTHS.map((m) => (
+                            <th
+                              key={m.value}
+                              colSpan={5}
+                              className="p-2 text-center font-bold border-r border-[var(--border-hairline)] bg-[var(--surface-card)]"
+                            >
+                              {m.label.toUpperCase()}
+                            </th>
+                          ))}
+
+                          <th colSpan={8} className="p-2 text-center font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200">
+                            TOTAL KUMULATIF SEMESTER
+                          </th>
+                        </tr>
+
+                        {/* Header Baris 2: Sub-Kolom H, S, I, A, D */}
+                        <tr className="bg-[var(--surface-recessed)]/80 border-b border-[var(--border-hairline)] text-[11px]">
+                          {SEMESTER_MONTHS.map((m) => (
+                            <React.Fragment key={m.value}>
+                              <th className="p-1 text-center font-bold text-[var(--status-hadir-fg)] w-7 border-r border-[var(--border-hairline)]/50">H</th>
+                              <th className="p-1 text-center font-bold text-[var(--status-sakit-fg)] w-7 border-r border-[var(--border-hairline)]/50">S</th>
+                              <th className="p-1 text-center font-bold text-[var(--status-izin-fg)] w-7 border-r border-[var(--border-hairline)]/50">I</th>
+                              <th className="p-1 text-center font-bold text-[var(--status-alpa-fg)] w-7 border-r border-[var(--border-hairline)]/50">A</th>
+                              <th className="p-1 text-center font-bold text-[var(--status-dispen-fg)] w-7 border-r border-[var(--border-hairline)]">D</th>
+                            </React.Fragment>
+                          ))}
+
+                          {/* Sub-Kolom Total Kumulatif */}
+                          <th className="p-1 text-center font-bold text-[var(--status-hadir-fg)] w-8 border-r border-[var(--border-hairline)]/50">H</th>
+                          <th className="p-1 text-center font-bold text-[var(--status-sakit-fg)] w-8 border-r border-[var(--border-hairline)]/50">S</th>
+                          <th className="p-1 text-center font-bold text-[var(--status-izin-fg)] w-8 border-r border-[var(--border-hairline)]/50">I</th>
+                          <th className="p-1 text-center font-bold text-[var(--status-alpa-fg)] w-8 border-r border-[var(--border-hairline)]/50">A</th>
+                          <th className="p-1 text-center font-bold text-[var(--status-dispen-fg)] w-8 border-r border-[var(--border-hairline)]/50">D</th>
+                          <th className="p-1 text-center font-bold text-[var(--text-primary)] w-9 border-r border-[var(--border-hairline)]/50">Total</th>
+                          <th className="p-1 text-center font-bold text-[var(--text-primary)] w-12 border-r border-[var(--border-hairline)]/50">%</th>
+                          <th className="p-1 text-center font-bold text-[var(--text-primary)] min-w-[80px]">Predikat</th>
+                        </tr>
+                      </thead>
+
+                      <tbody className="divide-y divide-[var(--border-hairline)]">
+                        {filteredSemesterStudents.map((st, idx) => {
+                          const isWarning = st.needsAttention;
+                          return (
+                            <tr
+                              key={st.studentId}
+                              className={`hover:bg-[var(--surface-recessed)]/40 transition-colors ${
+                                isWarning ? "bg-[var(--status-alpa-bg)]/20" : ""
+                              }`}
+                            >
+                              <td className="sticky left-0 z-10 p-2 text-center font-mono text-[11px] text-[var(--text-secondary)] border-r border-[var(--border-hairline)] bg-[var(--surface-card)]">
+                                {idx + 1}
+                              </td>
+                              <td className="p-2 text-center font-mono text-[11px] border-r border-[var(--border-hairline)]">
+                                {st.nis ?? "-"}
+                              </td>
+                              <td className="p-2 font-semibold text-[var(--text-primary)] border-r border-[var(--border-hairline)]">
+                                <span className="truncate block max-w-[170px]">{st.fullName}</span>
+                              </td>
+                              <td className="p-2 text-center border-r border-[var(--border-hairline)]">
+                                {st.gender ?? "-"}
+                              </td>
+
+                              {/* Data Per Bulan */}
+                              {SEMESTER_MONTHS.map((m) => {
+                                const stats = st.monthlyStats[m.value] || { hadir: 0, sakit: 0, izin: 0, alpa: 0, dispen: 0 };
+                                return (
+                                  <React.Fragment key={m.value}>
+                                    <td className="p-1.5 text-center font-mono font-semibold text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]/50">
+                                      {stats.hadir || "-"}
+                                    </td>
+                                    <td className="p-1.5 text-center font-mono text-[var(--status-sakit-fg)] border-r border-[var(--border-hairline)]/50">
+                                      {stats.sakit || "-"}
+                                    </td>
+                                    <td className="p-1.5 text-center font-mono text-[var(--status-izin-fg)] border-r border-[var(--border-hairline)]/50">
+                                      {stats.izin || "-"}
+                                    </td>
+                                    <td className="p-1.5 text-center font-mono font-bold text-[var(--status-alpa-fg)] border-r border-[var(--border-hairline)]/50">
+                                      {stats.alpa || "-"}
+                                    </td>
+                                    <td className="p-1.5 text-center font-mono text-[var(--status-dispen-fg)] border-r border-[var(--border-hairline)]">
+                                      {stats.dispen || "-"}
+                                    </td>
+                                  </React.Fragment>
+                                );
+                              })}
+
+                              {/* Data Total Semester */}
+                              <td className="p-1.5 text-center font-mono font-bold text-[var(--status-hadir-fg)] border-r border-[var(--border-hairline)]/50 bg-emerald-50/50 dark:bg-emerald-950/20">
+                                {st.totalHadir}
+                              </td>
+                              <td className="p-1.5 text-center font-mono text-[var(--status-sakit-fg)] border-r border-[var(--border-hairline)]/50">
+                                {st.totalSakit}
+                              </td>
+                              <td className="p-1.5 text-center font-mono text-[var(--status-izin-fg)] border-r border-[var(--border-hairline)]/50">
+                                {st.totalIzin}
+                              </td>
+                              <td className="p-1.5 text-center font-mono font-bold text-[var(--status-alpa-fg)] border-r border-[var(--border-hairline)]/50">
+                                {st.totalAlpa}
+                              </td>
+                              <td className="p-1.5 text-center font-mono text-[var(--status-dispen-fg)] border-r border-[var(--border-hairline)]/50">
+                                {st.totalDispen}
+                              </td>
+                              <td className="p-1.5 text-center font-mono font-bold border-r border-[var(--border-hairline)]/50">
+                                {st.totalHari}
+                              </td>
+                              <td className="p-1.5 text-center font-mono font-bold border-r border-[var(--border-hairline)]/50">
+                                <span className={isWarning ? "text-[var(--status-alpa-fg)]" : "text-[var(--status-hadir-fg)]"}>
+                                  {st.persentaseSemester}%
+                                </span>
+                              </td>
+                              <td className="p-1.5 text-center">
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--surface-recessed)]">
+                                  {st.predikat}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
         </div>
       )}

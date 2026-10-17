@@ -39,6 +39,9 @@ import {
   Upload,
   Clipboard,
   Smile,
+  LayoutGrid,
+  Table,
+  ChevronUp,
 } from "lucide-react";
 import { Toast } from "@/components/ui/Toast";
 
@@ -174,6 +177,25 @@ function GradesPageContent() {
   const [attitudeSearchQuery, setAttitudeSearchQuery] = useState("");
   const [attitudeFilter, setAttitudeFilter] = useState<AttitudeGrade | "ALL">("ALL");
   const [activeAttitudeDropdownStudentId, setActiveAttitudeDropdownStudentId] = useState<string | null>(null);
+
+  // 7c. State Mode Tampilan Responsif (Mobile Cards View vs Desktop Table View)
+  const [viewMode, setViewMode] = useState<"auto" | "cards" | "table">("auto");
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+  const toggleExpandCard = (studentId: string) => {
+    setExpandedCards((prev) => ({ ...prev, [studentId]: !prev[studentId] }));
+  };
+  const handleToggleExpandAllCards = () => {
+    const hasAnyOpen = Object.values(expandedCards).some(Boolean);
+    if (hasAnyOpen) {
+      setExpandedCards({});
+    } else {
+      const all: Record<string, boolean> = {};
+      sortedAndFilteredSummaries.forEach((s) => {
+        all[s.studentId] = true;
+      });
+      setExpandedCards(all);
+    }
+  };
 
   // 8. State Mounted untuk perlindungan hidrasi SSR (Hydration Mismatch Shield)
   const [isMounted, setIsMounted] = useState(false);
@@ -1340,6 +1362,36 @@ function GradesPageContent() {
               </>
             )}
           </button>
+
+          {/* Switcher Mode Tampilan: Kartu Siswa (Mobile) vs Tabel Matriks (Desktop) */}
+          <div className="flex items-center p-0.5 bg-[var(--surface-recessed)] rounded-[8px] border border-[var(--border-hairline)] shrink-0">
+            <button
+              type="button"
+              onClick={() => setViewMode(viewMode === "cards" ? "auto" : "cards")}
+              className={`px-2.5 py-1.5 rounded-[6px] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === "cards"
+                  ? "bg-[var(--surface-card)] text-[var(--color-accent)] shadow-2xs font-bold ring-1 ring-[var(--border-hairline)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+              title="Tampilan Kartu Siswa (Sangat cocok untuk layar HP / Mobile)"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Kartu</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode(viewMode === "table" ? "auto" : "table")}
+              className={`px-2.5 py-1.5 rounded-[6px] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === "table"
+                  ? "bg-[var(--surface-card)] text-[var(--color-accent)] shadow-2xs font-bold ring-1 ring-[var(--border-hairline)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+              title="Tampilan Tabel Matriks Lebar"
+            >
+              <Table className="w-3.5 h-3.5" />
+              <span>Tabel</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1384,10 +1436,344 @@ function GradesPageContent() {
         </div>
       )}
 
-      {/* Tabel Matriks Rekap Nilai Siswa (Apple HIG Ledger Style) */}
-      <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] overflow-hidden shadow-xs">
-        <div className="overflow-x-auto max-h-[600px] relative">
-          <table className="w-full text-left border-collapse text-xs">
+      {/* ========================================================================= */}
+      {/* TAMPILAN 1: KARTU SISWA MOBILE (CARD VIEW)                              */}
+      {/* Dioptimalkan untuk layar HP: tidak ada scroll kanan-kiri yang rumit,     */}
+      {/* informasi siswa, nilai akhir, predikat, sikap, dan rincian tugas jelas  */}
+      {/* ========================================================================= */}
+      <div className={viewMode === "cards" ? "block" : viewMode === "table" ? "hidden" : "block md:hidden"}>
+        {/* Header Kontrol Mode Kartu */}
+        <div className="flex items-center justify-between gap-2 mb-3 px-1">
+          <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+            <span className="font-semibold text-[var(--text-primary)]">
+              {sortedAndFilteredSummaries.length} Siswa
+            </span>
+            <span>·</span>
+            <span>{filteredAssessments.length} Asesmen Terdaftar</span>
+          </div>
+
+          {sortedAndFilteredSummaries.length > 0 && filteredAssessments.length > 0 && (
+            <button
+              type="button"
+              onClick={handleToggleExpandAllCards}
+              className="text-[11px] font-semibold text-[var(--color-accent)] hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>
+                {Object.values(expandedCards).some(Boolean)
+                  ? "Tutup Semua Rincian"
+                  : "Buka Semua Rincian"}
+              </span>
+            </button>
+          )}
+        </div>
+
+        {/* Daftar Kartu Siswa */}
+        {sortedAndFilteredSummaries.length === 0 ? (
+          <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[16px] p-8 text-center text-[var(--text-secondary)]">
+            <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p className="font-medium text-sm">Tidak ada siswa atau penilaian ditemukan</p>
+            <p className="text-xs mt-1">Coba sesuaikan kata kunci pencarian</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {sortedAndFilteredSummaries.map((summary, idx) => {
+              const isExpanded = !!expandedCards[summary.studentId];
+              const attitude = summary.attitudeGrade || studentAttitudes[summary.studentId] || DEFAULT_ATTITUDE_GRADE;
+              const attitudeMeta = ATTITUDE_GRADE_METAS[attitude] || ATTITUDE_GRADE_METAS.BAIK;
+              const isAttitudeOpen = activeAttitudeDropdownStudentId === `card-${summary.studentId}`;
+
+              // Hitung jumlah tugas yang sudah dinilai
+              let completedAsmts = 0;
+              filteredAssessments.forEach((a) => {
+                const val = summary.scores[a.id];
+                if (val !== null && val !== undefined) completedAsmts++;
+              });
+              const totalAsmts = filteredAssessments.length;
+              const isAllDone = totalAsmts > 0 && completedAsmts === totalAsmts;
+              const missingAsmts = totalAsmts - completedAsmts;
+
+              return (
+                <div
+                  key={summary.studentId}
+                  className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[16px] p-4 shadow-xs transition-all hover:border-[var(--color-accent)]/40 flex flex-col gap-3"
+                >
+                  {/* Baris Atas: Nomor, Nama, NIS, dan Badge Kelengkapan */}
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-7 h-7 rounded-full bg-[var(--surface-recessed)] text-[var(--text-secondary)] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-[var(--border-hairline)]">
+                        {String(idx + 1).padStart(2, "0")}
+                      </span>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-sm text-[var(--text-primary)] truncate leading-tight">
+                          {summary.studentName}
+                        </h4>
+                        <p className="text-[11px] text-[var(--text-secondary)] font-mono mt-0.5">
+                          NIS {summary.nis ?? "-"} · {summary.gender === "L" ? "Laki-laki" : "Perempuan"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Badge Kelengkapan / Tagihan */}
+                    {totalAsmts > 0 && (
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono shrink-0 border ${
+                          isAllDone
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                            : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
+                        }`}
+                      >
+                        {isAllDone ? "✓ Lengkap" : `${missingAsmts} Tagihan`}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 4 Kotak Metrik Ringkasan Nilai Siswa (2x2 Grid) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                    {/* Kotak 1: Nilai Akhir */}
+                    <div className="p-2.5 rounded-[12px] bg-[var(--surface-recessed)]/70 border border-[var(--border-hairline)] flex flex-col justify-between">
+                      <span className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                        Nilai Akhir
+                      </span>
+                      <div className="flex items-baseline gap-1 mt-1">
+                        {isCensoredViewActive ? (
+                          <span className="text-base font-mono font-bold text-[var(--text-secondary)] opacity-70">
+                            ***
+                          </span>
+                        ) : (
+                          <>
+                            <span className="text-lg font-bold font-mono text-[var(--text-primary)]">
+                              {summary.finalScore !== null ? summary.finalScore : "-"}
+                            </span>
+                            {summary.finalScore !== null && (
+                              <span
+                                className={`w-2 h-2 rounded-full shrink-0 ${
+                                  summary.finalScore >= kkm ? "bg-emerald-500" : "bg-rose-500"
+                                }`}
+                                title={summary.finalScore >= kkm ? "Tuntas" : "Remedial"}
+                              />
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Kotak 2: Predikat */}
+                    <div className="p-2.5 rounded-[12px] bg-[var(--surface-recessed)]/70 border border-[var(--border-hairline)] flex flex-col justify-between">
+                      <span className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                        Predikat
+                      </span>
+                      <div className="mt-1">
+                        {isCensoredViewActive ? (
+                          <span className="text-xs font-mono text-[var(--text-secondary)]">-</span>
+                        ) : (
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-[6px] text-xs font-mono font-bold ${
+                              summary.predicate === "A"
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                : summary.predicate === "B"
+                                ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                                : summary.predicate === "C"
+                                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300"
+                                : summary.predicate === "D"
+                                ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                                : "text-[var(--text-secondary)]"
+                            }`}
+                          >
+                            {summary.predicate || "-"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Kotak 3: Nilai Sikap (Interactive Popover) */}
+                    <div className="p-2.5 rounded-[12px] bg-[var(--surface-recessed)]/70 border border-[var(--border-hairline)] flex flex-col justify-between relative">
+                      <span className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                        Nilai Sikap
+                      </span>
+                      <div className="mt-1 relative">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActiveAttitudeDropdownStudentId(
+                              isAttitudeOpen ? null : `card-${summary.studentId}`
+                            )
+                          }
+                          className={`w-full px-2 py-1 rounded-[6px] text-[11px] font-bold border transition-all cursor-pointer flex items-center justify-between gap-1 ${attitudeMeta.badgeClass}`}
+                          title="Klik untuk ubah nilai sikap"
+                        >
+                          <span className="truncate">{attitudeMeta.label}</span>
+                          <ChevronDown className="w-3 h-3 opacity-70 shrink-0" />
+                        </button>
+
+                        {isAttitudeOpen && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-40"
+                              onClick={() => setActiveAttitudeDropdownStudentId(null)}
+                            />
+                            <div className="absolute left-0 bottom-full mb-1.5 w-44 bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[12px] shadow-xl py-1 z-50 text-left text-xs animate-in fade-in">
+                              <div className="px-3 py-1.5 text-[10px] font-bold text-[var(--text-secondary)] border-b border-[var(--border-hairline)] uppercase tracking-wider">
+                                Ubah Nilai Sikap
+                              </div>
+                              {(["SANGAT_BAIK", "BAIK", "KURANG_BAIK", "BURUK"] as AttitudeGrade[]).map((att) => {
+                                const m = ATTITUDE_GRADE_METAS[att];
+                                const isCur = att === attitude;
+                                return (
+                                  <button
+                                    key={att}
+                                    type="button"
+                                    onClick={() => {
+                                      handleUpdateStudentAttitude(summary.studentId, att);
+                                      setActiveAttitudeDropdownStudentId(null);
+                                    }}
+                                    className={`w-full px-3 py-1.5 flex items-center justify-between text-xs hover:bg-[var(--surface-recessed)] transition-colors cursor-pointer ${
+                                      isCur ? "font-bold text-[var(--color-accent)] bg-[var(--color-accent)]/10" : "text-[var(--text-primary)]"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-bold border ${m.badgeClass}`}>
+                                        {m.predicate}
+                                      </span>
+                                      <span>{m.label}</span>
+                                    </div>
+                                    {isCur && <Check className="w-3 h-3 text-[var(--color-accent)]" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Kotak 4: Status KKM */}
+                    <div className="p-2.5 rounded-[12px] bg-[var(--surface-recessed)]/70 border border-[var(--border-hairline)] flex flex-col justify-between">
+                      <span className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                        Status KKM ({kkm})
+                      </span>
+                      <div className="mt-1">
+                        {summary.finalScore === null ? (
+                          <span className="text-[11px] text-[var(--text-secondary)] font-medium">Belum Ada</span>
+                        ) : summary.isPassed ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[6px] text-[10px] font-bold bg-[var(--status-hadir-bg)] text-[var(--status-hadir-fg)]">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Tuntas</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[6px] text-[10px] font-bold bg-[var(--status-alpa-bg)] text-[var(--status-alpa-fg)]">
+                            <AlertCircle className="w-3 h-3" />
+                            <span>Remedial</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Accordion Rincian Tugas & Asesmen Siswa */}
+                  {filteredAssessments.length > 0 && (
+                    <div className="border-t border-[var(--border-hairline)] pt-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandCard(summary.studentId)}
+                        className="w-full py-1.5 px-2 rounded-[8px] bg-[var(--surface-recessed)]/60 hover:bg-[var(--surface-recessed)] text-xs font-semibold flex items-center justify-between text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <BookOpen className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+                          <span>Rincian Nilai Tugas &amp; Ulangan ({completedAsmts}/{totalAsmts} Terisi)</span>
+                        </span>
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                      </button>
+
+                      {/* Konten Grid Asesmen saat Accordion Terbuka */}
+                      {isExpanded && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-1 animate-in fade-in">
+                          {filteredAssessments.map((asmt) => {
+                            const sc = summary.scores[asmt.id];
+                            const asmtMeta = ASSESSMENT_TYPE_METAS[asmt.type];
+                            const isUnderKkm = sc !== null && sc !== undefined && sc < kkm;
+
+                            return (
+                              <div
+                                key={asmt.id}
+                                className="p-2.5 rounded-[10px] bg-[var(--surface-card)] border border-[var(--border-hairline)] flex items-center justify-between gap-2"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 mb-0.5">
+                                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold border uppercase ${asmtMeta.badgeClass}`}>
+                                      {asmtMeta.shortLabel}
+                                    </span>
+                                    <span className="text-[10px] text-[var(--text-secondary)] font-mono">
+                                      {asmt.date.slice(5)}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs font-semibold text-[var(--text-primary)] truncate" title={asmt.title}>
+                                    {asmt.title}
+                                  </p>
+                                </div>
+
+                                {/* Nilai Siswa & Tombol Edit Cepat */}
+                                <div className="shrink-0 flex items-center gap-1.5">
+                                  {isCensoredViewActive ? (
+                                    sc !== null && sc !== undefined ? (
+                                      <span className="px-2 py-0.5 rounded-[6px] text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                                        ✓ SUDAH
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded-[6px] text-[10px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300">
+                                        BELUM
+                                      </span>
+                                    )
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStartCellEdit(summary.studentId, asmt.id, sc)}
+                                      className={`px-2.5 py-1 rounded-[6px] font-mono text-xs font-bold transition-all border cursor-pointer hover:scale-105 active:scale-95 ${
+                                        sc === null || sc === undefined
+                                          ? "bg-[var(--surface-recessed)] text-[var(--text-secondary)] border-[var(--border-hairline)]"
+                                          : isUnderKkm
+                                          ? "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/40 dark:text-rose-300"
+                                          : "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                      }`}
+                                      title="Klik untuk mengubah nilai"
+                                    >
+                                      {sc !== null && sc !== undefined ? sc : "+ Isi"}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* TAMPILAN 2: TABEL MATRIKS LEBAR (TABLE VIEW)                              */}
+      {/* Aktif di desktop atau jika guru memilih mode tabel                        */}
+      {/* ========================================================================= */}
+      <div className={viewMode === "table" ? "block" : viewMode === "cards" ? "hidden" : "hidden md:block"}>
+        {/* Banner Petunjuk Geser Horizontal di Layar Mobile/Tablet */}
+        <div className="md:hidden px-3.5 py-2 bg-[var(--surface-recessed)] border border-[var(--border-hairline)] rounded-t-[14px] text-[11px] text-[var(--text-secondary)] flex items-center justify-between">
+          <span className="flex items-center gap-1 font-medium">
+            <span>👈 Geser tabel ke kanan untuk melihat seluruh nilai tugas 👉</span>
+          </span>
+          <span className="font-mono text-[10px] bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded font-bold">
+            {filteredAssessments.length} Kolom
+          </span>
+        </div>
+
+        {/* Tabel Matriks Rekap Nilai Siswa (Apple HIG Ledger Style) */}
+        <div className="bg-[var(--surface-card)] border border-[var(--border-hairline)] rounded-[14px] md:rounded-[14px] rounded-t-none md:rounded-t-[14px] overflow-hidden shadow-xs">
+          <div className="overflow-x-auto max-h-[600px] relative">
+            <table className="w-full text-left border-collapse text-xs">
             {/* Header Tabel */}
             <thead className="bg-[var(--surface-recessed)] border-b border-[var(--border-hairline)] sticky top-0 z-20">
               <tr>
@@ -1898,6 +2284,9 @@ function GradesPageContent() {
                   <td className="py-2.5 px-2.5 text-center border-r border-[var(--border-hairline)]">
                     -
                   </td>
+                  <td className="py-2.5 px-2.5 text-center font-mono text-[10px] text-[var(--text-secondary)] border-r border-[var(--border-hairline)]">
+                    {attitudeStats.baik + attitudeStats.sangatBaik} Baik
+                  </td>
                   <td className="py-2.5 px-3 text-center font-mono text-[11px] text-[var(--text-secondary)]">
                     {isCensoredViewActive
                       ? `${Math.round(((censoredStats.completedStudents || 0) / (censoredStats.totalStudents || 1)) * 100)}% Lengkap`
@@ -1909,6 +2298,7 @@ function GradesPageContent() {
           </table>
         </div>
       </div>
+    </div>
 
       {/* MODAL: Tambah / Ubah Penilaian */}
       {isAssessmentModalOpen && (
